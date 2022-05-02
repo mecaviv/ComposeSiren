@@ -9,7 +9,7 @@
 */
 
 #include "CS_midiIN.h"
-
+#include "parameters.h"
 #include <iostream>
 #include <functional>
 
@@ -232,6 +232,9 @@ void MidiIn::HandleControlChange(int Ch, int value1, int value2){
                 ControlCh[92][Ch]= value2 ;
                 //[self sendTremoloCh:(int)ControlCh[92][Ch]:(int)ControlCh[15][Ch]:Ch];
 
+                break;
+            case MidiControlChangeParameters::ResetAllController:
+                resetSireneCh(Ch);
                 break;
             default:
                 break;
