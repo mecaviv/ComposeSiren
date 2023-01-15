@@ -3,9 +3,15 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED)
 set(CMAKE_OSX_ARCHITECTURES "x86_64;arm64" CACHE INTERNAL "")
 
+if (CMAKE_SYSTEM_NAME STREQUAL Windows)
+  set(CMAKE_SYSTEM_VERSION 10.0.19044)
+endif()
+
 project(ComposeSiren VERSION 1.5.0)
 set(BaseTargetName ${PROJECT_NAME})
 set(VendorName "Mecanique Vivante")
+
+message("${CMAKE_SYSTEL_VERSION}")
 
 add_subdirectory(Dependencies/JUCE)
 
