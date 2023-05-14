@@ -12,7 +12,7 @@
 
 #include <iostream>
 #include <functional>
-
+#include "parameters.h"
 using namespace std;
 
 MidiIn::MidiIn(const std::function<void(int,int)> onVelocityChanged,
@@ -213,6 +213,8 @@ void MidiIn::HandleControlChange(int Ch, int value1, int value2){
             case 92 :
                 ControlCh[92][Ch]= value2 ;
                 break;
+            case MidiControlChangeParameters::ResetAllControllers:
+                resetSireneCh(Ch);
             default:
                 break;
         }
