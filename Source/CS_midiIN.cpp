@@ -123,15 +123,15 @@ void MidiIn::RealTimeStartNote(int Ch, int value1, int value2){
         updateFinalVelocity(Ch); // (velociteCh[Ch] *(ControlCh[7][Ch]/127.0))*(500./127.) ;
         tourmoteurCh[Ch] = tabledecorresponcanceMidinote(noteonfinalCh[Ch], Ch);
         sendVariaCh(Ch);
-				channelPressure[Ch] = 127;
+        channelPressure[Ch] = 127;
     }else if(Ch==10){
         if(value1 > 1 && value2 > 1) JouerClic(value1);
     }
 }
 
 static float computeFinalVelocity(float channelVelocity, float volumeControllerValue, float channelPressure) {
-	auto result = (channelVelocity *(volumeControllerValue/127.0)*(channelPressure/127.0))*(500./127.);
-	return result;
+    auto result = (channelVelocity *(volumeControllerValue/127.0)*(channelPressure/127.0))*(500./127.);
+    return result;
 }
 
 void MidiIn::updateFinalVelocity(int Ch){
