@@ -12,7 +12,7 @@
 
 #include <iostream>
 #include <functional>
-
+#include "parameters.h"
 using namespace std;
 
 MidiIn::MidiIn(const std::function<void(int,int)> onVelocityChanged,
@@ -96,6 +96,17 @@ void MidiIn::handleMIDIMessage2(int Ch, int value1, int value2){
     }else if (Ch >=224 && Ch <240){
         HandlePitchWheel(Ch-223, value1, value2);
     }
+
+    auto statusByte = Ch & 0xF0; // extract status byte
+    auto midiChannel = Ch & 0x0F;// extract MIDI channel
+    switch(statusByte) {
+        // channel pressure
+        case 0xd0:
+            auto oneBasedMidiChannel = midiChannel + 1;
+            channelPressure[oneBasedMidiChannel] = value1;
+            updateFinalVelocity(oneBasedMidiChannel);
+            break;
+    }
 }
 
 void MidiIn::RealTimeStartNote(int Ch, int value1, int value2){
@@ -109,15 +120,34 @@ void MidiIn::RealTimeStartNote(int Ch, int value1, int value2){
         noteonCh[Ch] = value1;
         velociteCh[Ch] = value2;
         noteonfinalCh[Ch] = ((noteonCh[Ch]) + pitchbendCh[Ch])  ;
-        volumefinalCh[Ch] =(velociteCh[Ch] *(ControlCh[7][Ch]/127.0))*(500./127.) ;
-        if(volumefinalCh[Ch] < 0.0)volumefinalCh[Ch]=0.0;
-        if(volumefinalCh[Ch] > 500.0)volumefinalCh[Ch]=500.0;
+        updateFinalVelocity(Ch); // (velociteCh[Ch] *(ControlCh[7][Ch]/127.0))*(500./127.) ;
         tourmoteurCh[Ch] = tabledecorresponcanceMidinote(noteonfinalCh[Ch], Ch);
         sendVariaCh(Ch);
-        sendVolCh((int) (volumefinalCh[Ch]*ChangevolumegeneralCh[Ch]), Ch);
+        channelPressure[Ch] = 127;
     }else if(Ch==10){
         if(value1 > 1 && value2 > 1) JouerClic(value1);
     }
+}
+
+static float computeFinalVelocity(float channelVelocity, float volumeControllerValue, float channelPressure) {
+    auto result = (channelVelocity *(volumeControllerValue/127.0)*(channelPressure/127.0))*(500./127.);
+    return result;
+}
+
+void MidiIn::updateFinalVelocity(int Ch){
+	auto finalVelocity = computeFinalVelocity(velociteCh[Ch], ControlCh[7][Ch], channelPressure[Ch]);
+	volumefinalCh[Ch] = finalVelocity;
+	if(volumefinalCh[Ch] < 0.0)
+	{
+		volumefinalCh[Ch]=0.0;
+		assert(false);
+	}
+	if(volumefinalCh[Ch] > 500.0)
+	{
+		volumefinalCh[Ch]=500.0;
+		assert(false);
+	}
+	sendVolCh((int)(volumefinalCh[Ch]*ChangevolumegeneralCh[Ch]), Ch);
 }
 
 void MidiIn::RealTimeStopNote(int Ch, int note){
@@ -153,10 +183,7 @@ void MidiIn::HandleControlChange(int Ch, int value1, int value2){
                 break;
             case 7 :
                 ControlCh[7][Ch] = value2 ;
-                volumefinalCh[Ch] =(velociteCh[Ch] *(ControlCh[7][Ch]/127.0))*(500./127.) ;
-                if(volumefinalCh[Ch] < 0.0)volumefinalCh[Ch]=0.0;
-                if(volumefinalCh[Ch] > 500.0)volumefinalCh[Ch]=500.0;
-                sendVolCh((int)(volumefinalCh[Ch]*ChangevolumegeneralCh[Ch]), Ch);
+                updateFinalVelocity(Ch);
                 break;
             case 9 :
                 ControlCh[9][Ch] = value2 ;
@@ -186,6 +213,8 @@ void MidiIn::HandleControlChange(int Ch, int value1, int value2){
             case 92 :
                 ControlCh[92][Ch]= value2 ;
                 break;
+            case MidiControlChangeParameters::ResetAllControllers:
+                resetSireneCh(Ch);
             default:
                 break;
         }
@@ -399,7 +428,7 @@ void MidiIn::resetSireneCh(int Ch){
 
     noteonfinalCh[Ch]=0.0;
     ///////////////////////////////////////////////////****** Ferme les volets
-
+    channelPressure[Ch] = 0;
     AncienVolFinalCh[Ch]=-1;
     ControlCh[1][Ch]=0;
     ControlCh[5][Ch]=0;
