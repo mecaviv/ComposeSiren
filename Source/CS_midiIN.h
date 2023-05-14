@@ -25,6 +25,8 @@ public:
   void HandleControlChange(int Ch, int value1, int value2);
   void HandlePitchWheel(int Ch, int value1, int value2);
 
+  void updateFinalVelocity(int Ch);
+
   float tabledecorresponcanceMidinote(float note, int Ch);
 
   void sendVolCh(int message, int Ch);
@@ -55,6 +57,7 @@ private:
   float velociteCh[17] = {0};
   float pitchbendCh[17] = {0};
   float ControlCh[127][17] = {0};
+  float channelPressure[17] = {0};
   float Control1FinalCh[17] = {0};
   float noteonfinalCh[17]  = {0};
   float volumefinalCh[17] ;
