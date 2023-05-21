@@ -66,6 +66,8 @@ module ComposeSirenesLouetteDsp =
     let MAX_Partiel = 200
 
     let MAX_TAB = 1000
+
+#if false
 module Routines =
     open ComposeSirenesLouetteDsp
 
@@ -107,7 +109,6 @@ module Routines =
     //type FileMap = System.Collections.Generic.IDictionary<Box<str>,Box<Vec<u8>>>
     type FileMap = System.Collections.Generic.IDictionary<string,ResizeArray<byte>>
 
-#if false
 
     let read_siren_dataset (sirenModel: SirenModel) (folder: DirectoryInfo) (fileMap: FileMap) =
 

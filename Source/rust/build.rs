@@ -19,7 +19,7 @@ fn main() {
         Ok(bindings) => {
 
 
-            bindings.write_to_file("../../Source/generated/composesirenrs.h");
+            bindings.write_to_file("../generated/ffi/composesirenrs.h");
             println!("generated C binding.");
         }
         Err(error) => {
