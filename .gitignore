@@ -5,6 +5,11 @@ Thumbs.db
 # local vscode settings
 .vscode/
 
+# jetbrains ide's
+cmake-build-debug
+
+.idea
+
 # libsamplerate tests
 Dependencies/libsamplerate/
 
@@ -21,3 +26,14 @@ build/
 # private config (see Config.cmake template)
 MyConfig.cmake
 
+# dotnet
+paket-files
+bin
+**/obj
+
+
+# rust
+Source/rust/target
+
+# generated code
+Source/generated
