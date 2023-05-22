@@ -1,5 +1,5 @@
 [package]
-name = "composesiren-dsp-rs"
+name = "composesiren-dsp-rs-lib"
 version = "0.1.0"
 edition = "2021"
 
@@ -10,10 +10,11 @@ edition = "2021"
 [lib]
 crate-type = ["staticlib"]
 
-[[bin]]
-name = "composesiren-dsp-rs"
-path = "src/main.rs"
 
+[[bin]]
+name = "composesiren-dsp-rs-main"
+path = "src/main.rs"
+#
 [dependencies]
 fable_library_rust = { path = "../generated/rust/mecaviv-siren-declarations-rs/src/fable_modules/fable-library-rust" }
 mecaviv-siren-declarations-rs = { path = "../generated/rust/mecaviv-siren-declarations-rs"}

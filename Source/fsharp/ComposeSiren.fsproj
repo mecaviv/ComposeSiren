@@ -8,6 +8,7 @@
   <ItemGroup>
     <Compile Include="composesiren.declarations.fs" />
     <Compile Include="composesiren.dsp.fs" />
+    <Compile Include="composesiren.dsp.processor.fs" />
     <Compile Include="lib.fs" />
     <Content Include="paket.references" />
   </ItemGroup>

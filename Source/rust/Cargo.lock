@@ -147,7 +147,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "composesiren-dsp-rs"
+name = "composesiren-dsp-rs-lib"
 version = "0.1.0"
 dependencies = [
  "bytemuck",

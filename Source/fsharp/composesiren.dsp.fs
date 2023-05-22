@@ -9,7 +9,7 @@ type SirenId =
     | Piccolo
     | AltoS1
     | AltoS2
-    | Bass| Tenor |SopranoS5 | SopranoS6 
+    | Bass| Tenor |SopranoS5 | SopranoS6
 *)
 
 type SirenModelFileSet =
@@ -33,28 +33,15 @@ module ComposeSirenesLouetteDsp =
         | DryWet
         | Depth
         | Width
-        
+
     type SirenDspParameterId =
         //| DspStereoPan of siren: SirenId
         | DspGain
         | DspPartialCount
         | ReverParameter of reverParameter: ReverbParameterId
-         
-    type UIEvents =
-        | AdjustSirenControl of parameterooo: SirenDspParameterId * value: uint8
-
-    type SirenVoiceDspState =
-        {
-            pan: float
-        }
-    type SirenDspState = 
-        {
-            sirens : SirenVoiceDspState array
-
-        }    
 
 
-    type LengthTable = 
+    type LengthTable =
         {
           sample_count: uint32
           max_tab_count: uint16
@@ -66,6 +53,66 @@ module ComposeSirenesLouetteDsp =
     let MAX_Partiel = 200
 
     let MAX_TAB = 1000
+
+
+
+
+module DspState =
+  [<RequireQualifiedAccess>]
+  type midi_note_index = midi_note_index of uint8
+  [<RequireQualifiedAccess>]
+  type midi_velocity = midi_velocity of uint8
+
+  [<RequireQualifiedAccess>]
+  type midi_pitchbend = midi_pitchbend of uint16
+  [<RequireQualifiedAccess>]
+  type dsp_frame = dsp_frame of uint64
+  type VibratoEvent =
+  | NewVibratoValueSample of frame: dsp_frame * vibratoDepthValue: float
+  type TremoloEvent =
+  | NewTremoloValueSample of frame: dsp_frame * tremoloDepthValue: float
+
+  type EngineSpeedUpdate =
+  | LiveMidiNoteOn of note: midi_note_index
+  | LiveMidiNoteOff of note: midi_note_index
+  | PitchbendValue of bend: midi_pitchbend
+  | VibratoEvent of VibratoEvent
+
+  type ShutterUpdateEvent =
+    | TremoloEvent of TremoloEvent
+    | LiveMidiNoteOn of note: midi_note_index
+    | LiveMidiNoteOff of note: midi_note_index
+  type ShutterState =
+    {
+      lastShutterEvent: ShutterUpdateEvent option
+    }
+  //| TuningMap // todo v3
+  type PitchEvent =
+  | MidiNote of midi_note_index * midi_velocity // add isOn isOff, for now, if velocity is 0, it is note off
+
+  type EngineSpeed() =
+    class
+    end
+
+  type EngineState =
+    {
+      lastPlayedNote: PitchEvent option
+      currentSpeed: EngineSpeed
+
+
+    }
+
+  type SirenVoiceDspState =
+      {
+        pan: float
+        engineState: EngineState
+        shutterState: ShutterState
+      }
+  type SirenDspState =
+      {
+          sirens : SirenVoiceDspState array
+
+      }
 
 #if false
 module Routines =
@@ -85,7 +132,7 @@ module Routines =
         length=length
         vector=vector}
 
-    let get_filename_and_buffer_size file (suffix: SirenDataFileSuffix) (directory:DirectoryInfo) = 
+    let get_filename_and_buffer_size file (suffix: SirenDataFileSuffix) (directory:DirectoryInfo) =
       //let s = sizeof<AmplitudeTable>
       let filePath, bufferSize =
         let amplitudeTable = NOMBRE_DE_NOTE * MAX_TAB * MAX_Partiel
@@ -119,7 +166,7 @@ module Routines =
         let fileInfo = FileInfo filePath
         let buffer_size = buffer_size / sizeof<float32> // std::mem::size_of::<f32>();
         let file_size = fileInfo.Length //std::fs::metadata(&file_path).expect("could not get file meta data").len() as usize;
-        let datafile = 
+        let datafile =
             //
             failwith $"rustcodetodo: std::fs::File::open(&file_path).expect(&format!(  not able to read {fileInfo.FullName})"
         //let datafile = BufReader::new(datafile);
@@ -137,7 +184,7 @@ module Routines =
         *)
         let float_buffer = ()
         floats_buffer
-          
+
           (*
           let amp    = readFileAsFloatsVector(&FileType::Amp, &fileSet.amp);
           let freq   = readFileAsFloatsVector(&FileType::Freq, &fileSet.freq);
@@ -174,7 +221,7 @@ module Routines =
              amp = amp
              freq= freq
              length = length
-             vector = vector 
+             vector = vector
            }
       sirenDataset
 #endif
@@ -187,7 +234,7 @@ module Routines =
 
   //use crate::types::SirenModel::{*};
   //const folder : &str = "/Users/gauthiersegay/dev/src/mecaviv/benoit/CodesSources/ComposeSirenes2/ComposeSirenes/";
-  
+
   //[<Test>]
 #if false
   let it_worksreadfiles() =
@@ -196,8 +243,8 @@ module Routines =
     for v in s1.vector do
       //let v = s1.vector.data[i];
       printfn $"{v}"
-    
-  
+
+
 
   //[<Test>]
   let it_works () =
@@ -208,7 +255,7 @@ module Routines =
     let s5 = sirenmodel_get_file_set(&Soprano)
     let s6 = sirenmodel_get_file_set(&Soprano)
     let s7 = sirenmodel_get_file_set(&Piccolo)
-    
+
     printfn $"s1={s1}"
     printfn $"s2={s2}"
     printfn $"s3={s3}"
@@ -217,6 +264,6 @@ module Routines =
     printfn $"s6={s6}"
     printfn $"s7={s7}"
     //assert_eq!(2 + 2, 4);
-    
-  
+
+
 #endif
