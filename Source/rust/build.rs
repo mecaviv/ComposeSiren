@@ -11,14 +11,16 @@ use std::path::Path;
 
 fn main() {
     let crate_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
+    run_cbindgen(&crate_dir);
+}
+
+fn run_cbindgen(crate_dir: &String) {
     let result =
         cbindgen::Builder::new()
             .with_crate(crate_dir)
             .generate();
     match result {
         Ok(bindings) => {
-
-
             bindings.write_to_file("../generated/ffi/composesirenrs.h");
             println!("generated C binding.");
         }
@@ -27,3 +29,4 @@ fn main() {
         }
     }
 }
+

@@ -3,7 +3,7 @@ namespace composesiren.dsp
 open composesiren.declarations
 //open System.IO
 open System.Collections.Generic
-
+open Fable.Core.Rust
 (*
 type SirenId =
     | Piccolo
@@ -11,7 +11,7 @@ type SirenId =
     | AltoS2
     | Bass| Tenor |SopranoS5 | SopranoS6
 *)
-
+[<Struct;OuterAttr("repr(C)")>]
 type SirenModelFileSet =
     {
       amp : SirenDataFileSuffix
@@ -19,7 +19,7 @@ type SirenModelFileSet =
       length: SirenDataFileSuffix
       vector: SirenDataFileSuffix
     }
-
+[<Struct;OuterAttr("repr(C)")>]
 type FileType =
     | Amp
     | Freq
@@ -28,11 +28,14 @@ type FileType =
 
 module ComposeSirenesLouetteDsp =
 
+    [<Struct;OuterAttr("repr(C)")>]
+
     type ReverbParameterId =
         | Size
         | DryWet
         | Depth
         | Width
+    [<Struct;OuterAttr("repr(C)")>]
 
     type SirenDspParameterId =
         //| DspStereoPan of siren: SirenId
@@ -40,6 +43,7 @@ module ComposeSirenesLouetteDsp =
         | DspPartialCount
         | ReverParameter of reverParameter: ReverbParameterId
 
+    [<Struct;OuterAttr("repr(C)")>]
 
     type LengthTable =
         {
@@ -54,9 +58,6 @@ module ComposeSirenesLouetteDsp =
 
     let MAX_TAB = 1000
 
-
-
-
 module DspState =
   [<RequireQualifiedAccess>]
   type midi_note_index = midi_note_index of uint8
@@ -67,11 +68,13 @@ module DspState =
   type midi_pitchbend = midi_pitchbend of uint16
   [<RequireQualifiedAccess>]
   type dsp_frame = dsp_frame of uint64
+  [<OuterAttr("repr(C)")>]
   type VibratoEvent =
   | NewVibratoValueSample of frame: dsp_frame * vibratoDepthValue: float
+  [<OuterAttr("repr(C)")>]
   type TremoloEvent =
   | NewTremoloValueSample of frame: dsp_frame * tremoloDepthValue: float
-
+  [<OuterAttr("repr(C)")>]
   type EngineSpeedUpdate =
   | LiveMidiNoteOn of note: midi_note_index
   | LiveMidiNoteOff of note: midi_note_index
@@ -94,13 +97,14 @@ module DspState =
     class
     end
 
+  [<Struct;OuterAttr("repr(C)")>]
+
   type EngineState =
     {
       lastPlayedNote: PitchEvent option
       currentSpeed: EngineSpeed
-
-
     }
+  [<Struct;OuterAttr("repr(C)")>]
 
   type SirenVoiceDspState =
       {
@@ -108,6 +112,7 @@ module DspState =
         engineState: EngineState
         shutterState: ShutterState
       }
+  [<Struct;OuterAttr("repr(C)")>]
   type SirenDspState =
       {
           sirens : SirenVoiceDspState array

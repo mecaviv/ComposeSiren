@@ -7,3 +7,10 @@ edition = "2021"
 
 [dependencies]
 fable_library_rust = { path="src/fable_modules/fable-library-rust" }
+
+
+
+
+[build-dependencies]
+cmake = "*"
+cbindgen = "*"
