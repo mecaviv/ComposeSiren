@@ -18,6 +18,17 @@ pipeline "Fun.Build" {
     runIfOnlySpecified false
 }
 
+pipeline "watch" {
+    description "developer mode watch"
+    
+    stage "run" {
+        run "dotnet fable Source/fsharp/ComposeSiren.fsproj -o Source/generated/rust/mecaviv-siren-declarations-rs/src --lang rust --watch bash build.dotnet.sh"
+        //workingDir "./Source/generated/Source/generated/rust/mecaviv-siren-declarations-rs/"
+        //run "cargo build"
+    }
+    runIfOnlySpecified
+    
+}
 pipeline "run" {
     description "running the rust sample program"
     

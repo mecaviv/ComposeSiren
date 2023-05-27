@@ -22,7 +22,7 @@ Dependencies/libsamplerate/
 
 # used by cmake
 build/
-
+cmake-build-debug
 # private config (see Config.cmake template)
 MyConfig.cmake
 
@@ -34,6 +34,11 @@ bin
 
 # rust
 Source/rust/target
+Source/fsharp/**.fs.rs
+Source/fsharp/**.fs.js
+Source/fsharp/fable_modules
+target
 
 # generated code
 Source/generated
+!/Source/generated/foo/Cargo.toml

@@ -16,7 +16,7 @@ name = "composesiren-dsp-rs-main"
 path = "src/main.rs"
 #
 [dependencies]
-fable_library_rust = { path = "../generated/rust/mecaviv-siren-declarations-rs/src/fable_modules/fable-library-rust" }
+fable_library_rust = { path = "../fsharp/fable_modules/fable-library-rust" }
 mecaviv-siren-declarations-rs = { path = "../generated/rust/mecaviv-siren-declarations-rs"}
 bytemuck = { version = "*", features = ["extern_crate_alloc"]}
 lazy_static = "*"

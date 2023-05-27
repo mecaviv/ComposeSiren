@@ -3,13 +3,13 @@ namespace composesiren.dsp.processor
 open composesiren.dsp
 open composesiren.dsp.ComposeSirenesLouetteDsp
 
-open DspState
+open composesiren.dsp.state
 
 //type SirenDspStqIndex
 
 type ProcessorState = {
 
-    sirens : SirenDspState array
+    sirens : SirenOrchestraDspState
 
 }
 

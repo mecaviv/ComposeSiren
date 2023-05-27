@@ -10,6 +10,8 @@
     <Compile Include="composesiren.dsp.processor.fs" />
     <Compile Include="lib.fs" />
     <Content Include="paket.references" />
+    <None Include="sample.fsx" />
+    <Folder Include="samples\" />
   </ItemGroup>
   <Import Project="..\..\.paket\Paket.Restore.targets" />
 </Project>

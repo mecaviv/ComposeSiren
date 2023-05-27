@@ -1,0 +1,1 @@
+dotnet fable watch Source/fsharp/samples/samples.fsproj --lang rust --run bash build.rust
