@@ -1,0 +1,12 @@
+[package]
+name = "samples"
+version = "0.0.0"
+edition = "2021"
+
+[[example]]
+name = "sample"
+path = "sample.rs"
+
+[dependencies]
+fable_library_rust = { path = "../../../fsharp/fable_modules/fable-library-rust/" }
+mecaviv-siren-declarations-rs = { path = "../mecaviv-siren-declarations-rs" }

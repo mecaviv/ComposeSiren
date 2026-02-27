@@ -1,0 +1,16 @@
+[package]
+name = "mecaviv-siren-declarations-rs"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+fable_library_rust = { path="src/fable_modules/fable-library-rust" }
+
+
+
+
+[build-dependencies]
+cmake = "*"
+cbindgen = "*"

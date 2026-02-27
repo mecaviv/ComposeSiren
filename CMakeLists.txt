@@ -13,6 +13,14 @@ execute_process(
 string(TIMESTAMP CURRENT_DATE "%Y-%m-%d")
 set(PROJECT_DESCRIPTION "ComposeSiren du ${CURRENT_DATE} sur commit n ${GIT_HASH}")
 
+include(FetchContent)
+FetchContent_Declare(
+        Corrosion
+        GIT_REPOSITORY https://github.com/AndrewGaspar/corrosion.git
+        GIT_TAG origin/master # Optionally specify a version tag or branch here
+)
+FetchContent_MakeAvailable(Corrosion)
+
 project(ComposeSiren VERSION 1.5.0 DESCRIPTION ${PROJECT_DESCRIPTION})
 set(BaseTargetName ${PROJECT_NAME})
 set(VendorName "Mecanique Vivante")
@@ -36,30 +44,30 @@ if (APPLE)
 endif()
 
 juce_add_plugin(${BaseTargetName}
-  PRODUCT_NAME "${BaseTargetName}"
-  COMPANY_NAME "${VendorName}"
-  VERSION ${CMAKE_PROJECT_VERSION}
-  ICON_BIG "${CMAKE_SOURCE_DIR}/Assets/Icon.png"
-  ICON_SMALL "${CMAKE_SOURCE_DIR}/Assets/Icon.png"
-  FORMATS ${FORMATS}
-  # A four-character manufacturer id with at least one upper-case character
-  PLUGIN_MANUFACTURER_CODE McVv
-  # A unique four-character plugin id with at least one upper-case character
-  PLUGIN_CODE MvCs
-  IS_SYNTH TRUE                     # Is this a synth or an effect?
-  NEEDS_MIDI_INPUT TRUE             # Does the plugin need midi input?
-  NEEDS_MIDI_OUTPUT TRUE            # Does the plugin need midi output?
-  IS_MIDI_EFFECT FALSE              # Is this plugin a MIDI effect?
-  EDITOR_WANTS_KEYBOARD_FOCUS TRUE  # Does the editor need keyboard focus?
-  COPY_PLUGIN_AFTER_BUILD FALSE     # Should the plugin be installed to a default location after building?
-  # VST3_CATEGORIES
-  # AAX_CATEGORY
-  # AU_MAIN_TYPE
-  # COMPANY_WEBSITE https://www.mecanique-vivante.com
-  # COMPANY_EMAIL
-  BUNDLE_ID "com.mecaviv.${BaseTargetName}"
-  PLUGIN_NAME "${BaseTargetName}"
-  PRODUCT_NAME "${BaseTargetName}"
+        PRODUCT_NAME "${BaseTargetName}"
+        COMPANY_NAME "${VendorName}"
+        VERSION ${CMAKE_PROJECT_VERSION}
+        ICON_BIG "${CMAKE_SOURCE_DIR}/Assets/Icon.png"
+        ICON_SMALL "${CMAKE_SOURCE_DIR}/Assets/Icon.png"
+        FORMATS ${FORMATS}
+        # A four-character manufacturer id with at least one upper-case character
+        PLUGIN_MANUFACTURER_CODE McVv
+        # A unique four-character plugin id with at least one upper-case character
+        PLUGIN_CODE MvCs
+        IS_SYNTH TRUE                     # Is this a synth or an effect?
+        NEEDS_MIDI_INPUT TRUE             # Does the plugin need midi input?
+        NEEDS_MIDI_OUTPUT TRUE            # Does the plugin need midi output?
+        IS_MIDI_EFFECT FALSE              # Is this plugin a MIDI effect?
+        EDITOR_WANTS_KEYBOARD_FOCUS TRUE  # Does the editor need keyboard focus?
+        COPY_PLUGIN_AFTER_BUILD FALSE     # Should the plugin be installed to a default location after building?
+        # VST3_CATEGORIES
+        # AAX_CATEGORY
+        # AU_MAIN_TYPE
+        # COMPANY_WEBSITE https://www.mecanique-vivante.com
+        # COMPANY_EMAIL
+        BUNDLE_ID "com.mecaviv.${BaseTargetName}"
+        PLUGIN_NAME "${BaseTargetName}"
+        PRODUCT_NAME "${BaseTargetName}"
 )
 
 juce_generate_juce_header(${BaseTargetName})
@@ -82,30 +90,36 @@ add_subdirectory(Assets)
 add_subdirectory(Source)
 
 target_link_libraries(${BaseTargetName}
-  PRIVATE
-    # copied from projucer project
-    juce::juce_audio_basics
-    juce::juce_audio_devices
-    juce::juce_audio_formats
-    juce::juce_audio_processors
-    juce::juce_audio_utils
-    juce::juce_core
-    juce::juce_data_structures
-    juce::juce_events
-    juce::juce_graphics
-    juce::juce_gui_basics
-    juce::juce_gui_extra
-    # recommended
-    juce::juce_recommended_warning_flags
-    juce::juce_recommended_config_flags
-    juce::juce_recommended_lto_flags
+        PRIVATE
+        # copied from projucer project
+        juce::juce_audio_basics
+        juce::juce_audio_devices
+        juce::juce_audio_formats
+        juce::juce_audio_processors
+        juce::juce_audio_utils
+        juce::juce_core
+        juce::juce_data_structures
+        juce::juce_events
+        juce::juce_graphics
+        juce::juce_gui_basics
+        juce::juce_gui_extra
+        # recommended
+        juce::juce_recommended_warning_flags
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
 )
 
-target_compile_definitions(${BaseTargetName} 
-  PUBLIC 
-    JUCE_VST3_CAN_REPLACE_VST2=0
-    JUCE_WEB_BROWSER=0
+target_compile_definitions(${BaseTargetName}
+        PUBLIC
+        JUCE_VST3_CAN_REPLACE_VST2=0
+        JUCE_WEB_BROWSER=0
 )
+
+
+
+corrosion_import_crate(MANIFEST_PATH ${CMAKE_CURRENT_SOURCE_DIR}/Source/rust/Cargo.toml CRATES composesiren-dsp-rs)
+target_link_libraries(${BaseTargetName} PUBLIC composesiren-dsp-rs)
+
 
 ################################################################################
 # packaging

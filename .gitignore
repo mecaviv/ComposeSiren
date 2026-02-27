@@ -5,6 +5,11 @@ Thumbs.db
 # local vscode settings
 .vscode/
 
+# jetbrains ide's
+cmake-build-debug
+
+.idea
+
 # libsamplerate tests
 Dependencies/libsamplerate/
 
@@ -17,7 +22,23 @@ Dependencies/libsamplerate/
 
 # used by cmake
 build/
-
+cmake-build-debug
 # private config (see Config.cmake template)
 MyConfig.cmake
 
+# dotnet
+paket-files
+bin
+**/obj
+
+
+# rust
+Source/rust/target
+Source/fsharp/**.fs.rs
+Source/fsharp/**.fs.js
+Source/fsharp/fable_modules
+target
+
+# generated code
+Source/generated
+!/Source/generated/foo/Cargo.toml
