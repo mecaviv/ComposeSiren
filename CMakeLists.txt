@@ -64,6 +64,18 @@ endif()
 
 add_subdirectory(Assets)
 add_subdirectory(Source)
+# ResourcesProcessing target
+add_subdirectory(ResourcesProcessing)
+
+# Make all plugin variants depend on processed resources
+include(cmake/JuceTargetUtils.cmake)
+juce_collect_targets(JUCE_PLUGIN_TARGETS "${PLUGIN_TARGETS}" "${$FORMATS}")
+
+foreach(target IN LISTS JUCE_PLUGIN_TARGETS)
+    add_dependencies("${target}" run_py_resources)
+    # Optional dev macros:
+    # target_compile_definitions("${target}" PRIVATE COMPOSESIREN_DEV_BUILD=1 COMPOSESIREN_DEV_RESOURCES_DIR="${DEV_RES_DIR}")
+endforeach()
 
 ################################################################################
 # packaging
@@ -75,6 +87,8 @@ add_subdirectory(Source)
 if(JUCE_COPY_PLUGIN_AFTER_BUILD)
   return()
 endif()
+
+
 
 if(APPLE) # we generate a cmake subproject to build the installer
   include(Packaging/Apple/MakePackage.cmake)

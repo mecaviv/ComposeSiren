@@ -13,7 +13,8 @@ add_library(ComposeSirenBuildOptions INTERFACE)
 # target_compile_features(ComposeSirenBuildOptions INTERFACE cxx_std_20)
 
 # normalize resources path across OSes and use it in Debug mode
-file(TO_CMAKE_PATH "${PROJECT_SOURCE_DIR}/Resources" DEV_RES_DIR)
+#file(TO_CMAKE_PATH "${PROJECT_SOURCE_DIR}/Resources" DEV_RES_DIR)
+file(TO_CMAKE_PATH "${PLUGIN_RESOURCES_DIR}" DEV_RES_DIR)
 
 target_compile_definitions(ComposeSirenBuildOptions
   INTERFACE
