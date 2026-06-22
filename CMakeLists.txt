@@ -64,7 +64,6 @@ endif()
 
 add_subdirectory(Assets)
 add_subdirectory(Source)
-# ResourcesProcessing target
 add_subdirectory(ResourcesProcessing)
 
 # Make all plugin variants depend on processed resources
