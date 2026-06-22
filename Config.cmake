@@ -36,6 +36,14 @@ option(USE_PROCESSED_RESOURCES
         ON
 )
 
+# Unified variable used across packaging scripts
+if(USE_PROCESSED_RESOURCES)
+    set(PLUGIN_RESOURCES_DIR "${PROCESSED_RESOURCES_DIR}" CACHE PATH "Resources directory for packaging" FORCE)
+else()
+    set(PLUGIN_RESOURCES_DIR "${RAW_RESOURCES_DIR}" CACHE PATH "Resources directory for packaging" FORCE)
+endif()
+
+
 # SIGNING CREDENTIALS ##########################################################
 
 # we could sign from xcode project but we want to allow using other generators :
