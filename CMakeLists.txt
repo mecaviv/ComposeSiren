@@ -69,7 +69,7 @@ add_subdirectory(ResourcesProcessing)
 
 # Make all plugin variants depend on processed resources
 include(cmake/JuceTargetUtils.cmake)
-juce_collect_targets(JUCE_PLUGIN_TARGETS "${PLUGIN_TARGETS}" "${$FORMATS}")
+juce_collect_targets(JUCE_PLUGIN_TARGETS "${PLUGIN_TARGETS}" "${FORMATS}")
 
 foreach(target IN LISTS JUCE_PLUGIN_TARGETS)
     add_dependencies("${target}" run_py_resources)
