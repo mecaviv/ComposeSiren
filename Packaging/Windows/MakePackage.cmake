@@ -56,7 +56,7 @@ endforeach()
 if(NOT "${PLUGIN_RESOURCES_DIR}" STREQUAL "")
   set(INSTALL_FOLDER "Common Files/${VendorName}/${BaseTargetName}/Resources")
   install(
-    DIRECTORY "${CMAKE_SOURCE_DIR}/Resources/"
+    DIRECTORY "${PLUGIN_RESOURCES_DIR}/"
     DESTINATION ${INSTALL_FOLDER}
     COMPONENT "Resources"
   )
@@ -70,17 +70,22 @@ set(PACKAGING_SCRIPTS_DIR "${CMAKE_SOURCE_DIR}/Packaging/Windows")
 
 # this defines the exact list of components we want to package
 # (without this some parts of JUCE get included too)
-set(COMPONENTS_LIST "")
+set(ALL_TARGETS "")
 
 if(USE_TARGET_FORMAT_COMPONENTS)
   foreach(PLUGIN_TARGET_NAME IN LISTS PLUGIN_TARGETS)
     foreach(FORMAT ${FORMATS})
-      list(APPEND COMPONENTS_LIST "${PLUGIN_TARGET_NAME}_${FORMAT}")
+      list(APPEND ALL_TARGETS "${PLUGIN_TARGET_NAME}_${FORMAT}")
     endforeach()
   endforeach()
 else()
-  set(COMPONENTS_LIST ${FORMATS})
+  set(ALL_TARGETS ${FORMATS})
 endif()
+
+add_custom_target(package DEPENDS ${ALL_TARGETS})
+add_dependencies(package run_py_resources)
+
+set(COMPONENTS_LIST ${ALL_TARGETS})
 
 if(NOT "${PLUGIN_RESOURCES_DIR}" STREQUAL "")
   list(APPEND COMPONENTS_LIST "Resources")
