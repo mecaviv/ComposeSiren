@@ -70,22 +70,17 @@ set(PACKAGING_SCRIPTS_DIR "${CMAKE_SOURCE_DIR}/Packaging/Windows")
 
 # this defines the exact list of components we want to package
 # (without this some parts of JUCE get included too)
-set(ALL_TARGETS "")
+set(COMPONENTS_LIST "")
 
 if(USE_TARGET_FORMAT_COMPONENTS)
   foreach(PLUGIN_TARGET_NAME IN LISTS PLUGIN_TARGETS)
     foreach(FORMAT ${FORMATS})
-      list(APPEND ALL_TARGETS "${PLUGIN_TARGET_NAME}_${FORMAT}")
+      list(APPEND COMPONENTS_LIST "${PLUGIN_TARGET_NAME}_${FORMAT}")
     endforeach()
   endforeach()
 else()
-  set(ALL_TARGETS ${FORMATS})
+  set(COMPONENTS_LIST ${FORMATS})
 endif()
-
-add_custom_target(package DEPENDS ${ALL_TARGETS})
-add_dependencies(package run_py_resources)
-
-set(COMPONENTS_LIST ${ALL_TARGETS})
 
 if(NOT "${PLUGIN_RESOURCES_DIR}" STREQUAL "")
   list(APPEND COMPONENTS_LIST "Resources")
@@ -203,6 +198,7 @@ endif()
 
 message("${COMPONENTS_LIST}")
 add_custom_target(dist DEPENDS ${COMPONENTS_LIST})
+add_dependencies(dist run_py_resources)
 add_custom_command(TARGET dist POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E echo "== Running CPack (NSIS) =="
         COMMAND "${CMAKE_CPACK_COMMAND}" -C "$<IF:$<CONFIG:>,${CMAKE_BUILD_TYPE},$<CONFIG>>"
