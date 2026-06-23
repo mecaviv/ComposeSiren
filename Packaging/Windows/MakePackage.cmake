@@ -196,7 +196,6 @@ if(NOT "${PLUGIN_RESOURCES_DIR}" STREQUAL "")
   cpack_add_component("Resources" DISPLAY_NAME "Shared plugin data" REQUIRED)
 endif()
 
-message("${COMPONENTS_LIST}")
 add_custom_target(dist DEPENDS ${COMPONENTS_LIST})
 add_dependencies(dist run_py_resources)
 add_custom_command(TARGET dist POST_BUILD

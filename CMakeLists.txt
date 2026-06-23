@@ -7,6 +7,8 @@ if (APPLE)
   # see : https://forum.juce.com/t/best-way-to-build-with-support-for-older-macos-versions/64879/3
   set(CMAKE_OSX_DEPLOYMENT_TARGET "10.13" CACHE STRING "minimum supported target macos version")
 endif()
+# in windows, specifying target archs can be done by creating dedicated CMake profiles named
+# "Debug/Release amd64/arm64" and associating them the corresponding visual studio toolchains
 
 if (LINUX)
   # to fix :
@@ -64,20 +66,10 @@ endif()
 
 add_subdirectory(Assets)
 add_subdirectory(Source)
-add_subdirectory(ResourcesProcessing)
 
-# Make all plugin variants depend on processed resources
-include(cmake/JuceTargetUtils.cmake)
-juce_collect_targets(JUCE_PLUGIN_TARGETS "${PLUGIN_TARGETS}" "${FORMATS}")
-
-foreach(target IN LISTS JUCE_PLUGIN_TARGETS)
-    add_dependencies("${target}" run_py_resources)
-    # Optional dev macros:
-    # target_compile_definitions("${target}" PRIVATE COMPOSESIREN_DEV_BUILD=1 COMPOSESIREN_DEV_RESOURCES_DIR="${DEV_RES_DIR}")
-endforeach()
-
-################################################################################
-# packaging
+if(USE_PROCESSED_RESOURCES)
+  add_subdirectory(ResourcesProcessing)
+endif()
 
 if(APPLE) # we generate a cmake subproject to build the installer
   include(Packaging/Apple/MakePackage.cmake)
@@ -85,13 +77,3 @@ elseif(WIN32) # we just proceed the regular way
   include(Packaging/Windows/MakePackage.cmake)
   #include(Packaging/Wix/MakePackage.cmake)
 endif()
-
-# recursively find and list build targets so you can print them
-include(cmake/TargetListing.cmake)
-set(excluded_dirs "${CMAKE_CURRENT_LIST_DIR}/Dependencies/JUCE")
-_get_all_cmake_targets(
-        all_targets
-        ${CMAKE_CURRENT_LIST_DIR}
-        ${excluded_dirs}
-)
-# message(STATUS "targets : ${all_targets}")
