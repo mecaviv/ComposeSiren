@@ -4,7 +4,7 @@
 # we already define these in Config.cmake
 #set(RES_INPUT_DIR "${CMAKE_SOURCE_DIR}/Resources")
 #set(RES_OUTPUT_DIR "${CMAKE_BINARY_DIR}/Resources-fixed")
-set(RES_INPUT_DIR "${RAW_RESOURCES_DIR}")
+set(RES_INPUT_DIR "${ORIGINAL_RESOURCES_DIR}")
 set(RES_OUTPUT_DIR "${PROCESSED_RESOURCES_DIR}")
 
 # we want to use the scripts in the current directory
@@ -74,6 +74,16 @@ add_custom_command(
 add_custom_target(run_py_resources
         DEPENDS "${RES_STAMP}"
 )
+
+foreach(PLUGIN_TARGET IN LISTS PLUGIN_TARGETS)
+    foreach(FORMAT IN LISTS FORMATS)
+        set(target "${PLUGIN_TARGET}_${FORMAT}")
+        if(TARGET "${target}")
+            # message(STATUS "adding run_py_resources dependency to ${target}")
+            add_dependencies("${target}" run_py_resources)
+        endif()
+    endforeach()
+endforeach()
 
 # Export the interpreter path for parent scripts if needed
 #set(PROCESSING_PYTHON "${PYENV_PY}" PARENT_SCOPE)

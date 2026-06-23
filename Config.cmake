@@ -19,7 +19,7 @@ set(VST2_PATH
 #)
 
 # Source of truth
-set(RAW_RESOURCES_DIR
+set(ORIGINAL_RESOURCES_DIR
         "${CMAKE_SOURCE_DIR}/Resources"
         CACHE PATH "Original resources directory"
 )
@@ -40,7 +40,7 @@ option(USE_PROCESSED_RESOURCES
 if(USE_PROCESSED_RESOURCES)
     set(PLUGIN_RESOURCES_DIR "${PROCESSED_RESOURCES_DIR}" CACHE PATH "Resources directory for packaging" FORCE)
 else()
-    set(PLUGIN_RESOURCES_DIR "${RAW_RESOURCES_DIR}" CACHE PATH "Resources directory for packaging" FORCE)
+    set(PLUGIN_RESOURCES_DIR "${ORIGINAL_RESOURCES_DIR}" CACHE PATH "Resources directory for packaging" FORCE)
 endif()
 
 

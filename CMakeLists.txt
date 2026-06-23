@@ -79,19 +79,19 @@ endforeach()
 ################################################################################
 # packaging
 
-# if JUCE_COPY_PLUGIN_AFTER_BUILD is set to true, it means we will install non
-# signed binaries locally (e.g. for debugging purpose) and we likely don't want
-# to build an installer right now, so we stop here :
-
-if(JUCE_COPY_PLUGIN_AFTER_BUILD)
-  return()
-endif()
-
-
-
 if(APPLE) # we generate a cmake subproject to build the installer
   include(Packaging/Apple/MakePackage.cmake)
 elseif(WIN32) # we just proceed the regular way
   include(Packaging/Windows/MakePackage.cmake)
   #include(Packaging/Wix/MakePackage.cmake)
 endif()
+
+# recursively find and list build targets so you can print them
+include(cmake/TargetListing.cmake)
+set(excluded_dirs "${CMAKE_CURRENT_LIST_DIR}/Dependencies/JUCE")
+_get_all_cmake_targets(
+        all_targets
+        ${CMAKE_CURRENT_LIST_DIR}
+        ${excluded_dirs}
+)
+# message(STATUS "targets : ${all_targets}")
