@@ -1,8 +1,8 @@
 # ComposeSiren
 
 ComposeSiren is a suite of audio and MIDI plugins that synthesize sounds of sirens made by [Mécanique Vivante][1].
-They also provide automatable parameters from DAW hosts synchronized to MIDI input and output.
-Theys allow to compose pieces for Mécanique Vivante's siren orchestra in studio by simulating them in real-time.
+The plugins provide automatable parameters from DAW hosts synchronized to MIDI input and output.
+They allow to compose pieces for Mécanique Vivante's siren orchestra in studio by simulating them in real-time.
 The DAW projects can ultimately be reused to play the pieces on the orchestra during live performances by controlling
 the sirens from the DAW's MIDI output.
 
@@ -15,9 +15,11 @@ The orchestra is composed of seven MIDI siren instruments :
 
 There are actually two plugins:
 - **OneSiren**, a simple plugin with flexible MIDI routing parameters that can simulate any siren from the orchestra.
+  ![OneSiren plugin](./Doc/pics/Mecaviv-OneSiren-soprano-01.png)
 - **SirenOrchestra**, a plugin that simulates the whole orchestra with its original fixed MIDI routing, and provides
   additional controls such as panning and volume adjustment for each simulated siren, as well as an embedded reverberation module
   and a master volume control.
+  ![SirenOrchestra](./Doc/pics/Mecaviv-SirenOrchestra-tenor-01.png)
 
 Both are currently available in two formats: VST3 and Audio Unit, and also exist as standalone applications.
 
@@ -26,14 +28,36 @@ Both are currently available in two formats: VST3 and Audio Unit, and also exist
 
 The ComposeSiren suite is developed on top of the **JUCE** frameworks. You can find more infos about it there: http://www.juce.com.
 
+#### Build instructions
+
+The project is based on CMake.
+In orger to build it, you should have **`CMake 3.22+`**,
+a **`C++20`** compiler, and **`Python 3`**
+(for optional Resource files processing build step)
+installed on your system.
+
+It has a few options showcased in the template config file `Config.cmake`
+(VST2 SDK path; whether, when, and how the binary Resource files
+should be processed; various credentials for software signing)
+
+You can derive your own `MyConfig.cmake` from it, then run the following
+commands:
+* `cmake -B cmake-build-debug -DCMAKE_BUILD_TYPE=Debug -C MyConfig.cmake`
+* `cd cmake-build-debug`
+* `cmake --build . --target <my_target>`
+* cmake --install cmake-build-debug --prefix install-debug
+
+`cmake -B cmake-build-test -G "Visual Studio 17 2022" -C MyConfig.cmake`
+
 The plugins are built on macOS as 64-bit VST3 and Audio Unit formats, and currently tested on [Reaper][6] and [Ableton Live][4].
 Upcoming windows versions are currently in the development pipeline.
 
 
 ### Using the plugins
 
-Download the latest installer for your OS from the [releases page][link] and run it. This will install the VST3 versions
-of both plugins (as well as their Audio Unit versions on MacOS), and the corresponding standalone applications.
+Download the latest installer for your OS from the [releases page](https://github.com/mecaviv/ComposeSiren/releases)
+and run it. This will install both plugins in VST3 format (as well as Audio Unit format on MacOS), and the corresponding
+standalone applications.
 <!-- 
 The vst3 plugin files are respectively called **OneSiren.vst3** and **, and the Audio Unit plugin file called **ComposeSiren.component**.
 You can download the vst3 plugin as well as the Audio Unit plugin directly from the **Releases** menu (to the right of the list of files).
@@ -50,12 +74,12 @@ You'll find [here][3] more info on how to use the plugins with Ableton Live.
 - 1.0.0 - First version of the vst3 plugin
 -->
 
-[1]: https://www.mecanique-vivante.com/en/the-song-of-the-sirens/the-musical-siren
+[1]: https://mecanique-vivante.com/en/instrumental-exploration/
 [2]: https://minhaskamal.github.io/DownGit/#/home?url=https://github.com/patriceguyot/ComposeSiren/tree/master/Builds/MacOSX/ComposeSiren.vst3
 [3]: https://help.ableton.com/hc/en-us/sections/202295165-Plug-Ins
 [4]: https://www.ableton.com/en/live/
 [5]: https://minhaskamal.github.io/DownGit/#/home?url=https://github.com/patriceguyot/ComposeSiren/tree/master/Builds/MacOSX/ComposeSiren.component
-
+[6]: https://www.reaper.fm/
 
 ### Building with CMake
 
