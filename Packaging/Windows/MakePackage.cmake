@@ -58,6 +58,7 @@ if(NOT "${PLUGIN_RESOURCES_DIR}" STREQUAL "")
   install(
     DIRECTORY "${PLUGIN_RESOURCES_DIR}/"
     DESTINATION ${INSTALL_FOLDER}
+    PATTERN "*.stamp" EXCLUDE
     COMPONENT "Resources"
   )
 endif()

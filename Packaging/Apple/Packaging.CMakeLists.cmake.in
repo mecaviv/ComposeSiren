@@ -158,6 +158,7 @@ if(NOT "@PLUGIN_RESOURCES_DIR@" STREQUAL "")
     DESTINATION ${INSTALL_FOLDER}
     COMPONENT "Resources"
     PATTERN ".DS_Store" EXCLUDE
+    PATTERN "*.stamp" EXCLUDE
   )
 endif()
 
