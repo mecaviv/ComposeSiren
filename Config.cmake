@@ -11,39 +11,6 @@ set(VST2_PATH
   CACHE STRING "Path to VST2 SDK"
 )
 
-# Do the plugins have common resources to install ? ############################
-
-#set(PLUGIN_RESOURCES_DIR
-#  "Resources"
-#  CACHE STRING "Top level directory that should be installed as shared plugin resources"
-#)
-
-# Source of truth
-set(ORIGINAL_RESOURCES_DIR
-        "${CMAKE_SOURCE_DIR}/Resources"
-        CACHE PATH "Original resources directory"
-)
-
-# Folder where
-set(PROCESSED_RESOURCES_DIR
-        "${CMAKE_BINARY_DIR}/Resources-processed"
-        CACHE PATH "Processed resources output directory"
-)
-
-# Do we generate and use new resource files with python ?
-option(USE_PROCESSED_RESOURCES
-        "Use ResourcesProcessing outputs instead of raw Resources"
-        ON
-)
-
-# Unified variable used across packaging scripts
-if(USE_PROCESSED_RESOURCES)
-    set(PLUGIN_RESOURCES_DIR "${PROCESSED_RESOURCES_DIR}" CACHE PATH "Resources directory for packaging" FORCE)
-else()
-    set(PLUGIN_RESOURCES_DIR "${ORIGINAL_RESOURCES_DIR}" CACHE PATH "Resources directory for packaging" FORCE)
-endif()
-
-
 # SIGNING CREDENTIALS ##########################################################
 
 # we could sign from xcode project but we want to allow using other generators :

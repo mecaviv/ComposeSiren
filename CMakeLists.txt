@@ -42,6 +42,30 @@ set(BaseTargetName ${PROJECT_NAME})
 set(VendorName "Mecanique Vivante")
 set(PLUGIN_MANUFACTURER_CODE "McVv")
 
+# DEAL WITH PLUGIN RESOURCES PROCESSING ########################################
+
+option(USE_PROCESSED_RESOURCES
+        "Use ResourcesProcessing outputs instead of original Resources"
+        ON)
+
+set(ORIGINAL_RESOURCES_DIR
+        "${CMAKE_SOURCE_DIR}/Resources"
+        CACHE PATH "Original resources directory")
+
+set(PROCESSED_RESOURCES_DIR
+        "${CMAKE_BINARY_DIR}/Resources-processed"
+        CACHE PATH "Processed resources output directory")
+
+if(USE_PROCESSED_RESOURCES)
+  set(PLUGIN_RESOURCES_DIR
+          "${PROCESSED_RESOURCES_DIR}"
+          CACHE PATH "Resources directory for packaging" FORCE)
+else()
+  set(PLUGIN_RESOURCES_DIR
+          "${ORIGINAL_RESOURCES_DIR}"
+          CACHE PATH "Resources directory for packaging" FORCE)
+endif()
+
 #set(PLUGIN_TARGETS OneSiren)
 set(PLUGIN_TARGETS OneSiren SirenOrchestra)
 #set(PLUGIN_TARGETS CustomMix)
