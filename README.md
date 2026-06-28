@@ -21,67 +21,45 @@ There are actually two plugins:
   and a master volume control.
   ![SirenOrchestra](./Doc/pics/Mecaviv-SirenOrchestra-tenor-01.png)
 
-Both are currently available in two formats: VST3 and Audio Unit, and also exist as standalone applications.
-
-
-### Development
+Both are currently available in two formats: VST3 and, on MacOS, Audio Unit. They also exist as Standalone Applications.
 
 The ComposeSiren suite is developed on top of the **JUCE** frameworks. You can find more infos about it there: http://www.juce.com.
 
-#### Build instructions
+On MacOS, the plugins are built as universal (x86_64/arm64) 64 bit VST3, Audio Unit and Standalone Application formats
+On windows they are built either as x64 or arm64 VST3 and Standalone Application formats.
+They are currently tested on [Reaper][6] and [Ableton Live][4].
 
-The project is based on CMake.
-In orger to build it, you should have **`CMake 3.22+`**,
-a **`C++20`** compiler, and **`Python 3`**
-(for optional Resource files processing build step)
-installed on your system.
-
-It has a few options showcased in the template config file `Config.cmake`
-(VST2 SDK path; whether, when, and how the binary Resource files
-should be processed; various credentials for software signing)
-
-You can derive your own `MyConfig.cmake` from it, then run the following
-commands:
-* `cmake -B cmake-build-debug -DCMAKE_BUILD_TYPE=Debug -C MyConfig.cmake`
-* `cd cmake-build-debug`
-* `cmake --build . --target <my_target>`
-* cmake --install cmake-build-debug --prefix install-debug
-
-`cmake -B cmake-build-test -G "Visual Studio 17 2022" -C MyConfig.cmake`
-
-The plugins are built on macOS as 64-bit VST3 and Audio Unit formats, and currently tested on [Reaper][6] and [Ableton Live][4].
-Upcoming windows versions are currently in the development pipeline.
-
-
-### Using the plugins
+### Getting the plugins
 
 Download the latest installer for your OS from the [releases page](https://github.com/mecaviv/ComposeSiren/releases)
 and run it. This will install both plugins in VST3 format (as well as Audio Unit format on MacOS), and the corresponding
-standalone applications.
-<!-- 
-The vst3 plugin files are respectively called **OneSiren.vst3** and **, and the Audio Unit plugin file called **ComposeSiren.component**.
-You can download the vst3 plugin as well as the Audio Unit plugin directly from the **Releases** menu (to the right of the list of files).
-You'll find [here][3] more info on how to use the plugins with Ableton Live.
--->
+Standalone Applications.
 
-<!--
-### Version history:
+### Build instructions
 
-- 1.5.0
-- 1.3.0 - Change default panning and volume
-- 1.2.0 - Audio Unit format added
-- 1.1.0 - Improved GUI
-- 1.0.0 - First version of the vst3 plugin
--->
+The project is based on `CMake`.
 
-[1]: https://mecanique-vivante.com/en/instrumental-exploration/
-[2]: https://minhaskamal.github.io/DownGit/#/home?url=https://github.com/patriceguyot/ComposeSiren/tree/master/Builds/MacOSX/ComposeSiren.vst3
-[3]: https://help.ableton.com/hc/en-us/sections/202295165-Plug-Ins
-[4]: https://www.ableton.com/en/live/
-[5]: https://minhaskamal.github.io/DownGit/#/home?url=https://github.com/patriceguyot/ComposeSiren/tree/master/Builds/MacOSX/ComposeSiren.component
-[6]: https://www.reaper.fm/
+In orger to build it, you should have **`CMake 3.22+`**,
+a **`C++20`** compiler, and (for optional Resource files processing build step)
+**`Python 3`** installed on your system.  
+It is also recommended to have `Ninja` installed but you can use `XCode` and
+`Visual Studio` generators for MacOS and Windows respectively.
 
-### Building with CMake
+The project consumes a few variables showcased in the template config file `Config.cmake`
+(VST2 SDK path and various credentials for software signing)
+
+You can derive your own `MyConfig.cmake` from it, then run the following
+commands:
+```
+$ cmake -B cmake-build-debug -DCMAKE_BUILD_TYPE=<my_build_type> -C MyConfig.cmake
+$ cmake --build cmake-build-debug --target <my_target>
+```
+
+Example packaging commands for Windows with Visual Studio 2022:
+```
+$ cmake -B cmake-build-release -G "Visual Studio 17 2022" -C MyConfig.cmake
+$ cmake --build cmake-build-release --config Release --target dist
+```
 
 #### dependencies
 
@@ -115,13 +93,12 @@ git clone https://github.com/mecaviv/ComposeSiren.git
 
 At the moment the plugin is built :
 
-* on Mac OS 11.6.4 using Ninja (Xcode works too)
-  * `cmake -B build -G Ninja -C Config.cmake -DCMAKE_BUILD_TYPE=Release` to setup the build system
+* on Mac OS 13.7.8 using Ninja (Xcode works too)
+  * `cmake -B build -G Ninja -C MyConfig.cmake -DCMAKE_BUILD_TYPE=Release` to setup the build system
   * `cmake --build build --config Release` to build the plugins and generate the installer
-* on Windows 10 using Visual Studio (couldn't get Ninja to work on windows yet)
-  * `cmake -B build -G "Visual Studio 17 2022" -C Config.cmake`
-  * `cmake --build build --config Release`
-  * `cpack --config build/CPackConfig.cmake`
+* on Windows 11 (Windows 10 compatible) using Visual Studio (Ninja works too)
+  * `cmake -B build -G "Visual Studio 17 2022" -C MyConfig.cmake`
+  * `cmake --build build --config Release --target dist`
 * on Linux or Raspberry
   * `cmake -B builds/linux -G "Unix Makefiles"`
   * `cmake --build builds/linux --config Release`
@@ -133,3 +110,10 @@ is created in `build/Packaging/ComposeSiren_Installer_artefacts`
 NB :
 * download VS 2022 Community from [HERE](https://aka.ms/vs/17/release/vs_community.exe)
   (more dl links [HERE](https://sharethis.zip/visual_studio/))
+
+[1]: https://mecanique-vivante.com/en/instrumental-exploration/
+[2]: https://minhaskamal.github.io/DownGit/#/home?url=https://github.com/patriceguyot/ComposeSiren/tree/master/Builds/MacOSX/ComposeSiren.vst3
+[3]: https://help.ableton.com/hc/en-us/sections/202295165-Plug-Ins
+[4]: https://www.ableton.com/en/live/
+[5]: https://minhaskamal.github.io/DownGit/#/home?url=https://github.com/patriceguyot/ComposeSiren/tree/master/Builds/MacOSX/ComposeSiren.component
+[6]: https://www.reaper.fm/
