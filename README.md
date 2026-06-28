@@ -42,17 +42,24 @@ The project is based on `CMake`.
 In orger to build it, you should have **`CMake 3.22+`**,
 a **`C++20`** compiler, and (for optional Resource files processing build step)
 **`Python 3`** installed on your system.  
-It is also recommended to have `Ninja` installed but you can use `XCode` and
+It is also recommended to have `Ninja` but you can use `XCode` and
 `Visual Studio` generators for MacOS and Windows respectively.
+You will also need `NSIS` for Windows installer generation.
 
-The project consumes a few variables showcased in the template config file `Config.cmake`
+The project consumes a few variables listed in the template config file `Config.cmake`
 (VST2 SDK path and various credentials for software signing)
 
-You can derive your own `MyConfig.cmake` from it, then run the following
+You can derive your own `MyConfig.cmake` file from it, then run the following
 commands:
 ```
-$ cmake -B cmake-build-debug -DCMAKE_BUILD_TYPE=<my_build_type> -C MyConfig.cmake
-$ cmake --build cmake-build-debug --target <my_target>
+$ cmake -B <my_cmake_build_dir> -DCMAKE_BUILD_TYPE=<my_build_type> -C MyConfig.cmake
+$ cmake --build <my_cmake_build_dir> --target <my_target>
+```
+
+Example packaging commands for MacOS with XCode:
+```
+$ cmake -B cmake-build-release -DCMAKE_BUILD_TYPE=RELEASE -C MyConfig.cmake
+$ cmake --build cmake-build-RELEASE --target dist
 ```
 
 Example packaging commands for Windows with Visual Studio 2022:
@@ -60,6 +67,9 @@ Example packaging commands for Windows with Visual Studio 2022:
 $ cmake -B cmake-build-release -G "Visual Studio 17 2022" -C MyConfig.cmake
 $ cmake --build cmake-build-release --config Release --target dist
 ```
+
+The resulting installer (built with `productbuild` on mac and `NSIS` on windows)
+is created in `build/Packaging/ComposeSiren_Installer_artefacts`
 
 #### dependencies
 
@@ -91,23 +101,7 @@ git clone https://github.com/mecaviv/ComposeSiren.git
 * if at some point the `Dependencies/JUCE` submodule is altered by some IDE, you
   can reset it using `git submodule deinit -f .` then `git submodule update --init`
 
-At the moment the plugin is built :
-
-* on Mac OS 13.7.8 using Ninja (Xcode works too)
-  * `cmake -B build -G Ninja -C MyConfig.cmake -DCMAKE_BUILD_TYPE=Release` to setup the build system
-  * `cmake --build build --config Release` to build the plugins and generate the installer
-* on Windows 11 (Windows 10 compatible) using Visual Studio (Ninja works too)
-  * `cmake -B build -G "Visual Studio 17 2022" -C MyConfig.cmake`
-  * `cmake --build build --config Release --target dist`
-* on Linux or Raspberry
-  * `cmake -B builds/linux -G "Unix Makefiles"`
-  * `cmake --build builds/linux --config Release`
-  * no instruction for installer for now
-
-The resulting installer (built with `productbuild` on mac and `NSIS` on windows)
-is created in `build/Packaging/ComposeSiren_Installer_artefacts`
-
-NB :
+##### NB :
 * download VS 2022 Community from [HERE](https://aka.ms/vs/17/release/vs_community.exe)
   (more dl links [HERE](https://sharethis.zip/visual_studio/))
 
