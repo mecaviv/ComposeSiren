@@ -53,6 +53,10 @@ foreach(PLUGIN_TARGET_NAME IN LISTS PLUGIN_TARGETS)
 endforeach()
 
 add_custom_target(package DEPENDS ${ALL_TARGETS})
+if(PROCESS_RESOURCES)
+    add_dependencies(package run_py_resources)
+endif()
+
 add_custom_command(
   TARGET package POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E echo "========== CREATING INSTALLER"

@@ -7,6 +7,8 @@ if (APPLE)
   # see : https://forum.juce.com/t/best-way-to-build-with-support-for-older-macos-versions/64879/3
   set(CMAKE_OSX_DEPLOYMENT_TARGET "10.13" CACHE STRING "minimum supported target macos version")
 endif()
+# in windows, specifying target archs can be done by creating dedicated CMake profiles named
+# "Debug/Release amd64/arm64" and associating them the corresponding visual studio toolchains
 
 if (LINUX)
   # to fix :
@@ -40,6 +42,30 @@ set(BaseTargetName ${PROJECT_NAME})
 set(VendorName "Mecanique Vivante")
 set(PLUGIN_MANUFACTURER_CODE "McVv")
 
+# DEAL WITH PLUGIN RESOURCES PROCESSING ########################################
+
+option(PROCESS_RESOURCES
+        "Use ResourcesProcessing outputs instead of original Resources"
+        ON)
+
+set(ORIGINAL_RESOURCES_DIR
+        "${CMAKE_SOURCE_DIR}/Resources"
+        CACHE PATH "Original resources directory")
+
+set(PROCESSED_RESOURCES_DIR
+        "${CMAKE_BINARY_DIR}/Resources-processed"
+        CACHE PATH "Processed resources output directory")
+
+if(PROCESS_RESOURCES)
+  set(PLUGIN_RESOURCES_DIR
+          "${PROCESSED_RESOURCES_DIR}"
+          CACHE PATH "Resources directory for packaging" FORCE)
+else()
+  set(PLUGIN_RESOURCES_DIR
+          "${ORIGINAL_RESOURCES_DIR}"
+          CACHE PATH "Resources directory for packaging" FORCE)
+endif()
+
 #set(PLUGIN_TARGETS OneSiren)
 set(PLUGIN_TARGETS OneSiren SirenOrchestra)
 #set(PLUGIN_TARGETS CustomMix)
@@ -65,15 +91,8 @@ endif()
 add_subdirectory(Assets)
 add_subdirectory(Source)
 
-################################################################################
-# packaging
-
-# if JUCE_COPY_PLUGIN_AFTER_BUILD is set to true, it means we will install non
-# signed binaries locally (e.g. for debugging purpose) and we likely don't want
-# to build an installer right now, so we stop here :
-
-if(JUCE_COPY_PLUGIN_AFTER_BUILD)
-  return()
+if(PROCESS_RESOURCES)
+  add_subdirectory(ResourcesProcessing)
 endif()
 
 if(APPLE) # we generate a cmake subproject to build the installer
