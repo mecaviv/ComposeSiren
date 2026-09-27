@@ -66,6 +66,17 @@ else()
           CACHE PATH "Resources directory for packaging" FORCE)
 endif()
 
+# DEAL WITH THE PARK BRIDGE ####################################################
+# SirenOrchestra drives the physical sirens either with SirenLink (C++, in
+# ComposeSirenCore/lib/net) or with mecaviv-bridge-composesiren (Rust, in
+# Source/mecaviv-bridge-composesiren, built on the mecaviv-rs crates of a
+# checkout next to ComposeSiren), linked statically: see
+# Source/ComposeSirenCore/MecavivBridge.cmake.
+
+option(COMPOSESIREN_MECAVIV_BRIDGE
+        "Drive the park with mecaviv-bridge-composesiren (Rust) instead of SirenLink"
+        OFF)
+
 #set(PLUGIN_TARGETS OneSiren)
 set(PLUGIN_TARGETS OneSiren SirenOrchestra)
 #set(PLUGIN_TARGETS CustomMix)

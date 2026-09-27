@@ -17,6 +17,20 @@
 #ifndef SIRENORCHESTRA_SIRENUDPBRIDGE_H
 #define SIRENORCHESTRA_SIRENUDPBRIDGE_H
 
+#if COMPOSESIREN_MECAVIV_BRIDGE
+
+// Variante mecaviv-bridge (option CMake COMPOSESIREN_MECAVIV_BRIDGE) : la
+// bibliothèque Rust Source/mecaviv-bridge-composesiren, construite sur les
+// crates de mecaviv-rs et liée en statique, porte le protocole et le
+// modèle de threads décrits ci-dessus (FIFO lock-free, thread dédié, ST lu sur
+// les KEB à 1 Hz, désactivée par défaut). Même interface : les appels du
+// plugin ne changent pas.
+#include <mecaviv_bridge.hpp>
+
+using SirenUdpBridge = mecaviv::Bridge;
+
+#else
+
 #include <array>
 #include <atomic>
 #include <juce_core/juce_core.h>
@@ -173,5 +187,7 @@ private:
         static_cast<int>(StState::unknown), static_cast<int>(StState::unknown),
         static_cast<int>(StState::unknown) };
 };
+
+#endif // COMPOSESIREN_MECAVIV_BRIDGE
 
 #endif //SIRENORCHESTRA_SIRENUDPBRIDGE_H

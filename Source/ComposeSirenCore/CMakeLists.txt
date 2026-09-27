@@ -43,8 +43,6 @@ target_sources(ComposeSirenCore
   lib/wrappers/SirenVoice.cpp
   lib/wrappers/SirenEnsemble.cpp
 
-  lib/net/SirenLink.cpp
-
   Components/SirenStripComponent.cpp
   Components/SirenTrackComponent.cpp
   Components/ReverbStripComponent.cpp
@@ -73,9 +71,20 @@ target_link_libraries(ComposeSirenCore
     juce::juce_recommended_lto_flags
 )
 
-if(WIN32)
-  # sockets de lib/net/SirenLink
-  target_link_libraries(ComposeSirenCore PRIVATE ws2_32)
+# ------------------------------------------------------------------------------
+# Park bridge: SirenLink, or the mecaviv-bridge Rust library (see root
+# CMakeLists.txt). SirenUdpBridge.h picks the matching implementation from
+# COMPOSESIREN_MECAVIV_BRIDGE.
+
+if(COMPOSESIREN_MECAVIV_BRIDGE)
+  include("${CMAKE_CURRENT_LIST_DIR}/MecavivBridge.cmake")
+  target_link_libraries(ComposeSirenCore PUBLIC mecaviv_bridge_composesiren)
+else()
+  target_sources(ComposeSirenCore PRIVATE lib/net/SirenLink.cpp)
+  if(WIN32)
+    # sockets de lib/net/SirenLink
+    target_link_libraries(ComposeSirenCore PRIVATE ws2_32)
+  endif()
 endif()
 
 # If we need additional global compile defs, put them here

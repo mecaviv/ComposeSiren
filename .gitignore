@@ -34,3 +34,5 @@ MyConfig.cmake
 # handy ignored tmp folder
 tmp/
 
+# rust
+Source/mecaviv-bridge-composesiren/target/*
