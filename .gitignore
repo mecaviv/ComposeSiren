@@ -36,3 +36,4 @@ tmp/
 
 # rust
 Source/mecaviv-bridge-composesiren/target/*
+Source/composesiren-mcp/target/*

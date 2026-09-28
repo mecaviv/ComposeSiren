@@ -21,6 +21,7 @@
 #if COMPOSESIREN_PARK_BRIDGE
 #include "SirenUdpBridge.h"
 #endif
+#include <McpControl.h>
 
 class SirenOrchestraPluginProcessor :
     public juce::AudioProcessor,
@@ -121,6 +122,8 @@ private:
     // mirror du MIDI routé vers les sirènes physiques (protocole Pd sirenMidi2Udp)
     SirenUdpBridge udpBridge;
 #endif
+
+    McpControl mcp;
 
 private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SirenOrchestraPluginProcessor)

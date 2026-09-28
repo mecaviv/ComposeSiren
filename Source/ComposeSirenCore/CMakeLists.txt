@@ -43,6 +43,9 @@ target_sources(ComposeSirenCore
   lib/wrappers/SirenVoice.cpp
   lib/wrappers/SirenEnsemble.cpp
 
+  McpControl.cpp
+  McpDeviceHooks.cpp
+
   Components/SirenStripComponent.cpp
   Components/SirenTrackComponent.cpp
   Components/ReverbStripComponent.cpp
@@ -50,6 +53,9 @@ target_sources(ComposeSirenCore
 )
 
 # ------------------------------------------------------------------------------
+
+include("${CMAKE_CURRENT_LIST_DIR}/Mcp.cmake")
+target_link_libraries(ComposeSirenCore PUBLIC composesiren_mcp)
 
 target_link_libraries(ComposeSirenCore
   PRIVATE

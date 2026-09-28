@@ -47,7 +47,8 @@ SirenOrchestraPluginProcessor::SirenOrchestraPluginProcessor() :
     getResourcesPathFunction(getResourcesPathGetter()),
     ensemble(allSirenIds, getResourcesPathFunction()),
     ensembleParameterBridges(apvts, &ensemble),
-    reverbParameterBridges(apvts, &reverb)
+    reverbParameterBridges(apvts, &reverb),
+    mcp(*this, "SirenOrchestra", "MvSO")
 {
     ssm.subscribe(&ensemble);
     router.sendAllCurrentParameterValues();
@@ -149,6 +150,7 @@ void SirenOrchestraPluginProcessor::selectedNewResourcesPath(const std::string& 
 //------------------------------------------------------------------------------
 void SirenOrchestraPluginProcessor::timerCallback()
 {
+    mcp.pump();
     ensemble.notifyListeners();
 }
 
@@ -174,6 +176,7 @@ void SirenOrchestraPluginProcessor::processBlock(juce::AudioBuffer<float>& audio
 
     // MIDI ROUTING / SCHEDULING / UI SYNCING //////////////////////////////////
 
+    mcp.drainMidi(midiIn);
     scheduler.reset();
 
     for (const auto metadata : midiIn) {

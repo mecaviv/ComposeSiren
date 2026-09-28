@@ -1,0 +1,73 @@
+#pragma once
+
+#include <atomic>
+#include <condition_variable>
+#include <cstdint>
+#include <memory>
+#include <mutex>
+#include <string>
+#include <vector>
+
+#include <juce_audio_processors/juce_audio_processors.h>
+
+#include "composesiren_mcp.h"
+
+// In-process MCP server. Rust owns the HTTP listener and the discovery file
+// ~/.composesiren_mcp.json. This class runs the commands on the message thread
+// and queues MIDI for the next audio block.
+
+class McpControl
+{
+public:
+    McpControl(juce::AudioProcessor& processor, const juce::String& pluginName, const juce::String& pluginCode);
+    ~McpControl();
+
+    McpControl(const McpControl&) = delete;
+    McpControl& operator=(const McpControl&) = delete;
+
+    // Call from the message thread (the editor timer does). Also invoked by
+    // the server when a command arrives.
+    void pump();
+
+    // Move queued MIDI into the block, at sample 0, before the host's events.
+    void drainMidi(juce::MidiBuffer& midi) const;
+
+    int getPort() const { return port; }
+
+private:
+    struct Job
+    {
+        std::string request;
+        std::string response;
+        bool done = false;
+        std::mutex mutex;
+        std::condition_variable cv;
+    };
+
+    struct State
+    {
+        std::atomic<bool> alive { true };
+        std::atomic<bool> shuttingDown { false };
+        McpControl* control = nullptr;
+        juce::AudioProcessor* processor = nullptr;
+        std::mutex jobsMutex;
+        std::vector<std::shared_ptr<Job>> jobs;
+        mutable std::mutex midiMutex;
+        std::vector<juce::MidiMessage> midi;
+    };
+
+    static char* dispatch(const char* requestJson, void* user);
+    std::string handle(const juce::var& request) const;
+    std::string listParameters() const;
+    std::string getParameter(const juce::String& id) const;
+    std::string setParameter(const juce::String& id, double value) const;
+    std::string sendMidi(int status, int data1, int data2) const;
+    juce::RangedAudioParameter* findParameter(const juce::String& id) const;
+    static juce::var parameterObject(juce::RangedAudioParameter& parameter);
+    static char* duplicate(const std::string& text);
+
+    juce::AudioProcessor& processor;
+    std::shared_ptr<State> state;
+    cs_mcp_server_t* server = nullptr;
+    int port = 0;
+};
