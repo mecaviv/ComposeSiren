@@ -78,10 +78,10 @@ is created in `build/Packaging/ComposeSiren_Installer_artefacts`
 
 ### Park bridge: SirenLink or mecaviv-bridge
 
-`-DCOMPOSESIREN_PARK_BRIDGE=ON` (the default) compiles the UDP park bridge
-and shows the "Sirenes physiques" and "ST" controls on SirenOrchestra.
-`-DCOMPOSESIREN_PARK_BRIDGE=OFF` builds neither the C++ nor the Rust
-implementation, and those controls are omitted.
+The park UDP bridge is off by default. `-DCOMPOSESIREN_PARK_BRIDGE=ON`
+compiles it and shows the "Sirenes physiques" and "ST" controls on
+SirenOrchestra. With the default (`OFF`), neither the C++ nor the Rust
+implementation is built, and those controls are omitted.
 
 When the park bridge is on, SirenOrchestra drives the physical sirens with
 `SirenLink` (C++) by default. With `-DCOMPOSESIREN_MECAVIV_BRIDGE=ON` it uses
@@ -104,8 +104,8 @@ code is the same in both cases: `SirenUdpBridge.h` picks the implementation.
   time. See `Source/ComposeSirenCore/MecavivBridge.cmake`.
 
 ```
-$ cmake -B cmake-build-debug -DCMAKE_BUILD_TYPE=Debug -DCOMPOSESIREN_PARK_BRIDGE=OFF
-$ cmake -B cmake-build-debug -DCMAKE_BUILD_TYPE=Debug -DCOMPOSESIREN_MECAVIV_BRIDGE=ON
+$ cmake -B cmake-build-debug -DCMAKE_BUILD_TYPE=Debug -DCOMPOSESIREN_PARK_BRIDGE=ON
+$ cmake -B cmake-build-debug -DCMAKE_BUILD_TYPE=Debug -DCOMPOSESIREN_PARK_BRIDGE=ON -DCOMPOSESIREN_MECAVIV_BRIDGE=ON
 $ cmake --build cmake-build-debug --target SirenOrchestra_VST3
 ```
 

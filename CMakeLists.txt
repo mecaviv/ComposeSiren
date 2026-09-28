@@ -76,7 +76,7 @@ endif()
 
 option(COMPOSESIREN_PARK_BRIDGE
         "Compile the park UDP bridge (C++ SirenLink or Rust mecaviv-bridge) and show Sirenes physiques / ST"
-        ON)
+        OFF)
 
 option(COMPOSESIREN_MECAVIV_BRIDGE
         "Drive the park with mecaviv-bridge-composesiren (Rust) instead of SirenLink (requires COMPOSESIREN_PARK_BRIDGE)"
