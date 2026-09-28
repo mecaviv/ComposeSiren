@@ -15,7 +15,12 @@
 #include <lib/wrappers/SirenStateMonitor.h>
 #include <ParameterBridges.h>
 #include "OrchestraMidiRouter.h"
+#ifndef COMPOSESIREN_PARK_BRIDGE
+#define COMPOSESIREN_PARK_BRIDGE 0
+#endif
+#if COMPOSESIREN_PARK_BRIDGE
 #include "SirenUdpBridge.h"
+#endif
 
 class SirenOrchestraPluginProcessor :
     public juce::AudioProcessor,
@@ -39,9 +44,11 @@ public:
     void resetSiren(std::optional<sirenId>) override;
     std::string getResourcesPath() override;
     void selectedNewResourcesPath(const std::string&) override;
+#if COMPOSESIREN_PARK_BRIDGE
     void physicalSirensSwitched(bool) override;
     bool physicalSirensEnabled() override;
     void stAllSwitched(bool) override;
+#endif
 
     // Timer callback (called from UI thread)
     //--------------------------------------------------------------------------
@@ -82,7 +89,9 @@ public:
     juce::MidiKeyboardState& getMidiKeyboardState();
     VoiceManagerState& getVoiceManagerState();
     SirenStateMonitor& getSirenStateMonitor();
+#if COMPOSESIREN_PARK_BRIDGE
     SirenUdpBridge& getUdpBridge() { return udpBridge; }
+#endif
 
 private:
     // needed by DSP
@@ -108,8 +117,10 @@ private:
 
     SirenStateMonitor ssm;
 
+#if COMPOSESIREN_PARK_BRIDGE
     // mirror du MIDI routé vers les sirènes physiques (protocole Pd sirenMidi2Udp)
     SirenUdpBridge udpBridge;
+#endif
 
 private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SirenOrchestraPluginProcessor)

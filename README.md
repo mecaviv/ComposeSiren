@@ -78,12 +78,18 @@ is created in `build/Packaging/ComposeSiren_Installer_artefacts`
 
 ### Park bridge: SirenLink or mecaviv-bridge
 
-SirenOrchestra drives the physical sirens with `SirenLink` (C++) by default.
-With `-DCOMPOSESIREN_MECAVIV_BRIDGE=ON` it uses `mecaviv-bridge-composesiren`
-instead, linked statically. That Rust crate, in
-`Source/mecaviv-bridge-composesiren`, is made for this plugin and builds on
-the protocol crates of [mecaviv-rs](../mecaviv-rs). The plugin code is the
-same in both cases: `SirenUdpBridge.h` picks the implementation.
+`-DCOMPOSESIREN_PARK_BRIDGE=ON` (the default) compiles the UDP park bridge
+and shows the "Sirenes physiques" and "ST" controls on SirenOrchestra.
+`-DCOMPOSESIREN_PARK_BRIDGE=OFF` builds neither the C++ nor the Rust
+implementation, and those controls are omitted.
+
+When the park bridge is on, SirenOrchestra drives the physical sirens with
+`SirenLink` (C++) by default. With `-DCOMPOSESIREN_MECAVIV_BRIDGE=ON` it uses
+`mecaviv-bridge-composesiren` instead, linked statically.
+`COMPOSESIREN_MECAVIV_BRIDGE` has no effect if the park bridge is off. That
+Rust crate, in `Source/mecaviv-bridge-composesiren`, is made for this plugin
+and builds on the protocol crates of [mecaviv-rs](../mecaviv-rs). The plugin
+code is the same in both cases: `SirenUdpBridge.h` picks the implementation.
 
 - mecaviv-rs must be checked out next to ComposeSiren (`../mecaviv-rs`): the
   crate's `Cargo.toml` depends on it by relative path.
@@ -98,6 +104,7 @@ same in both cases: `SirenUdpBridge.h` picks the implementation.
   time. See `Source/ComposeSirenCore/MecavivBridge.cmake`.
 
 ```
+$ cmake -B cmake-build-debug -DCMAKE_BUILD_TYPE=Debug -DCOMPOSESIREN_PARK_BRIDGE=OFF
 $ cmake -B cmake-build-debug -DCMAKE_BUILD_TYPE=Debug -DCOMPOSESIREN_MECAVIV_BRIDGE=ON
 $ cmake --build cmake-build-debug --target SirenOrchestra_VST3
 ```

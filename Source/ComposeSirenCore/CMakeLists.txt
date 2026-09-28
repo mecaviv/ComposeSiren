@@ -72,19 +72,25 @@ target_link_libraries(ComposeSirenCore
 )
 
 # ------------------------------------------------------------------------------
-# Park bridge: SirenLink, or the mecaviv-bridge Rust library (see root
-# CMakeLists.txt). SirenUdpBridge.h picks the matching implementation from
+# Park bridge: compiled only when COMPOSESIREN_PARK_BRIDGE is ON. Then
+# SirenLink, or the mecaviv-bridge Rust library (see root CMakeLists.txt).
+# SirenUdpBridge.h picks the matching implementation from
 # COMPOSESIREN_MECAVIV_BRIDGE.
 
-if(COMPOSESIREN_MECAVIV_BRIDGE)
-  include("${CMAKE_CURRENT_LIST_DIR}/MecavivBridge.cmake")
-  target_link_libraries(ComposeSirenCore PUBLIC mecaviv_bridge_composesiren)
-else()
-  target_sources(ComposeSirenCore PRIVATE lib/net/SirenLink.cpp)
-  if(WIN32)
-    # sockets de lib/net/SirenLink
-    target_link_libraries(ComposeSirenCore PRIVATE ws2_32)
+if(COMPOSESIREN_PARK_BRIDGE)
+  target_compile_definitions(ComposeSirenCore PUBLIC COMPOSESIREN_PARK_BRIDGE=1)
+  if(COMPOSESIREN_MECAVIV_BRIDGE)
+    include("${CMAKE_CURRENT_LIST_DIR}/MecavivBridge.cmake")
+    target_link_libraries(ComposeSirenCore PUBLIC mecaviv_bridge_composesiren)
+  else()
+    target_sources(ComposeSirenCore PRIVATE lib/net/SirenLink.cpp)
+    if(WIN32)
+      # sockets de lib/net/SirenLink
+      target_link_libraries(ComposeSirenCore PRIVATE ws2_32)
+    endif()
   endif()
+else()
+  target_compile_definitions(ComposeSirenCore PUBLIC COMPOSESIREN_PARK_BRIDGE=0)
 endif()
 
 # If we need additional global compile defs, put them here

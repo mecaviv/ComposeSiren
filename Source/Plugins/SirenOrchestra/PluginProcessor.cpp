@@ -102,6 +102,7 @@ bool SirenOrchestraPluginProcessor::isBusesLayoutSupported(const BusesLayout& la
 
 // MainButtonsComponent::Listener callbacks
 //------------------------------------------------------------------------------
+#if COMPOSESIREN_PARK_BRIDGE
 void SirenOrchestraPluginProcessor::physicalSirensSwitched(bool on)
 {
     udpBridge.setEnabled(on);
@@ -116,16 +117,19 @@ void SirenOrchestraPluginProcessor::stAllSwitched(bool on)
 {
     udpBridge.setStAll(on);
 }
+#endif
 
 void SirenOrchestraPluginProcessor::resetSiren(std::optional<sirenId> id)
 {
     ensemble.stop(id);
 
+#if COMPOSESIREN_PARK_BRIDGE
     // relayer le reset aux sirènes physiques (trame [8, 10, 0...] du patch Pd)
     if (id.has_value())
         udpBridge.pushReset(static_cast<int>(id.value()) + 1);
     else
         udpBridge.pushResetAll();
+#endif
 }
 
 std::string SirenOrchestraPluginProcessor::getResourcesPath()
@@ -192,6 +196,7 @@ void SirenOrchestraPluginProcessor::processBlock(juce::AudioBuffer<float>& audio
     // ... THEN
     midiIn.swapWith(midiOut);
 
+#if COMPOSESIREN_PARK_BRIDGE
     // mirror du MIDI routé vers les sirènes physiques via UDP
     // (lock-free : les envois réseau se font sur le thread du bridge)
     for (const auto metadata : midiIn) {
@@ -201,6 +206,7 @@ void SirenOrchestraPluginProcessor::processBlock(juce::AudioBuffer<float>& audio
                                m.getRawData()[1],
                                m.getRawData()[2]);
     }
+#endif
 
     // AUDIO CONTROL / SYNTHESIS ///////////////////////////////////////////////
 
@@ -354,9 +360,11 @@ void SirenOrchestraPluginProcessor::getStateInformation(juce::MemoryBlock& destD
     juce::XmlElement xmlState("AllParameters");
     xmlState.addChildElement(apvts.state.createXml().release());
     xmlState.addChildElement(vms.toXml().release());
+#if COMPOSESIREN_PARK_BRIDGE
     // le pilotage des sirènes physiques suit la session, pas le plugin
     auto* bridgeXml = xmlState.createNewChildElement("UdpBridge");
     bridgeXml->setAttribute("enabled", udpBridge.isEnabled());
+#endif
     copyXmlToBinary(xmlState, destData);
 }
 
@@ -382,10 +390,12 @@ void SirenOrchestraPluginProcessor::setStateInformation(const void* data,
                 apvts.replaceState(juce::ValueTree::fromXml(*xmlSubState));
             }
 
+#if COMPOSESIREN_PARK_BRIDGE
             xmlSubState = xmlState->getChildByName("UdpBridge");
             if (xmlSubState != nullptr) {
                 udpBridge.setEnabled(xmlSubState->getBoolAttribute("enabled", false));
             }
+#endif
         }
     }
 

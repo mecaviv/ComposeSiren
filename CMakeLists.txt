@@ -67,14 +67,19 @@ else()
 endif()
 
 # DEAL WITH THE PARK BRIDGE ####################################################
-# SirenOrchestra drives the physical sirens either with SirenLink (C++, in
-# ComposeSirenCore/lib/net) or with mecaviv-bridge-composesiren (Rust, in
-# Source/mecaviv-bridge-composesiren, built on the mecaviv-rs crates of a
-# checkout next to ComposeSiren), linked statically: see
+# COMPOSESIREN_PARK_BRIDGE compiles the UDP park bridge at all. Off: neither
+# SirenLink nor the Rust crate is built, and the "Sirenes physiques" / "ST"
+# controls are omitted. On: SirenOrchestra drives the physical sirens with
+# SirenLink (C++, ComposeSirenCore/lib/net) or, if COMPOSESIREN_MECAVIV_BRIDGE
+# is also ON, with mecaviv-bridge-composesiren (Rust). See
 # Source/ComposeSirenCore/MecavivBridge.cmake.
 
+option(COMPOSESIREN_PARK_BRIDGE
+        "Compile the park UDP bridge (C++ SirenLink or Rust mecaviv-bridge) and show Sirenes physiques / ST"
+        ON)
+
 option(COMPOSESIREN_MECAVIV_BRIDGE
-        "Drive the park with mecaviv-bridge-composesiren (Rust) instead of SirenLink"
+        "Drive the park with mecaviv-bridge-composesiren (Rust) instead of SirenLink (requires COMPOSESIREN_PARK_BRIDGE)"
         OFF)
 
 #set(PLUGIN_TARGETS OneSiren)

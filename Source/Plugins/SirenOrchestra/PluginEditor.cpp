@@ -24,7 +24,11 @@ makeSirenTracks(juce::AudioProcessorValueTreeState& vts,
 SirenOrchestraPluginEditor::SirenOrchestraPluginEditor(SirenOrchestraPluginProcessor& p) :
     AudioProcessorEditor(p),
     audioProcessor(p),
+#if COMPOSESIREN_PARK_BRIDGE
     mainButtons(p, true, true),
+#else
+    mainButtons(p, true, false),
+#endif
     sirenTracks(
         makeSirenTracks(
             p.getAudioProcessorValueTreeState(),
@@ -45,10 +49,14 @@ SirenOrchestraPluginEditor::SirenOrchestraPluginEditor(SirenOrchestraPluginProce
 
     for (auto i : sirenOrder) {
         addAndMakeVisible(sirenTracks.at(i).get());
+#if COMPOSESIREN_PARK_BRIDGE
         stLeds.emplace(i, std::make_unique<StLedComponent>());
         addAndMakeVisible(stLeds.at(i).get());
+#endif
     }
+#if COMPOSESIREN_PARK_BRIDGE
     startTimerHz(4); // rafraîchissement des LEDs d'état ST
+#endif
 
     addAndMakeVisible(rvbStrip);
     addAndMakeVisible(masterVolume);
@@ -68,7 +76,9 @@ SirenOrchestraPluginEditor::SirenOrchestraPluginEditor(SirenOrchestraPluginProce
 
 SirenOrchestraPluginEditor::~SirenOrchestraPluginEditor()
 {
+#if COMPOSESIREN_PARK_BRIDGE
     stopTimer();
+#endif
     audioProcessor.getVoiceManagerState()
                   .removeListener(VoiceManagerState::Listener::Key::midiInput,
                                   this);
@@ -125,6 +135,7 @@ void SirenOrchestraPluginEditor::resized()
             );
         }
 
+#if COMPOSESIREN_PARK_BRIDGE
         // LED d'état ST, à gauche du nom dans la zone de titre du strip
         constexpr int ledSize = 9;
         const auto trackBounds = track->getBounds();
@@ -134,6 +145,7 @@ void SirenOrchestraPluginEditor::resized()
             ledSize,
             ledSize
         );
+#endif
     }
 
     constexpr int reverbY = tracksY + fullSirenHeight + spacer +
@@ -176,6 +188,7 @@ void SirenOrchestraPluginEditor::resized()
     midiKeyboard.setBounds(0, keyboardY, sirenControlsWidth, keyboardH);
 }
 
+#if COMPOSESIREN_PARK_BRIDGE
 void SirenOrchestraPluginEditor::timerCallback()
 {
     for (auto& [id, led] : stLeds) {
@@ -183,6 +196,7 @@ void SirenOrchestraPluginEditor::timerCallback()
         led->setState(audioProcessor.getUdpBridge().getStState(siren));
     }
 }
+#endif
 
 void SirenOrchestraPluginEditor::midiInputChanged(AnyOrOneBasedMidiChannel inch)
 {

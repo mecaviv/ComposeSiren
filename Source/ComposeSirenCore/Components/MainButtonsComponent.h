@@ -9,6 +9,10 @@
 #include "../lib/definitions/palette.h"
 #include "../lib/definitions/sirenProperties.h"
 
+#ifndef COMPOSESIREN_PARK_BRIDGE
+#define COMPOSESIREN_PARK_BRIDGE 0
+#endif
+
 class MainButtonsComponent : public juce::Component,
                              public juce::TextButton::Listener
 {
@@ -30,9 +34,14 @@ public:
     MainButtonsComponent(Listener& l, bool hasResetAll = false,
                          bool hasStAll = false) :
         listener(l),
-        hasResetAllButton(hasResetAll),
-        hasStAllSwitch(hasStAll)
+        hasResetAllButton(hasResetAll)
+#if COMPOSESIREN_PARK_BRIDGE
+        , hasStAllSwitch(hasStAll)
+#endif
     {
+#if !COMPOSESIREN_PARK_BRIDGE
+        juce::ignoreUnused(hasStAll);
+#endif
         selectResourcesButton.setColour(
             juce::TextButton::buttonColourId,
             juce::Colour{mecaviv::Colours::darkTransparentBackground}
@@ -58,6 +67,7 @@ public:
             addAndMakeVisible(resetAllButton);
         }
 
+#if COMPOSESIREN_PARK_BRIDGE
         if (hasStAllSwitch) {
             physicalButton.setButtonText("Sirenes physiques");
             physicalButton.setColour(juce::ToggleButton::textColourId, juce::Colours::whitesmoke);
@@ -74,6 +84,7 @@ public:
             stAllButton.addListener(this);
             addAndMakeVisible(stAllButton);
         }
+#endif
     }
 
     ~MainButtonsComponent() override = default;
@@ -143,6 +154,7 @@ public:
             fb.items.add(item);
         }
 
+#if COMPOSESIREN_PARK_BRIDGE
         if (hasStAllSwitch) {
             item = juce::FlexItem(physicalButton).withMinWidth(150)
                                                  .withMinHeight(btnsHeight)
@@ -155,6 +167,7 @@ public:
             item.margin = juce::FlexItem::Margin(0.f, 0.f, 0.f, margin);
             fb.items.add(item);
         }
+#endif
 
         fb.performLayout(bounds);
     }
@@ -171,6 +184,7 @@ public:
             return;
         }
 
+#if COMPOSESIREN_PARK_BRIDGE
         if (btn == &physicalButton) {
             const bool on = physicalButton.getToggleState();
             stAllButton.setEnabled(on);
@@ -182,6 +196,7 @@ public:
             listener.stAllSwitched(stAllButton.getToggleState());
             return;
         }
+#endif
 
         if (btn == &resetAllButton) {
             listener.resetSiren(std::nullopt);
@@ -215,13 +230,17 @@ private:
 
     std::optional<sirenId> currentSirenId{std::nullopt};
     bool hasResetAllButton{false};
+#if COMPOSESIREN_PARK_BRIDGE
     bool hasStAllSwitch{false};
+#endif
 
     juce::TextButton resetButton;
     juce::TextButton resetAllButton;
     juce::TextButton selectResourcesButton;
+#if COMPOSESIREN_PARK_BRIDGE
     juce::ToggleButton physicalButton;
     juce::ToggleButton stAllButton;
+#endif
 
     std::unique_ptr<juce::FileChooser> fileChooser;
 };

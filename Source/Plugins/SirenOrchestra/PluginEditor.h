@@ -15,6 +15,7 @@
 
 constexpr std::array<sirenId, 7> sirenOrder = { S7, S6, S5, S2, S1, S4, S3 };
 
+#if COMPOSESIREN_PARK_BRIDGE
 // LED D'ÉTAT ST (sirène physique, lue sur le variateur KEB) ===================
 
 class StLedComponent : public juce::Component
@@ -58,6 +59,7 @@ public:
 private:
     SirenUdpBridge::StState state { SirenUdpBridge::StState::unknown };
 };
+#endif
 
 // SIREN STRIP MENU (MIGHT BE MOVED TO ITS OWN FILE) ===========================
 
@@ -137,8 +139,10 @@ private:
 
 class SirenOrchestraPluginEditor : public juce::AudioProcessorEditor,
                                    public VoiceManagerState::Listener,
-                                   public SirenStripMenu::Listener,
-                                   private juce::Timer
+                                   public SirenStripMenu::Listener
+#if COMPOSESIREN_PARK_BRIDGE
+                                   , private juce::Timer
+#endif
 {
 public:
     SirenOrchestraPluginEditor(SirenOrchestraPluginProcessor&);
@@ -147,8 +151,10 @@ public:
     void paint(juce::Graphics&) override;
     void resized() override;
 
+#if COMPOSESIREN_PARK_BRIDGE
     // rafraîchit les LEDs d'état ST depuis le bridge UDP
     void timerCallback() override;
+#endif
 
     // VoiceManagerState::Listener
     //--------------------------------------------------------------------------
@@ -163,7 +169,9 @@ private:
 
     MainButtonsComponent mainButtons;
     std::map<sirenId, std::unique_ptr<SirenTrackComponent>> sirenTracks;
+#if COMPOSESIREN_PARK_BRIDGE
     std::map<sirenId, std::unique_ptr<StLedComponent>> stLeds;
+#endif
     ReverbStripComponent rvbStrip;
     MasterVolumeComponent masterVolume;
     DbRangesMidiKeyboardComponent midiKeyboard;
