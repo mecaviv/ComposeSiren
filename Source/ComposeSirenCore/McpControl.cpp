@@ -40,6 +40,7 @@ McpControl::McpControl(juce::AudioProcessor& processorIn,
     state->processor = &processor;
     state->control = this;
 
+#if COMPOSESIREN_MCP
     const int standalone = McpDeviceHooks::installed() ? 1 : 0;
     server = cs_mcp_start(pluginName.toRawUTF8(),
                           pluginCode.toRawUTF8(),
@@ -47,6 +48,9 @@ McpControl::McpControl(juce::AudioProcessor& processorIn,
                           &McpControl::dispatch,
                           state.get(),
                           &port);
+#else
+    juce::ignoreUnused(pluginName, pluginCode);
+#endif
 }
 
 McpControl::~McpControl()
@@ -54,7 +58,9 @@ McpControl::~McpControl()
     state->shuttingDown.store(true);
     pump();
     state->control = nullptr;
+#if COMPOSESIREN_MCP
     cs_mcp_stop(server);
+#endif
     server = nullptr;
     state->alive.store(false);
     state->processor = nullptr;

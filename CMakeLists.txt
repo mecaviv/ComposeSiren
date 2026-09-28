@@ -82,6 +82,15 @@ option(COMPOSESIREN_MECAVIV_BRIDGE
         "Drive the park with mecaviv-bridge-composesiren (Rust) instead of SirenLink (requires COMPOSESIREN_PARK_BRIDGE)"
         OFF)
 
+# DEAL WITH THE MCP SERVER #####################################################
+# Each plugin instance can run an in-process MCP server (Rust crate
+# Source/composesiren-mcp). It does not use mecaviv-rs. See
+# Source/ComposeSirenCore/Mcp.cmake.
+
+option(COMPOSESIREN_MCP
+        "In-process MCP server for parameters, MIDI, and standalone audio/MIDI devices"
+        ON)
+
 #set(PLUGIN_TARGETS OneSiren)
 set(PLUGIN_TARGETS OneSiren SirenOrchestra)
 #set(PLUGIN_TARGETS CustomMix)

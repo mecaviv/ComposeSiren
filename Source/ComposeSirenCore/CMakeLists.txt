@@ -54,8 +54,13 @@ target_sources(ComposeSirenCore
 
 # ------------------------------------------------------------------------------
 
-include("${CMAKE_CURRENT_LIST_DIR}/Mcp.cmake")
-target_link_libraries(ComposeSirenCore PUBLIC composesiren_mcp)
+if(COMPOSESIREN_MCP)
+  include("${CMAKE_CURRENT_LIST_DIR}/Mcp.cmake")
+  target_link_libraries(ComposeSirenCore PUBLIC composesiren_mcp)
+  target_compile_definitions(ComposeSirenCore PUBLIC COMPOSESIREN_MCP=1)
+else()
+  target_compile_definitions(ComposeSirenCore PUBLIC COMPOSESIREN_MCP=0)
+endif()
 
 target_link_libraries(ComposeSirenCore
   PRIVATE

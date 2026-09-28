@@ -10,7 +10,14 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 
+#ifndef COMPOSESIREN_MCP
+#define COMPOSESIREN_MCP 0
+#endif
+#if COMPOSESIREN_MCP
 #include "composesiren_mcp.h"
+#else
+struct cs_mcp_server_t;
+#endif
 
 // In-process MCP server. Rust owns the HTTP listener and the discovery file
 // ~/.composesiren_mcp.json. This class runs the commands on the message thread

@@ -109,6 +109,27 @@ $ cmake -B cmake-build-debug -DCMAKE_BUILD_TYPE=Debug -DCOMPOSESIREN_PARK_BRIDGE
 $ cmake --build cmake-build-debug --target SirenOrchestra_VST3
 ```
 
+### MCP server
+
+Each plugin instance can run an in-process MCP server so an assistant can set
+parameters, send MIDI, and (in the standalone) choose audio and MIDI devices.
+It is on by default (`-DCOMPOSESIREN_MCP=ON`). It does not use the park bridge
+or mecaviv-rs. Turn it off with `-DCOMPOSESIREN_MCP=OFF`.
+
+- The crate lives in `Source/composesiren-mcp`.
+- A running instance writes `~/.composesiren_mcp.json` with `pluginName`,
+  `plugin4CC`, `port`, `pid`, `sessionId`, and `standalone`.
+- Streamable HTTP is at `http://127.0.0.1:<port>/mcp`. The first port tried is
+  13720.
+- You need a Rust toolchain when MCP is ON. A universal macOS build needs both
+  `aarch64-apple-darwin` and `x86_64-apple-darwin`, the same as the park
+  bridge. See `Source/ComposeSirenCore/Mcp.cmake`.
+
+```
+$ cmake -B cmake-build-debug -DCMAKE_BUILD_TYPE=Debug
+$ cmake --build cmake-build-debug --target OneSiren_Standalone
+```
+
 ### dependencies
 
 #### linux
