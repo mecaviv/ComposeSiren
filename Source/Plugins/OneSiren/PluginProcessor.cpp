@@ -30,7 +30,8 @@ OneSirenPluginProcessor::OneSirenPluginProcessor() :
           createParameterLayout(parameterLayoutData)
     ),
     router(parameterLayoutData[0], apvts, midiKeyboardState),
-    getResourcesPathFunction(getResourcesPathGetter())
+    getResourcesPathFunction(getResourcesPathGetter()),
+    mcp(*this, "OneSiren", "MvOS")
 {
     ssm.subscribe(&siren);
     vms.addListener(this);
@@ -121,6 +122,7 @@ void OneSirenPluginProcessor::midiOutputChanged(AnyOrOneBasedMidiChannel outch)
 // -----------------------------------------------------------------------------
 void OneSirenPluginProcessor::timerCallback()
 {
+    mcp.pump();
     // siren.update();
     siren.notifyListeners();
 }
@@ -154,6 +156,7 @@ void OneSirenPluginProcessor::processBlock(juce::AudioBuffer<float>& audio,
 
     // MIDI ROUTING / SCHEDULING / UI SYNCING //////////////////////////////////
 
+    mcp.drainMidi(midiIn);
     scheduler.reset();
 
     for (const auto metadata : midiIn) {

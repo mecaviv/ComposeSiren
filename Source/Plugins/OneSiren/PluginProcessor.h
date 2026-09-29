@@ -14,6 +14,7 @@
 #include <Components/MainButtonsComponent.h>
 #include "OneMidiRouter.h"
 #include "lib/wrappers/SirenStateMonitor.h"
+#include <McpControl.h>
 // #include "UiState.h"
 
 class OneSirenPluginProcessor :
@@ -108,6 +109,8 @@ private:
     SirenStateMonitor ssm;
 
     std::function<std::string(void)> getResourcesPathFunction;
+
+    McpControl mcp;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(OneSirenPluginProcessor)
 };

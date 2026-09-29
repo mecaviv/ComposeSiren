@@ -78,12 +78,18 @@ is created in `build/Packaging/ComposeSiren_Installer_artefacts`
 
 ### Park bridge: SirenLink or mecaviv-bridge
 
-SirenOrchestra drives the physical sirens with `SirenLink` (C++) by default.
-With `-DCOMPOSESIREN_MECAVIV_BRIDGE=ON` it uses `mecaviv-bridge-composesiren`
-instead, linked statically. That Rust crate, in
-`Source/mecaviv-bridge-composesiren`, is made for this plugin and builds on
-the protocol crates of [mecaviv-rs](../mecaviv-rs). The plugin code is the
-same in both cases: `SirenUdpBridge.h` picks the implementation.
+The park UDP bridge is off by default. `-DCOMPOSESIREN_PARK_BRIDGE=ON`
+compiles it and shows the "Sirenes physiques" and "ST" controls on
+SirenOrchestra. With the default (`OFF`), neither the C++ nor the Rust
+implementation is built, and those controls are omitted.
+
+When the park bridge is on, SirenOrchestra drives the physical sirens with
+`SirenLink` (C++) by default. With `-DCOMPOSESIREN_MECAVIV_BRIDGE=ON` it uses
+`mecaviv-bridge-composesiren` instead, linked statically.
+`COMPOSESIREN_MECAVIV_BRIDGE` has no effect if the park bridge is off. That
+Rust crate, in `Source/mecaviv-bridge-composesiren`, is made for this plugin
+and builds on the protocol crates of [mecaviv-rs](../mecaviv-rs). The plugin
+code is the same in both cases: `SirenUdpBridge.h` picks the implementation.
 
 - mecaviv-rs must be checked out next to ComposeSiren (`../mecaviv-rs`): the
   crate's `Cargo.toml` depends on it by relative path.
@@ -98,8 +104,30 @@ same in both cases: `SirenUdpBridge.h` picks the implementation.
   time. See `Source/ComposeSirenCore/MecavivBridge.cmake`.
 
 ```
-$ cmake -B cmake-build-debug -DCMAKE_BUILD_TYPE=Debug -DCOMPOSESIREN_MECAVIV_BRIDGE=ON
+$ cmake -B cmake-build-debug -DCMAKE_BUILD_TYPE=Debug -DCOMPOSESIREN_PARK_BRIDGE=ON
+$ cmake -B cmake-build-debug -DCMAKE_BUILD_TYPE=Debug -DCOMPOSESIREN_PARK_BRIDGE=ON -DCOMPOSESIREN_MECAVIV_BRIDGE=ON
 $ cmake --build cmake-build-debug --target SirenOrchestra_VST3
+```
+
+### MCP server
+
+Each plugin instance can run an in-process MCP server so an assistant can set
+parameters, send MIDI, and (in the standalone) choose audio and MIDI devices.
+It is on by default (`-DCOMPOSESIREN_MCP=ON`). It does not use the park bridge
+or mecaviv-rs. Turn it off with `-DCOMPOSESIREN_MCP=OFF`.
+
+- The crate lives in `Source/composesiren-mcp`.
+- A running instance writes `~/.composesiren_mcp.json` with `pluginName`,
+  `plugin4CC`, `port`, `pid`, `sessionId`, and `standalone`.
+- Streamable HTTP is at `http://127.0.0.1:<port>/mcp`. The first port tried is
+  13720.
+- You need a Rust toolchain when MCP is ON. A universal macOS build needs both
+  `aarch64-apple-darwin` and `x86_64-apple-darwin`, the same as the park
+  bridge. See `Source/ComposeSirenCore/Mcp.cmake`.
+
+```
+$ cmake -B cmake-build-debug -DCMAKE_BUILD_TYPE=Debug
+$ cmake --build cmake-build-debug --target OneSiren_Standalone
 ```
 
 ### dependencies
