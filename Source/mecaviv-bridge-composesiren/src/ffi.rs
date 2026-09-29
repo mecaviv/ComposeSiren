@@ -13,7 +13,7 @@ use std::ptr;
 use mecaviv_v1::SirenId;
 use mecaviv_v1::keb::DriveState;
 
-use crate::Bridge;
+use crate::{Backend, Bridge};
 
 /// Number of sirens: siren numbers are 1 to `MECAVIV_BRIDGE_NUM_SIRENS`.
 pub const MECAVIV_BRIDGE_NUM_SIRENS: u8 = 7;
@@ -43,6 +43,28 @@ impl From<DriveState> for mecaviv_st_state_t {
     }
 }
 
+/// How the park is driven.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum mecaviv_bridge_backend_t {
+    /// No transport: the handle is null, or enable failed to open one.
+    MECAVIV_BRIDGE_BACKEND_NONE = 0,
+    /// This process talks to the boards.
+    MECAVIV_BRIDGE_BACKEND_IN_PROCESS = 1,
+    /// `mecaviv-bridge-daemon` owns the hardware link.
+    MECAVIV_BRIDGE_BACKEND_DAEMON = 2,
+}
+
+impl From<Backend> for mecaviv_bridge_backend_t {
+    fn from(backend: Backend) -> Self {
+        match backend {
+            Backend::None => Self::MECAVIV_BRIDGE_BACKEND_NONE,
+            Backend::InProcess => Self::MECAVIV_BRIDGE_BACKEND_IN_PROCESS,
+            Backend::Daemon => Self::MECAVIV_BRIDGE_BACKEND_DAEMON,
+        }
+    }
+}
+
 /// # Safety
 ///
 /// `bridge` is null or was returned by `mecaviv_bridge_new` and not freed.
@@ -52,7 +74,7 @@ unsafe fn get<'a>(bridge: *const mecaviv_bridge_t) -> Option<&'a Bridge> {
 }
 
 /// Creates a disabled bridge to the park at its default addresses. Returns
-/// null if its sockets or its thread cannot be created.
+/// null if its thread cannot be created.
 #[unsafe(no_mangle)]
 pub extern "C" fn mecaviv_bridge_new() -> *mut mecaviv_bridge_t {
     Bridge::new().map_or(ptr::null_mut(), |bridge| {
@@ -177,9 +199,71 @@ pub unsafe extern "C" fn mecaviv_bridge_st_state(
     }
 }
 
+/// How the park is driven. While disabled, a listening daemon socket is
+/// reported as daemon so the UI can say what enabling will use. None for a
+/// null handle.
+///
+/// # Safety
+///
+/// `bridge` is null or a live handle.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mecaviv_bridge_backend(
+    bridge: *const mecaviv_bridge_t,
+) -> mecaviv_bridge_backend_t {
+    // SAFETY: guaranteed by the caller.
+    unsafe { get(bridge) }.map_or(
+        mecaviv_bridge_backend_t::MECAVIV_BRIDGE_BACKEND_NONE,
+        |bridge| bridge.backend().into(),
+    )
+}
+
+/// Tooltip for the current backend: a static NUL-terminated string. Do not
+/// free it. The none tooltip for a null handle.
+///
+/// # Safety
+///
+/// `bridge` is null or a live handle.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mecaviv_bridge_backend_tooltip(
+    bridge: *const mecaviv_bridge_t,
+) -> *const c_char {
+    // SAFETY: guaranteed by the caller.
+    tooltip_ptr(unsafe { get(bridge) }.map_or(Backend::None, Bridge::backend))
+}
+
 /// The library version, `major.minor.patch`, as a static NUL-terminated
 /// string. Do not free it.
 #[unsafe(no_mangle)]
 pub extern "C" fn mecaviv_bridge_version() -> *const c_char {
     concat!(env!("CARGO_PKG_VERSION"), "\0").as_ptr().cast()
+}
+
+fn tooltip_ptr(backend: Backend) -> *const c_char {
+    match backend {
+        Backend::None => concat!("Park bridge is not available.", "\0")
+            .as_ptr()
+            .cast(),
+        Backend::InProcess => concat!("Uses the in-process bridge.", "\0").as_ptr().cast(),
+        Backend::Daemon => concat!("Uses the mecaviv-bridge daemon.", "\0")
+            .as_ptr()
+            .cast(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::ffi::CStr;
+
+    use super::tooltip_ptr;
+    use crate::Backend;
+
+    #[test]
+    #[allow(unsafe_code, reason = "reads the C strings the ABI returns")]
+    fn c_tooltips_match_backend() {
+        for backend in [Backend::None, Backend::InProcess, Backend::Daemon] {
+            // SAFETY: tooltip_ptr returns a static NUL-terminated string.
+            let tip = unsafe { CStr::from_ptr(tooltip_ptr(backend)) };
+            assert_eq!(tip.to_str(), Ok(backend.tooltip()));
+        }
+    }
 }

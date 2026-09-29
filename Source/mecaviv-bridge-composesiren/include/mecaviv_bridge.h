@@ -28,6 +28,16 @@ typedef enum {
     MECAVIV_ST_STATE_ON = 1,
 } mecaviv_st_state_t;
 
+// How the park is driven.
+typedef enum {
+    // No transport: the handle is null, or enable failed to open one.
+    MECAVIV_BRIDGE_BACKEND_NONE = 0,
+    // This process talks to the boards.
+    MECAVIV_BRIDGE_BACKEND_IN_PROCESS = 1,
+    // `mecaviv-bridge-daemon` owns the hardware link.
+    MECAVIV_BRIDGE_BACKEND_DAEMON = 2,
+} mecaviv_bridge_backend_t;
+
 // Opaque handle to a bridge.
 typedef struct mecaviv_bridge_t mecaviv_bridge_t;
 
@@ -36,7 +46,7 @@ extern "C" {
 #endif // __cplusplus
 
 // Creates a disabled bridge to the park at its default addresses. Returns
-// null if its sockets or its thread cannot be created.
+// null if its thread cannot be created.
 mecaviv_bridge_t *mecaviv_bridge_new(void);
 
 // Stops and frees a bridge.
@@ -102,6 +112,23 @@ void mecaviv_bridge_set_st_all(const mecaviv_bridge_t *bridge, bool enabled);
 //
 // `bridge` is null or a live handle.
 mecaviv_st_state_t mecaviv_bridge_st_state(const mecaviv_bridge_t *bridge, uint8_t siren);
+
+// How the park is driven. While disabled, a listening daemon socket is
+// reported as daemon so the UI can say what enabling will use. None for a
+// null handle.
+//
+// # Safety
+//
+// `bridge` is null or a live handle.
+mecaviv_bridge_backend_t mecaviv_bridge_backend(const mecaviv_bridge_t *bridge);
+
+// Tooltip for the current backend: a static NUL-terminated string. Do not
+// free it. The none tooltip for a null handle.
+//
+// # Safety
+//
+// `bridge` is null or a live handle.
+const char *mecaviv_bridge_backend_tooltip(const mecaviv_bridge_t *bridge);
 
 // The library version, `major.minor.patch`, as a static NUL-terminated
 // string. Do not free it.

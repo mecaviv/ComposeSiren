@@ -28,6 +28,7 @@ public:
         // quand l'éditeur s'ouvre (l'état vit dans le processor, pas dans l'UI).
         virtual void physicalSirensSwitched(bool) {}
         virtual bool physicalSirensEnabled() { return false; }
+        virtual juce::String physicalSirensTooltip() { return {}; }
         virtual void stAllSwitched(bool) {}
     };
 
@@ -74,6 +75,7 @@ public:
             physicalButton.setColour(juce::ToggleButton::tickColourId, juce::Colours::whitesmoke);
             physicalButton.setToggleState(listener.physicalSirensEnabled(),
                                           juce::dontSendNotification);
+            physicalButton.setTooltip(listener.physicalSirensTooltip());
             physicalButton.addListener(this);
             addAndMakeVisible(physicalButton);
 
@@ -177,6 +179,14 @@ public:
         currentSirenId = id;
     }
 
+#if COMPOSESIREN_PARK_BRIDGE
+    void refreshPhysicalSirensTooltip()
+    {
+        if (hasStAllSwitch)
+            physicalButton.setTooltip(listener.physicalSirensTooltip());
+    }
+#endif
+
     void buttonClicked(juce::Button* btn) override
     {
         if (btn == &resetButton) {
@@ -189,6 +199,7 @@ public:
             const bool on = physicalButton.getToggleState();
             stAllButton.setEnabled(on);
             listener.physicalSirensSwitched(on);
+            refreshPhysicalSirensTooltip();
             return;
         }
 

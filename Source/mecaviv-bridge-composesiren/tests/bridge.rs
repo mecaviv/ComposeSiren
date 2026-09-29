@@ -4,7 +4,9 @@
 use std::net::{Ipv4Addr, SocketAddr, UdpSocket};
 use std::time::{Duration, Instant};
 
-use mecaviv_bridge_composesiren::{Bridge, DriveState, ParkTable, SirenEndpoints, SirenId};
+use mecaviv_bridge_composesiren::{
+    Backend, Bridge, DriveState, ParkTable, SirenEndpoints, SirenId,
+};
 use mecaviv_v1::frame::Frame;
 use mecaviv_v1::keb::{KebModel, StRequest};
 use mecaviv_v1::value::U7;
@@ -193,6 +195,16 @@ fn generated_header_declares_every_exported_function() {
 }
 
 #[test]
+fn with_park_is_in_process() {
+    let park = FakePark::new();
+    let bridge = Bridge::with_park(park.table.clone()).unwrap();
+    assert_eq!(bridge.backend(), Backend::InProcess);
+    assert_eq!(bridge.backend().tooltip(), "Uses the in-process bridge.");
+    bridge.set_enabled(true);
+    assert!(wait_for(|| bridge.backend() == Backend::InProcess));
+}
+
+#[test]
 #[allow(unsafe_code, reason = "reads the C string the ABI returns")]
 fn version_is_the_crate_version() {
     // SAFETY: the ABI returns a static NUL-terminated string.
@@ -200,4 +212,160 @@ fn version_is_the_crate_version() {
         std::ffi::CStr::from_ptr(mecaviv_bridge_composesiren::ffi::mecaviv_bridge_version())
     };
     assert_eq!(version.to_str(), Ok(mecaviv_bridge_composesiren::VERSION));
+}
+
+#[test]
+#[allow(unsafe_code, reason = "reads the C string the ABI returns")]
+fn backend_tooltip_matches_backend() {
+    let park = FakePark::new();
+    let bridge = Bridge::with_park(park.table.clone()).unwrap();
+    // SAFETY: the ABI returns a static NUL-terminated string.
+    let tip = unsafe {
+        std::ffi::CStr::from_ptr(
+            mecaviv_bridge_composesiren::ffi::mecaviv_bridge_backend_tooltip(std::ptr::null()),
+        )
+    };
+    assert_eq!(tip.to_str(), Ok(Backend::None.tooltip()));
+    let _ = bridge;
+}
+
+#[cfg(unix)]
+mod daemon {
+    use super::*;
+    use std::os::unix::net::UnixListener;
+    use std::sync::atomic::{AtomicU64, Ordering};
+    use std::sync::mpsc::{self, Receiver};
+    use std::thread::{self, JoinHandle};
+
+    use mecaviv_bridge_daemon::{
+        ClientId, ClientMessage, ServerMessage, read_record, write_record,
+    };
+    use mecaviv_v1::Command;
+
+    static SOCK: AtomicU64 = AtomicU64::new(0);
+
+    struct Mock {
+        path: std::path::PathBuf,
+        received: Receiver<ClientMessage>,
+        _thread: JoinHandle<()>,
+    }
+
+    impl Drop for Mock {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_file(&self.path);
+        }
+    }
+
+    fn spawn_mock() -> Mock {
+        let path = std::env::temp_dir().join(format!(
+            "mecaviv-cs-bridge-{}-{}.sock",
+            std::process::id(),
+            SOCK.fetch_add(1, Ordering::Relaxed)
+        ));
+        let _ = std::fs::remove_file(&path);
+        let listener = UnixListener::bind(&path).unwrap();
+        let (tx, received) = mpsc::channel();
+        let thread = thread::spawn(move || {
+            for stream in listener.incoming() {
+                let Ok(mut stream) = stream else { break };
+                while let Ok(payload) = read_record(&mut stream) {
+                    let Ok(message) = ClientMessage::decode(&payload) else {
+                        break;
+                    };
+                    match &message {
+                        ClientMessage::Hello(_) => {
+                            let welcome = ServerMessage::Welcome {
+                                client: ClientId(1),
+                            };
+                            if write_record(&mut stream, &welcome.encode()).is_err() {
+                                break;
+                            }
+                        }
+                        ClientMessage::Subscribe { .. } => {
+                            let state = ServerMessage::DriveState {
+                                siren: super::siren(1),
+                                state: DriveState::Enabled,
+                            };
+                            if write_record(&mut stream, &state.encode()).is_err() {
+                                break;
+                            }
+                        }
+                        ClientMessage::Park { .. } => {
+                            if tx.send(message).is_err() {
+                                return;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+        Mock {
+            path,
+            received,
+            _thread: thread,
+        }
+    }
+
+    #[test]
+    fn new_uses_the_daemon_when_it_accepts_hello() {
+        let mock = spawn_mock();
+        let bridge = Bridge::with_socket(mock.path.clone()).unwrap();
+        assert_eq!(bridge.backend(), Backend::Daemon);
+        assert_eq!(
+            bridge.backend().tooltip(),
+            "Uses the mecaviv-bridge daemon."
+        );
+
+        bridge.set_enabled(true);
+        assert!(wait_for(|| bridge.backend() == Backend::Daemon));
+
+        let reset = mock
+            .received
+            .recv_timeout(Duration::from_secs(3))
+            .expect("reset handshake");
+        match reset {
+            ClientMessage::Park {
+                dest,
+                command: Command::Reset,
+                ..
+            } => assert_eq!(dest, Target::All),
+            other => panic!("{other:?}"),
+        }
+
+        assert!(wait_for(|| bridge.st_state(siren(1)) == DriveState::Enabled));
+        assert!(bridge.push_midi([0x90, 60, 100]));
+        let midi = mock
+            .received
+            .recv_timeout(Duration::from_secs(3))
+            .expect("midi");
+        match midi {
+            ClientMessage::Park {
+                command: Command::Midi { .. },
+                ..
+            } => {}
+            other => panic!("{other:?}"),
+        }
+
+        bridge.set_enabled(false);
+        assert!(wait_for(|| bridge.st_state(siren(1)) == DriveState::Unknown));
+        assert_eq!(bridge.backend(), Backend::Daemon);
+    }
+
+    #[test]
+    fn with_park_does_not_talk_to_the_daemon() {
+        let mock = spawn_mock();
+        let park = FakePark::new();
+        let bridge = Bridge::with_park(park.table.clone()).unwrap();
+        assert_eq!(bridge.backend(), Backend::InProcess);
+        bridge.set_enabled(true);
+        for _ in 1..=7 {
+            assert_eq!(park.next_card_command(), Some(Command::Reset));
+        }
+        assert!(
+            mock.received
+                .recv_timeout(Duration::from_millis(200))
+                .is_err(),
+            "with_park must not send Park records"
+        );
+    }
 }

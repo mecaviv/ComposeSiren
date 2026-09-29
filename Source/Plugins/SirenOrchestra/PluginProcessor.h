@@ -48,6 +48,7 @@ public:
 #if COMPOSESIREN_PARK_BRIDGE
     void physicalSirensSwitched(bool) override;
     bool physicalSirensEnabled() override;
+    juce::String physicalSirensTooltip() override;
     void stAllSwitched(bool) override;
 #endif
 

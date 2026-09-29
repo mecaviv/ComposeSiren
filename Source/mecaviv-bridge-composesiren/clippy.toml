@@ -1,1 +1,1 @@
-doc-valid-idents = ["ComposeSiren", "SirenLink", "SirenUdpBridge", "SirenOrchestra", "KEB", ".."]
+doc-valid-idents = ["ComposeSiren", "SirenLink", "SirenUdpBridge", "SirenOrchestra", "KEB", "Sirenes", ".."]

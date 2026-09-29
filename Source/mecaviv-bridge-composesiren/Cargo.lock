@@ -116,6 +116,14 @@ name = "mecaviv-bridge-composesiren"
 version = "0.1.0"
 dependencies = [
  "cbindgen",
+ "mecaviv-bridge-daemon",
+ "mecaviv-v1",
+]
+
+[[package]]
+name = "mecaviv-bridge-daemon"
+version = "0.1.0"
+dependencies = [
  "mecaviv-v1",
 ]
 

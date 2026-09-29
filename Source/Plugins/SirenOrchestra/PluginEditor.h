@@ -168,6 +168,7 @@ private:
     SirenOrchestraPluginProcessor& audioProcessor;
 
     MainButtonsComponent mainButtons;
+    juce::TooltipWindow tooltipWindow { this };
     std::map<sirenId, std::unique_ptr<SirenTrackComponent>> sirenTracks;
 #if COMPOSESIREN_PARK_BRIDGE
     std::map<sirenId, std::unique_ptr<StLedComponent>> stLeds;

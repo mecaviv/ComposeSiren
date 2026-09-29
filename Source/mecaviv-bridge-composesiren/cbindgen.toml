@@ -25,7 +25,7 @@ autogen_warning = """
  * builds. Do not edit: change ffi.rs instead. */"""
 
 [export]
-include = ["mecaviv_st_state_t"]
+include = ["mecaviv_st_state_t", "mecaviv_bridge_backend_t"]
 
 [enum]
 prefix_with_name = false
