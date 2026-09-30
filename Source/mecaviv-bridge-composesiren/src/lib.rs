@@ -4,11 +4,11 @@
 //! plugin: its API is the one `SirenUdpBridge.h` expects. The protocol comes
 //! from the `mecaviv-v1` crate of mecaviv-rs, checked out next to ComposeSiren.
 //!
-//! Today it drives the sirens in-process, over the V1 direct path, as
-//! `SirenLink` did. Later the same [`Bridge`] will talk to
-//! `mecaviv-bridge-daemon` when it runs, and fall back to driving the park
-//! itself when it does not. Its API, and the C ABI and C++ wrapper in
-//! `include/`, stay the same.
+//! On enable it tries `mecaviv-bridge-daemon` on the local socket and falls
+//! back to the in-process V1 path (`SirenLink`'s direct UDP) when the
+//! handshake fails. [`Bridge::with_park`] never talks to the daemon. Its API,
+//! and the C ABI and C++ wrapper in `include/`, stay the same except for
+//! [`Backend`], which the UI uses for the "Sirenes physiques" tooltip.
 //!
 //! - [`Bridge`]: the handle. Disabled until [`Bridge::set_enabled`], so an
 //!   instance in the studio never talks to a park that is not there.
@@ -18,14 +18,15 @@
 //!   is the hand-written C++ wrapper on top of it.
 
 mod bridge;
+mod daemon;
 pub mod ffi;
 mod link;
 mod park;
 
-pub use bridge::Bridge;
+pub use bridge::{Backend, Bridge};
 pub use mecaviv_v1::SirenId;
 pub use mecaviv_v1::keb::DriveState;
 pub use park::{ParkTable, SirenEndpoints};
 
-/// The library's version, reported to the daemon in the client handshake.
+/// The library's version, reported through the C ABI.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

@@ -23,6 +23,13 @@ public:
         on = MECAVIV_ST_STATE_ON,
     };
 
+    enum class Backend : int
+    {
+        none = MECAVIV_BRIDGE_BACKEND_NONE,
+        in_process = MECAVIV_BRIDGE_BACKEND_IN_PROCESS,
+        daemon = MECAVIV_BRIDGE_BACKEND_DAEMON,
+    };
+
     // Disabled until setEnabled(true). If the bridge cannot be created, every
     // call does nothing and getStState() returns unknown.
     Bridge() noexcept : handle(mecaviv_bridge_new()) {}
@@ -60,6 +67,17 @@ public:
             return StState::unknown;
         return static_cast<StState>(
             mecaviv_bridge_st_state(handle, static_cast<std::uint8_t>(siren)));
+    }
+
+    Backend backend() const noexcept
+    {
+        return static_cast<Backend>(mecaviv_bridge_backend(handle));
+    }
+
+    // Static NUL-terminated string. Do not free it.
+    const char* backendTooltip() const noexcept
+    {
+        return mecaviv_bridge_backend_tooltip(handle);
     }
 
     static const char* version() noexcept { return mecaviv_bridge_version(); }

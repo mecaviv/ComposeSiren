@@ -195,6 +195,7 @@ void SirenOrchestraPluginEditor::timerCallback()
         const int siren = sirenPropertiesById.at(id)->oneBasedMidiChannel.oneBased;
         led->setState(audioProcessor.getUdpBridge().getStState(siren));
     }
+    mainButtons.refreshPhysicalSirensTooltip();
 }
 #endif
 

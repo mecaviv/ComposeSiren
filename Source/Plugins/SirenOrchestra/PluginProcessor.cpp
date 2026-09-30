@@ -114,6 +114,15 @@ bool SirenOrchestraPluginProcessor::physicalSirensEnabled()
     return udpBridge.isEnabled();
 }
 
+juce::String SirenOrchestraPluginProcessor::physicalSirensTooltip()
+{
+#if COMPOSESIREN_MECAVIV_BRIDGE
+    return udpBridge.backendTooltip();
+#else
+    return "Uses SirenLink (in-process).";
+#endif
+}
+
 void SirenOrchestraPluginProcessor::stAllSwitched(bool on)
 {
     udpBridge.setStAll(on);
