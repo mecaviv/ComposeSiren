@@ -11,6 +11,12 @@
 #ifndef COMPOSESIREN_DBRANGES_MIDIKEYBOARDCOMPONENT_H
 #define COMPOSESIREN_DBRANGES_MIDIKEYBOARDCOMPONENT_H
 
+#include <algorithm>
+#include <atomic>
+#include <functional>
+#include <map>
+#include <optional>
+
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "../lib/definitions/sirenProperties.h"
 #include "../lib/definitions/palette.h"
@@ -159,25 +165,152 @@ private:
 };
 
 //==============================================================================
+// Helper: tracks which MIDI channel activated each note
+// Separate from CustomMidiKeyboardComponent to avoid diamond inheritance
+// (MidiKeyboardComponent already IS a MidiKeyboardState::Listener)
+//==============================================================================
+
+class NoteChannelTracker : private juce::MidiKeyboardState::Listener
+{
+public:
+    NoteChannelTracker(juce::MidiKeyboardState& state,
+                       std::function<void()> onStateChanged = nullptr)
+        : keyboardState(state), callback(std::move(onStateChanged))
+    {
+        keyboardState.addListener(this);
+    }
+
+    ~NoteChannelTracker() override
+    {
+        keyboardState.removeListener(this);
+    }
+
+    std::optional<int> getActiveChannelForNote(int note) const
+    {
+        const juce::ScopedLock sl(lock);
+        auto it = noteChannels.find(note);
+        if (it != noteChannels.end() && !it->second.empty()) {
+            return it->second.back();
+        }
+        return std::nullopt;
+    }
+
+private:
+    juce::MidiKeyboardState& keyboardState;
+    std::function<void()> callback;
+    mutable juce::CriticalSection lock;
+
+    // note -> [channels] (most recent at back). Audio thread writes, UI reads.
+    std::map<int, std::vector<int>> noteChannels;
+
+    void handleNoteOn(juce::MidiKeyboardState*,
+                      int channel, int note, float) override
+    {
+        {
+            const juce::ScopedLock sl(lock);
+            auto& channels = noteChannels[note];
+            if (std::find(channels.begin(), channels.end(), channel) == channels.end()) {
+                channels.push_back(channel);
+            }
+        }
+        if (callback) callback();
+    }
+
+    void handleNoteOff(juce::MidiKeyboardState*,
+                       int channel, int note, float) override
+    {
+        {
+            const juce::ScopedLock sl(lock);
+            auto it = noteChannels.find(note);
+            if (it != noteChannels.end()) {
+                auto& channels = it->second;
+                channels.erase(
+                    std::remove(channels.begin(), channels.end(), channel),
+                    channels.end()
+                );
+                if (channels.empty()) {
+                    noteChannels.erase(it);
+                }
+            }
+        }
+        if (callback) callback();
+    }
+};
+
+//==============================================================================
 // customized MidiKeyboardComponent class
 // owned by DbRangesMidiKeyboardComponent
 //==============================================================================
+
+// MidiKeyboardComponent is already a juce::Timer, so use a separate timer.
+class FlagRepaintTimer : private juce::Timer
+{
+public:
+    FlagRepaintTimer(std::atomic<bool>& f, juce::Component& c) : flag(f), comp(c) {
+        startTimerHz(30);
+    }
+    ~FlagRepaintTimer() override { stopTimer(); }
+
+private:
+    void timerCallback() override {
+        if (flag.exchange(false, std::memory_order_relaxed))
+            comp.repaint();
+    }
+    std::atomic<bool>& flag;
+    juce::Component& comp;
+};
 
 class CustomMidiKeyboardComponent : public juce::MidiKeyboardComponent
 {
 public:
     CustomMidiKeyboardComponent(juce::MidiKeyboardState& s,
-                                juce::MidiKeyboardComponent::Orientation o) :
-        juce::MidiKeyboardComponent(s, o)
+                                juce::MidiKeyboardComponent::Orientation o,
+                                SirenStateMonitor& ssm) :
+        juce::MidiKeyboardComponent(s, o),
+        sirenStateMonitor(ssm),
+        // Note events arrive on the audio thread: only flag, never repaint here.
+        channelTracker(s, [this]() { needsRepaint.store(true, std::memory_order_relaxed); })
     {
-        // setBlackNoteLengthProportion(1.0f);
-        // setOctaveForMiddleC(4);
         setWantsKeyboardFocus(false);
+        setMidiChannelsToDisplay(0xffff);
     }
 
     ~CustomMidiKeyboardComponent() override = default;
 
-    // TODO : override paint method for more control over final look and feel
+    void setCurrentSirenId(std::optional<sirenId> id)
+    {
+        currentSirenId = id;
+        repaint();
+    }
+
+    void drawWhiteNote(int midiNoteNumber,
+                       juce::Graphics& g,
+                       juce::Rectangle<float> area,
+                       bool isDown,
+                       bool isOver,
+                       juce::Colour lineColour,
+                       juce::Colour textColour) override
+    {
+        juce::Colour c(findColour(whiteNoteColourId));
+        const bool coloured = applySirenDownColour(c, midiNoteNumber, isDown);
+        if (isOver && !coloured)
+            c = c.overlaidWith(findColour(mouseOverKeyOverlayColourId));
+        else if (isOver && coloured)
+            c = c.brighter(0.15f);
+
+        g.setColour(c);
+        g.fillRect(area);
+
+        g.setColour(lineColour);
+        g.drawRect(area);
+
+        auto text = getWhiteNoteText(midiNoteNumber);
+        if (text.isNotEmpty()) {
+            g.setColour(textColour);
+            g.setFont(juce::FontOptions(10.0f));
+            g.drawText(text, area.reduced(2, 2), juce::Justification::centredBottom, false);
+        }
+    }
 
     void drawBlackNote(int midiNoteNumber,
                        juce::Graphics& g,
@@ -187,9 +320,11 @@ public:
                        const juce::Colour noteFillColour) override
     {
         juce::Colour c(noteFillColour);
-
-        if (isDown)  c = c.overlaidWith(findColour(keyDownOverlayColourId));
-        if (isOver)  c = c.overlaidWith(findColour(mouseOverKeyOverlayColourId));
+        const bool coloured = applySirenDownColour(c, midiNoteNumber, isDown);
+        if (isOver && !coloured)
+            c = c.overlaidWith(findColour(mouseOverKeyOverlayColourId));
+        else if (isOver && coloured)
+            c = c.brighter(0.15f);
 
         g.setColour(c);
         g.fillRect(area);
@@ -218,6 +353,45 @@ public:
 
         return {};
     }
+
+private:
+    // Colour a down key with the siren that is actually sounding. Orchestra:
+    // MIDI channel maps to a siren that is in the ensemble. OneSiren: the
+    // input channel is a filter, so fall back to the selected category's siren.
+    // Never overlay the orange key-down colour on top — a click is also
+    // isOver, and that overlay was hiding the siren colour.
+    bool applySirenDownColour(juce::Colour& c, int midiNoteNumber, bool isDown) const
+    {
+        if (!isDown)
+            return false;
+
+        if (auto channel = channelTracker.getActiveChannelForNote(midiNoteNumber)) {
+            OneBasedMidiChannel ch{.oneBased = *channel};
+            auto it = sirenPropertiesByChannel.find(ch);
+            if (it != sirenPropertiesByChannel.end()) {
+                const sirenId id = it->second->id;
+                const auto& active = sirenStateMonitor.getActiveSirenIds();
+                if (std::find(active.begin(), active.end(), id) != active.end()) {
+                    c = sirenColourById.at(id);
+                    return true;
+                }
+            }
+        }
+
+        if (currentSirenId.has_value()) {
+            c = sirenColourById.at(*currentSirenId);
+            return true;
+        }
+
+        c = c.overlaidWith(findColour(keyDownOverlayColourId));
+        return false;
+    }
+
+    SirenStateMonitor& sirenStateMonitor;
+    std::atomic<bool> needsRepaint{false};
+    NoteChannelTracker channelTracker;
+    FlagRepaintTimer repaintTimer{needsRepaint, *this};
+    std::optional<sirenId> currentSirenId;
 };
 
 //==============================================================================
@@ -252,7 +426,7 @@ public:
                                   SirenStateMonitor& ssm,
                                   const juce::String& name = "") :
         Component(name),
-        keyboard(s, juce::MidiKeyboardComponent::horizontalKeyboard),
+        keyboard(s, juce::MidiKeyboardComponent::horizontalKeyboard, ssm),
         sirenPitchesDisplay(ssm, keyboard),
         voiceManagerState(vms)
     {
@@ -317,6 +491,7 @@ public:
     void setCurrentSirenCategory(sirenCategory c)
     {
         data = sirenPropertiesByCategory.at(c);
+        keyboard.setCurrentSirenId(data->id);
         resized();
         repaint();
     }
@@ -329,6 +504,7 @@ public:
         {
             data = sirenPropertiesByChannel.at(midiChannel);
             sirenPitchesDisplay.setForegroundSirenId(data->id);
+            keyboard.setCurrentSirenId(data->id);
             keyboard.setMidiChannel(midiChannel.oneBased);
             resized();
             repaint();
