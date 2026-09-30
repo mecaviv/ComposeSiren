@@ -12,7 +12,7 @@
 #ifndef COMPOSESIREN_PARK_BRIDGE
 #define COMPOSESIREN_PARK_BRIDGE 0
 #endif
-#include <RecordDialog.h>
+#include "../lib/utilities/recorder/RecordDialog.h"
 
 class MainButtonsComponent : public juce::Component,
                              public juce::TextButton::Listener

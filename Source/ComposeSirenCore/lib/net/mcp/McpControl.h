@@ -10,7 +10,7 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 
-#include "Recorder.h"
+#include "lib/utilities/recorder/Recorder.h"
 
 #ifndef COMPOSESIREN_MCP
 #define COMPOSESIREN_MCP 0

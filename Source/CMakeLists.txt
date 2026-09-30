@@ -88,7 +88,7 @@ function(add_plugin_variant TARGET_NAME PLUGIN_CODE BUNDLE_ID)
   if(COMPOSESIREN_MCP AND TARGET ${TARGET_NAME}_Standalone)
     target_sources(${TARGET_NAME}_Standalone
       PRIVATE
-        "${CMAKE_CURRENT_LIST_DIR}/Plugins/StandaloneMcpHooks.cpp"
+        "${CMAKE_CURRENT_LIST_DIR}/ComposeSirenCore/lib/net/mcp/StandaloneMcpHooks.cpp"
     )
   endif()
 

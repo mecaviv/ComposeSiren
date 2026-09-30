@@ -1,6 +1,7 @@
 /*
  * composesiren-record: C ABI of ComposeSiren's recorder (FLAC or WAV of the
- * audio output). The C++ wrapper sits in ComposeSirenCore/Recorder.
+ * audio output). The C++ wrapper sits in
+ * ComposeSirenCore/lib/utilities/recorder/Recorder.
  */
 
 #ifndef COMPOSESIREN_RECORD_H

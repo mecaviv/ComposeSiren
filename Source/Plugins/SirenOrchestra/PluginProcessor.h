@@ -21,8 +21,8 @@
 #if COMPOSESIREN_PARK_BRIDGE
 #include "SirenUdpBridge.h"
 #endif
-#include <McpControl.h>
-#include <Recorder.h>
+#include <lib/net/mcp/McpControl.h>
+#include <lib/utilities/recorder/Recorder.h>
 
 class SirenOrchestraPluginProcessor :
     public juce::AudioProcessor,

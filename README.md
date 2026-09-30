@@ -101,7 +101,8 @@ code is the same in both cases: `SirenUdpBridge.h` picks the implementation.
 - On macOS universal builds, the library is built per architecture with
   `cargo` and merged with `lipo`. Everywhere else it is imported with
   [Corrosion](https://github.com/corrosion-rs/corrosion), fetched at configure
-  time. See `Source/ComposeSirenCore/MecavivBridge.cmake`.
+  time. See `Source/ComposeSirenCore/MecavivBridge.cmake`, and
+  `cmake/RustStaticLib.cmake` for the build of the three Rust crates.
 
 ```
 $ cmake -B cmake-build-debug -DCMAKE_BUILD_TYPE=Debug -DCOMPOSESIREN_PARK_BRIDGE=ON
