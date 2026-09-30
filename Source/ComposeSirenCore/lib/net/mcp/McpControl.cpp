@@ -166,6 +166,11 @@ std::string McpControl::handle(const juce::var& request) const
                         static_cast<int>(request.getProperty("data1", 0)),
                         static_cast<int>(request.getProperty("data2", 0)));
 
+#if COMPOSESIREN_RECORD
+    if (op == "start_recording" || op == "stop_recording" || op == "recording_status")
+        return recording(op, request);
+#endif
+
     const auto hooks = McpDeviceHooks::copy();
     if (op == "list_audio_devices")
         return jsonOf(hooks.listAudio ? hooks.listAudio() : failure(hostOwnsDevices)).toStdString();
@@ -269,3 +274,60 @@ std::string McpControl::sendMidi(int status, int data1, int data2) const
     object.getDynamicObject()->setProperty("queued", true);
     return jsonOf(object).toStdString();
 }
+
+#if COMPOSESIREN_RECORD
+std::string McpControl::recording(const juce::String& op, const juce::var& request) const
+{
+    if (recorder == nullptr)
+        return jsonOf(failure("this plugin does not record")).toStdString();
+
+    auto describe = [this] {
+        const auto s = recorder->status();
+        auto object = okObject();
+        auto* o = object.getDynamicObject();
+        o->setProperty("recording", s.recording);
+        o->setProperty("fading", s.fading);
+        o->setProperty("path", s.file.getFullPathName());
+        o->setProperty("format", s.format ? Recorder::name(*s.format) : juce::String());
+        o->setProperty("sampleRate", s.sampleRate);
+        o->setProperty("channels", s.channels);
+        o->setProperty("seconds", s.seconds());
+        o->setProperty("framesDropped", static_cast<juce::int64>(s.framesDropped));
+        if (s.error.isNotEmpty())
+            o->setProperty("error", s.error);
+        return object;
+    };
+
+    if (op == "start_recording") {
+        const auto formatName = request.getProperty("format", {}).toString();
+        auto format = Recorder::Format::flac24;
+        if (formatName.isNotEmpty()) {
+            const auto named = Recorder::formatNamed(formatName);
+            if (!named)
+                return jsonOf(failure("unknown format " + formatName + ": flac, wav or wav-float")).toStdString();
+            format = *named;
+        }
+        const auto path = request.getProperty("path", {}).toString();
+        const auto file = path.isNotEmpty() ? juce::File::getCurrentWorkingDirectory().getChildFile(path)
+                                            : Recorder::defaultFile(format);
+        const auto result = recorder->start(file, format);
+        if (result.failed())
+            return jsonOf(failure(result.getErrorMessage())).toStdString();
+        return jsonOf(describe()).toStdString();
+    }
+    if (op == "stop_recording") {
+        // fade: end without cutting a sound short (see Recorder::stopFading);
+        // the reply comes at once, recording_status says when it has ended.
+        const auto fade = static_cast<bool>(request.getProperty("fade", false));
+        const auto wait = request.getProperty("wait_seconds", {});
+        const auto length = request.getProperty("fade_seconds", {});
+        const auto result = fade ? recorder->stopFading(wait.isVoid() ? 2.0 : static_cast<double>(wait),
+                                                        length.isVoid() ? 3.0 : static_cast<double>(length))
+                                 : recorder->stop();
+        if (result.failed())
+            return jsonOf(failure(result.getErrorMessage())).toStdString();
+        return jsonOf(describe()).toStdString();
+    }
+    return jsonOf(describe()).toStdString();
+}
+#endif

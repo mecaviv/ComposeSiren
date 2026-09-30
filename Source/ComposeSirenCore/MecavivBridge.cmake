@@ -10,12 +10,8 @@
 # The crate depends on the mecaviv-v1 crate of mecaviv-rs through a relative
 # path: mecaviv-rs must be checked out next to ComposeSiren.
 #
-# Corrosion builds one Rust target triple. For a macOS universal build
-# (several CMAKE_OSX_ARCHITECTURES), the library is built for each
-# architecture with cargo and merged with lipo instead.
-
-set(MECAVIV_BRIDGE_CRATE_DIR "${CMAKE_SOURCE_DIR}/Source/mecaviv-bridge-composesiren")
-set(MECAVIV_BRIDGE_INCLUDE_DIR "${MECAVIV_BRIDGE_CRATE_DIR}/include")
+# See cmake/RustStaticLib.cmake for the build (lipo for a macOS universal
+# build, Corrosion otherwise).
 
 cmake_path(ABSOLUTE_PATH CMAKE_SOURCE_DIR NORMALIZE OUTPUT_VARIABLE _mecaviv_cs_root)
 cmake_path(GET _mecaviv_cs_root PARENT_PATH _mecaviv_checkouts)
@@ -26,99 +22,11 @@ if(NOT EXISTS "${_mecaviv_checkouts}/mecaviv-rs/crates/mecaviv-v1/Cargo.toml")
     "Source/mecaviv-bridge-composesiren/Cargo.toml depends on it by relative path.")
 endif()
 
-list(LENGTH CMAKE_OSX_ARCHITECTURES _mecaviv_arch_count)
+include("${CMAKE_SOURCE_DIR}/cmake/RustStaticLib.cmake")
 
-# rustc rejects an empty MACOSX_DEPLOYMENT_TARGET: only pass it when set.
-set(_mecaviv_cargo_env "")
-if(APPLE AND CMAKE_OSX_DEPLOYMENT_TARGET)
-  list(APPEND _mecaviv_cargo_env "MACOSX_DEPLOYMENT_TARGET=${CMAKE_OSX_DEPLOYMENT_TARGET}")
-endif()
+composesiren_add_rust_staticlib(
+  TARGET mecaviv_bridge_composesiren
+  CRATE_DIR "${CMAKE_SOURCE_DIR}/Source/mecaviv-bridge-composesiren"
+)
 
-if(APPLE AND _mecaviv_arch_count GREATER 1)
-  # -- macOS universal: cargo per architecture, then lipo ----------------------
-
-  find_program(MECAVIV_CARGO cargo
-    HINTS "$ENV{CARGO_HOME}/bin" "$ENV{HOME}/.cargo/bin"
-    REQUIRED)
-  find_program(MECAVIV_RUSTUP rustup
-    HINTS "$ENV{CARGO_HOME}/bin" "$ENV{HOME}/.cargo/bin")
-  find_program(MECAVIV_LIPO lipo REQUIRED)
-
-  if(MECAVIV_RUSTUP)
-    execute_process(
-      COMMAND "${MECAVIV_RUSTUP}" target list --installed
-      OUTPUT_VARIABLE _mecaviv_installed_targets
-      OUTPUT_STRIP_TRAILING_WHITESPACE)
-  endif()
-
-  set(_mecaviv_target_dir "${CMAKE_CURRENT_BINARY_DIR}/mecaviv-bridge-target")
-  set(_mecaviv_profile "$<IF:$<CONFIG:Debug>,dev,release>")
-  set(_mecaviv_profile_dir "$<IF:$<CONFIG:Debug>,debug,release>")
-  set(_mecaviv_lib_name "libmecaviv_bridge_composesiren.a")
-  set(_mecaviv_lib "${CMAKE_CURRENT_BINARY_DIR}/mecaviv-bridge/$<CONFIG>/${_mecaviv_lib_name}")
-
-  set(_mecaviv_target_flags "")
-  set(_mecaviv_arch_libs "")
-  foreach(_arch IN LISTS CMAKE_OSX_ARCHITECTURES)
-    if(_arch STREQUAL "arm64")
-      set(_triple "aarch64-apple-darwin")
-    elseif(_arch STREQUAL "x86_64")
-      set(_triple "x86_64-apple-darwin")
-    else()
-      message(FATAL_ERROR "mecaviv-bridge-composesiren: no Rust target for macOS architecture ${_arch}")
-    endif()
-    if(MECAVIV_RUSTUP AND NOT _mecaviv_installed_targets MATCHES "(^|\n)${_triple}(\n|$)")
-      message(FATAL_ERROR
-        "mecaviv-bridge-composesiren: the universal build needs the Rust target ${_triple}. "
-        "Install it with: rustup target add ${_triple}")
-    endif()
-    list(APPEND _mecaviv_target_flags "--target=${_triple}")
-    list(APPEND _mecaviv_arch_libs
-      "${_mecaviv_target_dir}/${_triple}/${_mecaviv_profile_dir}/${_mecaviv_lib_name}")
-  endforeach()
-
-  # Always runs: cargo decides what is up to date.
-  add_custom_target(mecaviv_bridge_composesiren_universal
-    COMMAND "${CMAKE_COMMAND}" -E env
-      ${_mecaviv_cargo_env}
-      "CARGO_TARGET_DIR=${_mecaviv_target_dir}"
-      "${MECAVIV_CARGO}" build
-        --manifest-path "${MECAVIV_BRIDGE_CRATE_DIR}/Cargo.toml"
-        --lib
-        "--profile=${_mecaviv_profile}"
-        ${_mecaviv_target_flags}
-    COMMAND "${CMAKE_COMMAND}" -E make_directory
-      "${CMAKE_CURRENT_BINARY_DIR}/mecaviv-bridge/$<CONFIG>"
-    COMMAND "${MECAVIV_LIPO}" -create ${_mecaviv_arch_libs} -output "${_mecaviv_lib}"
-    BYPRODUCTS "${_mecaviv_lib}"
-    COMMENT "Building mecaviv-bridge-composesiren for ${CMAKE_OSX_ARCHITECTURES}"
-    VERBATIM
-    USES_TERMINAL
-  )
-
-  add_library(mecaviv_bridge_composesiren INTERFACE)
-  target_link_libraries(mecaviv_bridge_composesiren INTERFACE "${_mecaviv_lib}")
-  add_dependencies(mecaviv_bridge_composesiren mecaviv_bridge_composesiren_universal)
-
-else()
-  # -- every other platform: Corrosion -----------------------------------------
-
-  include(FetchContent)
-  FetchContent_Declare(
-    Corrosion
-    GIT_REPOSITORY https://github.com/corrosion-rs/corrosion.git
-    GIT_TAG v0.6.1
-  )
-  FetchContent_MakeAvailable(Corrosion)
-
-  corrosion_import_crate(
-    MANIFEST_PATH "${MECAVIV_BRIDGE_CRATE_DIR}/Cargo.toml"
-    CRATE_TYPES staticlib
-  )
-  if(_mecaviv_cargo_env)
-    corrosion_set_env_vars(mecaviv_bridge_composesiren ${_mecaviv_cargo_env})
-  endif()
-endif()
-
-target_include_directories(mecaviv_bridge_composesiren INTERFACE "${MECAVIV_BRIDGE_INCLUDE_DIR}")
 target_compile_definitions(mecaviv_bridge_composesiren INTERFACE COMPOSESIREN_MECAVIV_BRIDGE=1)

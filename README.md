@@ -101,7 +101,8 @@ code is the same in both cases: `SirenUdpBridge.h` picks the implementation.
 - On macOS universal builds, the library is built per architecture with
   `cargo` and merged with `lipo`. Everywhere else it is imported with
   [Corrosion](https://github.com/corrosion-rs/corrosion), fetched at configure
-  time. See `Source/ComposeSirenCore/MecavivBridge.cmake`.
+  time. See `Source/ComposeSirenCore/MecavivBridge.cmake`, and
+  `cmake/RustStaticLib.cmake` for the build of the three Rust crates.
 
 ```
 $ cmake -B cmake-build-debug -DCMAKE_BUILD_TYPE=Debug -DCOMPOSESIREN_PARK_BRIDGE=ON
@@ -128,6 +129,42 @@ or mecaviv-rs. Turn it off with `-DCOMPOSESIREN_MCP=OFF`.
 ```
 $ cmake -B cmake-build-debug -DCMAKE_BUILD_TYPE=Debug
 $ cmake --build cmake-build-debug --target OneSiren_Standalone
+```
+
+### Recorder
+
+SirenOrchestra can record its audio output, after the reverb, to FLAC (24-bit)
+or WAV (24-bit, or 32-bit float). It is off by default; turn it on with
+`-DCOMPOSESIREN_RECORD=ON`.
+
+- **Dialog:** a Record... button in the top row opens it. It has the format,
+  the file (by default `~/Music/ComposeSiren/ComposeSiren-<date>-<time>.flac`),
+  start and stop, and the duration and any dropped frames.
+  - **Fade out** (on by default): Stop lets the sound ring on and ends the
+    file itself. It ends as soon as the output has stayed under -60 dBFS for
+    a quarter second. If it still sounds after 2 s (a drone, a note left on),
+    it fades out over 3 s. The button reads "Fading out..." until then.
+    Unticked, Stop cuts at once.
+- **MCP tools** (with `COMPOSESIREN_MCP`): `start_recording` (optional `path`,
+  and `format`: `flac`, `wav` or `wav-float`), `stop_recording`, and
+  `recording_status`.
+  - `stop_recording` takes `fade` (default false: cut at once), and with it
+    `wait_seconds` (2) and `fade_seconds` (3). It returns at once. Poll
+    `recording_status`, which reports `fading`, until `recording` is false.
+  - `tap-viewer midi --song FILE --record` (firmwares-artila, `m_seq/rs`)
+    uses them to record a song next to its MIDI file.
+- **The crate:** `Source/composesiren-record`, pure Rust (`flacenc`, `hound`),
+  with no JUCE, so it also works for the DSP outside the plugin.
+  - The audio thread only copies each block into a lock-free ring buffer.
+  - A writer thread encodes and writes the file.
+  - A recording cut short (a crash) still decodes up to its last complete
+    FLAC frame.
+- **Rust:** it needs a toolchain like the MCP server. See
+  `Source/ComposeSirenCore/Record.cmake`.
+
+```
+$ cmake -B cmake-build-debug -DCMAKE_BUILD_TYPE=Debug -DCOMPOSESIREN_RECORD=ON
+$ cmake --build cmake-build-debug --target SirenOrchestra_Standalone
 ```
 
 ### dependencies

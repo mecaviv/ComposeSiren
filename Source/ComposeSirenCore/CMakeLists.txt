@@ -43,8 +43,8 @@ target_sources(ComposeSirenCore
   lib/wrappers/SirenVoice.cpp
   lib/wrappers/SirenEnsemble.cpp
 
-  McpControl.cpp
-  McpDeviceHooks.cpp
+  lib/net/mcp/McpControl.cpp
+  lib/net/mcp/McpDeviceHooks.cpp
 
   Components/SirenStripComponent.cpp
   Components/SirenTrackComponent.cpp
@@ -60,6 +60,18 @@ if(COMPOSESIREN_MCP)
   target_compile_definitions(ComposeSirenCore PUBLIC COMPOSESIREN_MCP=1)
 else()
   target_compile_definitions(ComposeSirenCore PUBLIC COMPOSESIREN_MCP=0)
+endif()
+
+if(COMPOSESIREN_RECORD)
+  include("${CMAKE_CURRENT_LIST_DIR}/Record.cmake")
+  target_link_libraries(ComposeSirenCore PUBLIC composesiren_record)
+  target_compile_definitions(ComposeSirenCore PUBLIC COMPOSESIREN_RECORD=1)
+  target_sources(ComposeSirenCore PRIVATE
+    lib/utilities/recorder/Recorder.cpp
+    lib/utilities/recorder/RecordDialog.cpp
+  )
+else()
+  target_compile_definitions(ComposeSirenCore PUBLIC COMPOSESIREN_RECORD=0)
 endif()
 
 target_link_libraries(ComposeSirenCore

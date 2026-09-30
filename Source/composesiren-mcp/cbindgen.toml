@@ -15,7 +15,7 @@ header = """
  *
  * The server listens on 127.0.0.1 and records itself in ~/.composesiren_mcp.json,
  * the same kind of discovery file Gearmulator writes at ~/.gearmulator_mcp.json.
- * The C++ wrapper sits in ComposeSirenCore/McpControl.
+ * The C++ wrapper sits in ComposeSirenCore/lib/net/mcp/McpControl.
  */"""
 
 autogen_warning = """

@@ -12,6 +12,7 @@
 #ifndef COMPOSESIREN_PARK_BRIDGE
 #define COMPOSESIREN_PARK_BRIDGE 0
 #endif
+#include "../lib/utilities/recorder/RecordDialog.h"
 
 class MainButtonsComponent : public juce::Component,
                              public juce::TextButton::Listener
@@ -30,6 +31,11 @@ public:
         virtual bool physicalSirensEnabled() { return false; }
         virtual juce::String physicalSirensTooltip() { return {}; }
         virtual void stAllSwitched(bool) {}
+#if COMPOSESIREN_RECORD
+        // optionnel : l'enregistreur de la sortie audio ; un bouton Record...
+        // ouvre son dialogue quand il y en a un.
+        virtual Recorder* getRecorder() { return nullptr; }
+#endif
     };
 
     MainButtonsComponent(Listener& l, bool hasResetAll = false,
@@ -59,6 +65,16 @@ public:
         resetButton.setButtonText ("Reset");
         resetButton.addListener(this);
         addAndMakeVisible(resetButton);
+
+#if COMPOSESIREN_RECORD
+        if (listener.getRecorder() != nullptr) {
+            recordButton.setColour(juce::TextButton::buttonColourId, juce::Colour { 0xff37474f });
+            recordButton.setColour(juce::TextButton::textColourOffId, juce::Colours::whitesmoke);
+            recordButton.setButtonText("Record...");
+            recordButton.addListener(this);
+            addAndMakeVisible(recordButton);
+        }
+#endif
 
         if (hasResetAllButton) {
             resetAllButton.setColour(juce::TextButton::buttonColourId, juce::Colours::darkred);
@@ -142,6 +158,15 @@ public:
                                                     .withMinHeight(btnsHeight)
                                                     .withFlex(0,1);
         fb.items.add(item);
+#if COMPOSESIREN_RECORD
+        if (recordButton.isVisible()) {
+            item = juce::FlexItem(recordButton).withMinWidth(90)
+                                               .withMinHeight(btnsHeight)
+                                               .withFlex(0,0);
+            item.margin = juce::FlexItem::Margin(0.f, 0.f, 0.f, margin);
+            fb.items.add(item);
+        }
+#endif
         item = juce::FlexItem(resetButton).withMinWidth(75)
                                           .withMinHeight(btnsHeight)
                                           .withFlex(0,0);
@@ -189,6 +214,13 @@ public:
 
     void buttonClicked(juce::Button* btn) override
     {
+#if COMPOSESIREN_RECORD
+        if (btn == &recordButton) {
+            if (auto* recorder = listener.getRecorder())
+                RecordDialog::show(*recorder, getTopLevelComponent());
+            return;
+        }
+#endif
         if (btn == &resetButton) {
             listener.resetSiren(currentSirenId);
             return;
@@ -246,6 +278,12 @@ private:
 #endif
 
     juce::TextButton resetButton;
+
+    #if COMPOSESIREN_RECORD
+
+    juce::TextButton recordButton;
+
+    #endif
     juce::TextButton resetAllButton;
     juce::TextButton selectResourcesButton;
 #if COMPOSESIREN_PARK_BRIDGE

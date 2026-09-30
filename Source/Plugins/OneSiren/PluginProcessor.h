@@ -14,7 +14,7 @@
 #include <Components/MainButtonsComponent.h>
 #include "OneMidiRouter.h"
 #include "lib/wrappers/SirenStateMonitor.h"
-#include <McpControl.h>
+#include <lib/net/mcp/McpControl.h>
 // #include "UiState.h"
 
 class OneSirenPluginProcessor :

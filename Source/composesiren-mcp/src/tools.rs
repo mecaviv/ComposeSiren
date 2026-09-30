@@ -13,7 +13,6 @@ use crate::dispatch::Dispatch;
 #[derive(Clone)]
 pub struct ComposeSirenServer {
     dispatch: Dispatch,
-    #[allow(dead_code)]
     tool_router: rmcp::handler::server::tool::ToolRouter<Self>,
 }
 
@@ -88,10 +87,11 @@ struct SetMidiOutputArgs {
 #[tool_router]
 impl ComposeSirenServer {
     pub fn new(dispatch: Dispatch) -> Self {
-        Self {
-            dispatch,
-            tool_router: Self::tool_router(),
-        }
+        #[cfg(feature = "record")]
+        let tool_router = Self::tool_router() + Self::record_router();
+        #[cfg(not(feature = "record"))]
+        let tool_router = Self::tool_router();
+        Self { dispatch, tool_router }
     }
 
     #[tool(description = "List every automatable parameter with its id, value, and range.")]
@@ -219,7 +219,68 @@ impl ComposeSirenServer {
     }
 }
 
-#[tool_handler]
+#[cfg(feature = "record")]
+#[derive(Debug, Deserialize, JsonSchema)]
+struct StartRecordingArgs {
+    /// File to write. Omit for ~/Music/ComposeSiren/ComposeSiren-<date>-<time>.<ext>.
+    #[serde(default)]
+    path: Option<String>,
+    /// `flac` (24-bit, the default), `wav` (24-bit) or `wav-float` (32-bit float).
+    #[serde(default)]
+    format: Option<String>,
+}
+
+#[cfg(feature = "record")]
+#[derive(Debug, Deserialize, JsonSchema)]
+struct StopRecordingArgs {
+    /// End without cutting a sound short: wait for it to die out, and if it
+    /// still sounds (a drone), fade it out. The reply comes at once; call
+    /// `recording_status` until `recording` is false.
+    #[serde(default)]
+    fade: bool,
+    /// Seconds to wait for the sound to die out (default 2).
+    #[serde(default)]
+    wait_seconds: Option<f64>,
+    /// Seconds the fade-out lasts (default 3).
+    #[serde(default)]
+    fade_seconds: Option<f64>,
+}
+
+/// The recording tools, with the `record` feature (`COMPOSESIREN_RECORD`).
+#[cfg(feature = "record")]
+#[tool_router(router = record_router)]
+impl ComposeSirenServer {
+    #[tool(description = "Start recording the audio output to a FLAC or WAV file. Returns the file's path.")]
+    fn start_recording(
+        &self,
+        Parameters(args): Parameters<StartRecordingArgs>,
+    ) -> Result<CallToolResult, McpError> {
+        self.finish(self.dispatch.call(json!({
+            "op": "start_recording",
+            "path": args.path,
+            "format": args.format,
+        })))
+    }
+
+    #[tool(description = "Stop recording and complete the file, at once or (fade) once the sound has died out or faded out. Returns its path, duration and dropped frames.")]
+    fn stop_recording(&self, Parameters(args): Parameters<StopRecordingArgs>) -> Result<CallToolResult, McpError> {
+        self.finish(self.dispatch.call(json!({
+            "op": "stop_recording",
+            "fade": args.fade,
+            "wait_seconds": args.wait_seconds,
+            "fade_seconds": args.fade_seconds,
+        })))
+    }
+
+    #[tool(description = "Whether a recording is running, its file, duration so far and dropped frames.")]
+    fn recording_status(&self) -> Result<CallToolResult, McpError> {
+        self.finish(self.dispatch.call(json!({"op": "recording_status"})))
+    }
+}
+
+// The field, not the macro's default `Self::tool_router()`: with the `record`
+// feature, `new` adds the recording tools to it.
+#[tool_handler(router = self.tool_router)]
 impl ServerHandler for ComposeSirenServer {
     fn get_info(&self) -> ServerConfig {
         ServerConfig::new(

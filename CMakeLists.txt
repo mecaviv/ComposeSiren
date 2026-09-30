@@ -91,6 +91,16 @@ option(COMPOSESIREN_MCP
         "In-process MCP server for parameters, MIDI, and standalone audio/MIDI devices"
         ON)
 
+# DEAL WITH THE RECORDER #######################################################
+# Records the audio output to FLAC or WAV (Rust crate Source/composesiren-record,
+# pure Rust encoders): a Record dialog in the editor, and, with COMPOSESIREN_MCP,
+# the start_recording, stop_recording and recording_status tools. See
+# Source/ComposeSirenCore/Record.cmake.
+
+option(COMPOSESIREN_RECORD
+        "Record the audio output to FLAC or WAV (dialog, and MCP tools with COMPOSESIREN_MCP)"
+        OFF)
+
 #set(PLUGIN_TARGETS OneSiren)
 set(PLUGIN_TARGETS OneSiren SirenOrchestra)
 #set(PLUGIN_TARGETS CustomMix)
