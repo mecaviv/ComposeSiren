@@ -3,7 +3,36 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 if (APPLE)
-  set(CMAKE_OSX_ARCHITECTURES "x86_64;arm64" CACHE INTERNAL "")
+  # Host architecture by default. Fat x86_64+arm64 binaries: -DMACOS_UNIVERSAL=ON
+  option(MACOS_UNIVERSAL
+          "Build a universal (x86_64 and arm64) macOS binary"
+          OFF)
+  if(MACOS_UNIVERSAL)
+    set(CMAKE_OSX_ARCHITECTURES "x86_64;arm64"
+            CACHE STRING "macOS architectures" FORCE)
+  else()
+    # uname: CMAKE_HOST_SYSTEM_PROCESSOR is not set until project(), and
+    # CMAKE_OSX_ARCHITECTURES has to be set before that. A leftover x86_64
+    # in the cache (CLion, or the previous universal default) is overwritten.
+    execute_process(
+      COMMAND uname -m
+      OUTPUT_VARIABLE _macos_uname
+      OUTPUT_STRIP_TRAILING_WHITESPACE)
+    if(_macos_uname MATCHES "^(arm64|aarch64)$")
+      set(_macos_host_arch arm64)
+    else()
+      set(_macos_host_arch x86_64)
+    endif()
+    set(CMAKE_OSX_ARCHITECTURES "${_macos_host_arch}"
+            CACHE STRING "macOS architectures" FORCE)
+  endif()
+  list(LENGTH CMAKE_OSX_ARCHITECTURES _macos_arch_count)
+  if(_macos_arch_count GREATER 1)
+    set(MACOS_PKG_ARCH "universal")
+  else()
+    set(MACOS_PKG_ARCH "${CMAKE_OSX_ARCHITECTURES}")
+  endif()
+  message(STATUS "macOS architectures: ${CMAKE_OSX_ARCHITECTURES}")
   # see : https://forum.juce.com/t/best-way-to-build-with-support-for-older-macos-versions/64879/3
   set(CMAKE_OSX_DEPLOYMENT_TARGET "10.13" CACHE STRING "minimum supported target macos version")
 endif()
