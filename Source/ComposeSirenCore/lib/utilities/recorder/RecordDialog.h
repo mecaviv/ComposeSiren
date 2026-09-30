@@ -36,6 +36,7 @@ private:
     juce::Label file;
     juce::TextButton choose { "Choose..." };
     juce::TextButton startStop { "Start recording" };
+    juce::ToggleButton fadeOut { "Fade out" };
     juce::Label status;
     juce::File chosen;
     std::unique_ptr<juce::FileChooser> chooser;

@@ -10,4 +10,4 @@ pub mod ffi;
 pub mod flac;
 mod recorder;
 
-pub use recorder::{Format, Recorder, Status, Summary};
+pub use recorder::{Fade, Format, Recorder, Status, Summary};

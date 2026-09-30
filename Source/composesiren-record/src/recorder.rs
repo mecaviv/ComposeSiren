@@ -72,7 +72,35 @@ pub struct Status {
     pub frames_dropped: u64,
     /// The writer's error, if it stopped on one.
     pub error: Option<String>,
+    /// A fading stop is under way: the recording ends by itself.
+    pub fading: bool,
 }
+
+/// How a recording ends when asked to fade ([`Recorder::stop_fading`]): it
+/// goes on for up to `wait`, ending as soon as the sound has died out on its
+/// own (a quarter second under -60 dBFS); if it still sounds then (a drone,
+/// a note left on), it fades out over `length` and ends.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Fade {
+    /// How long to wait for the sound to die out.
+    pub wait: Duration,
+    /// How long the fade-out lasts.
+    pub length: Duration,
+}
+
+impl Default for Fade {
+    fn default() -> Self {
+        Fade {
+            wait: Duration::from_secs(2),
+            length: Duration::from_secs(3),
+        }
+    }
+}
+
+/// Under this peak, a frame is silent (-60 dBFS).
+const SILENCE: f32 = 0.001;
+/// Silence that long ends a fading stop early.
+const SILENT_END: Duration = Duration::from_millis(250);
 
 /// A finished recording.
 #[derive(Clone, Debug, PartialEq)]
@@ -93,11 +121,38 @@ struct Shared {
     written: AtomicU64,
     dropped: AtomicU64,
     error: Mutex<Option<String>>,
+    /// A fading stop is under way.
+    fading: AtomicBool,
+}
+
+/// A fading stop asked of the writer: the wait and fade lengths in frames.
+#[derive(Default)]
+struct FadeRequest {
+    requested: AtomicBool,
+    wait_frames: AtomicU64,
+    fade_frames: AtomicU64,
+}
+
+/// Where a fading stop is.
+enum Ending {
+    Running,
+    /// Waiting for the sound to die out: frames left, silent frames so far.
+    Tail {
+        left: u64,
+        silent: u64,
+    },
+    /// Fading out: frames done of `total`.
+    Fading {
+        done: u64,
+        total: u64,
+    },
+    Done,
 }
 
 struct Session {
     thread: JoinHandle<Consumer<f32>>,
     stop: Arc<AtomicBool>,
+    fade: Arc<FadeRequest>,
     path: PathBuf,
     format: Format,
     sample_rate: u32,
@@ -133,7 +188,12 @@ enum Encoder {
 }
 
 impl Encoder {
-    fn create(path: &Path, format: Format, sample_rate: u32, channels: u32) -> Result<Self, String> {
+    fn create(
+        path: &Path,
+        format: Format,
+        sample_rate: u32,
+        channels: u32,
+    ) -> Result<Self, String> {
         if let Some(dir) = path.parent().filter(|d| !d.as_os_str().is_empty()) {
             std::fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
         }
@@ -148,7 +208,12 @@ impl Encoder {
                 } else {
                     (32, hound::SampleFormat::Float)
                 };
-                let spec = hound::WavSpec { channels: channels as u16, sample_rate, bits_per_sample: bits, sample_format };
+                let spec = hound::WavSpec {
+                    channels: channels as u16,
+                    sample_rate,
+                    bits_per_sample: bits,
+                    sample_format,
+                };
                 hound::WavWriter::new(std::io::BufWriter::new(file), spec)
                     .map(|w| Encoder::Wav(w, format))
                     .map_err(|e| e.to_string())
@@ -163,10 +228,14 @@ impl Encoder {
                 scratch.extend(samples.iter().map(|&x| to_24(x)));
                 w.push(scratch).map_err(|e| e.to_string())
             }
-            Encoder::Wav(w, Format::Wav24) => {
-                samples.iter().try_for_each(|&x| w.write_sample(to_24(x))).map_err(|e| e.to_string())
-            }
-            Encoder::Wav(w, _) => samples.iter().try_for_each(|&x| w.write_sample(x)).map_err(|e| e.to_string()),
+            Encoder::Wav(w, Format::Wav24) => samples
+                .iter()
+                .try_for_each(|&x| w.write_sample(to_24(x)))
+                .map_err(|e| e.to_string()),
+            Encoder::Wav(w, _) => samples
+                .iter()
+                .try_for_each(|&x| w.write_sample(x))
+                .map_err(|e| e.to_string()),
         }
     }
 
@@ -197,6 +266,7 @@ impl Recorder {
                 written: AtomicU64::new(0),
                 dropped: AtomicU64::new(0),
                 error: Mutex::new(None),
+                fading: AtomicBool::new(false),
             }),
             session: Mutex::new(None),
             last: Mutex::new(None),
@@ -234,7 +304,14 @@ impl Recorder {
     /// Starts recording to `path`: blocks of `channels` channels at
     /// `sample_rate`. Fails if a recording is running or the file cannot be
     /// created.
-    pub fn start(&self, path: &Path, format: Format, sample_rate: u32, channels: u32) -> Result<(), String> {
+    pub fn start(
+        &self,
+        path: &Path,
+        format: Format,
+        sample_rate: u32,
+        channels: u32,
+    ) -> Result<(), String> {
+        self.reap();
         let mut session = self.session.lock().expect("no poisoning");
         if session.is_some() {
             return Err("a recording is already running".into());
@@ -242,8 +319,13 @@ impl Recorder {
         if sample_rate == 0 || channels == 0 {
             return Err("no audio format yet: the device has not started".into());
         }
-        let mut encoder = Encoder::create(path, format, sample_rate, channels)?;
-        let mut consumer = self.consumer.lock().expect("no poisoning").take().ok_or("the ring is in use")?;
+        let encoder = Encoder::create(path, format, sample_rate, channels)?;
+        let mut consumer = self
+            .consumer
+            .lock()
+            .expect("no poisoning")
+            .take()
+            .ok_or("the ring is in use")?;
         // Whatever an earlier recording left behind.
         let stale = consumer.slots();
         if let Ok(chunk) = consumer.read_chunk(stale) {
@@ -254,59 +336,88 @@ impl Recorder {
         shared.dropped.store(0, Ordering::Relaxed);
         *shared.error.lock().expect("no poisoning") = None;
         shared.channels.store(channels, Ordering::Relaxed);
+        shared.fading.store(false, Ordering::Relaxed);
         let stop = Arc::new(AtomicBool::new(false));
         let stop_flag = Arc::clone(&stop);
+        let fade = Arc::new(FadeRequest::default());
+        let fade_request = Arc::clone(&fade);
+        let silent_end = (SILENT_END.as_secs_f64() * f64::from(sample_rate)) as u64;
         let thread = std::thread::Builder::new()
             .name("composesiren-record".into())
             .spawn(move || {
-                let nch = channels as usize;
-                let mut scratch = Vec::new();
-                let mut failed = None;
-                loop {
-                    let stopping = stop_flag.load(Ordering::Acquire);
-                    let available = consumer.slots() / nch * nch;
-                    if available > 0 {
-                        if let Ok(chunk) = consumer.read_chunk(available) {
-                            let (a, b) = chunk.as_slices();
-                            for part in [a, b] {
-                                if failed.is_none()
-                                    && !part.is_empty()
-                                    && let Err(e) = encoder.push(part, &mut scratch)
-                                {
-                                    failed = Some(e);
-                                }
-                            }
-                            chunk.commit_all();
-                            shared.written.fetch_add((available / nch) as u64, Ordering::Relaxed);
-                        }
-                    } else if stopping {
-                        break;
-                    } else {
-                        std::thread::sleep(Duration::from_millis(5));
-                    }
-                }
-                let result = match failed {
-                    Some(e) => Err(e),
-                    None => encoder.finish(),
-                };
-                if let Err(e) = result {
-                    *shared.error.lock().expect("no poisoning") = Some(e);
-                }
+                write(
+                    &mut consumer,
+                    encoder,
+                    &shared,
+                    &stop_flag,
+                    &fade_request,
+                    channels as usize,
+                    silent_end,
+                );
                 consumer
             })
             .map_err(|e| e.to_string())?;
         self.shared.recording.store(true, Ordering::Release);
         *self.last.lock().expect("no poisoning") = Some((path.to_path_buf(), format, sample_rate));
-        *session = Some(Session { thread, stop, path: path.to_path_buf(), format, sample_rate });
+        *session = Some(Session {
+            thread,
+            stop,
+            fade,
+            path: path.to_path_buf(),
+            format,
+            sample_rate,
+        });
         Ok(())
+    }
+
+    /// Asks the running recording to end with `fade` (see [`Fade`]). Returns
+    /// at once; the recording ends by itself ([`Status::recording`] turns
+    /// false). [`Recorder::stop`] still stops it at once.
+    pub fn stop_fading(&self, fade: Fade) -> Result<(), String> {
+        self.reap();
+        let session = self.session.lock().expect("no poisoning");
+        let session = session.as_ref().ok_or("no recording is running")?;
+        let frames = |d: Duration| (d.as_secs_f64() * f64::from(session.sample_rate)) as u64;
+        session
+            .fade
+            .wait_frames
+            .store(frames(fade.wait), Ordering::Relaxed);
+        session
+            .fade
+            .fade_frames
+            .store(frames(fade.length), Ordering::Relaxed);
+        self.shared.fading.store(true, Ordering::Release);
+        session.fade.requested.store(true, Ordering::Release);
+        Ok(())
+    }
+
+    /// A recording that ended by itself (a fading stop): its writer joined,
+    /// the ring handed back.
+    fn reap(&self) {
+        let mut session = self.session.lock().expect("no poisoning");
+        if session.as_ref().is_some_and(|s| s.thread.is_finished()) {
+            let ended = session.take().expect("checked");
+            if let Ok(consumer) = ended.thread.join() {
+                *self.consumer.lock().expect("no poisoning") = Some(consumer);
+            }
+        }
     }
 
     /// Stops recording: the writer drains the ring and completes the file.
     pub fn stop(&self) -> Result<Summary, String> {
-        let session = self.session.lock().expect("no poisoning").take().ok_or("no recording is running")?;
+        self.reap();
+        let session = self
+            .session
+            .lock()
+            .expect("no poisoning")
+            .take()
+            .ok_or("no recording is running")?;
         self.shared.recording.store(false, Ordering::Release);
         session.stop.store(true, Ordering::Release);
-        let consumer = session.thread.join().map_err(|_| "the writer thread panicked".to_owned())?;
+        let consumer = session
+            .thread
+            .join()
+            .map_err(|_| "the writer thread panicked".to_owned())?;
         *self.consumer.lock().expect("no poisoning") = Some(consumer);
         if let Some(e) = self.shared.error.lock().expect("no poisoning").clone() {
             return Err(e);
@@ -322,8 +433,17 @@ impl Recorder {
     /// The running recording, or the last one.
     #[must_use]
     pub fn status(&self) -> Status {
-        let running = self.session.lock().expect("no poisoning").as_ref().map(|s| (s.path.clone(), s.format, s.sample_rate));
-        let (path, format, sample_rate) = match running.clone().or_else(|| self.last.lock().expect("no poisoning").clone()) {
+        self.reap();
+        let running = self
+            .session
+            .lock()
+            .expect("no poisoning")
+            .as_ref()
+            .map(|s| (s.path.clone(), s.format, s.sample_rate));
+        let (path, format, sample_rate) = match running
+            .clone()
+            .or_else(|| self.last.lock().expect("no poisoning").clone())
+        {
             Some((p, f, r)) => (Some(p), Some(f), r),
             None => (None, None, 0),
         };
@@ -336,6 +456,7 @@ impl Recorder {
             frames_written: self.shared.written.load(Ordering::Relaxed),
             frames_dropped: self.shared.dropped.load(Ordering::Relaxed),
             error: self.shared.error.lock().expect("no poisoning").clone(),
+            fading: running.is_some() && self.shared.fading.load(Ordering::Relaxed),
         }
     }
 }
@@ -343,5 +464,116 @@ impl Recorder {
 impl Drop for Recorder {
     fn drop(&mut self) {
         let _ = self.stop();
+    }
+}
+
+/// The writer thread: drains the ring into the encoder until stopped, or,
+/// on a fading stop, until the sound dies out or the fade ends; then
+/// completes the file.
+#[allow(clippy::too_many_lines)]
+fn write(
+    consumer: &mut Consumer<f32>,
+    mut encoder: Encoder,
+    shared: &Shared,
+    stop_flag: &AtomicBool,
+    fade_request: &FadeRequest,
+    nch: usize,
+    silent_end: u64,
+) {
+    let mut scratch = Vec::new();
+    let mut faded: Vec<f32> = Vec::new();
+    let mut failed = None;
+    let mut ending = Ending::Running;
+    loop {
+        let stopping = stop_flag.load(Ordering::Acquire);
+        if matches!(ending, Ending::Running) && fade_request.requested.load(Ordering::Acquire) {
+            ending = Ending::Tail {
+                left: fade_request.wait_frames.load(Ordering::Relaxed),
+                silent: 0,
+            };
+        }
+        let available = consumer.slots() / nch * nch;
+        if available > 0
+            && let Ok(chunk) = consumer.read_chunk(available)
+        {
+            {
+                let (a, b) = chunk.as_slices();
+                let mut frames = 0u64;
+                for part in [a, b] {
+                    let out: &[f32] = if matches!(ending, Ending::Running) {
+                        frames += (part.len() / nch) as u64;
+                        part
+                    } else {
+                        // A fading stop: frame by frame.
+                        faded.clear();
+                        for frame in part.chunks_exact(nch) {
+                            let gain = match &mut ending {
+                                Ending::Tail { left, silent } => {
+                                    let peak = frame.iter().fold(0.0f32, |m, x| m.max(x.abs()));
+                                    *silent = if peak < SILENCE { *silent + 1 } else { 0 };
+                                    *left = left.saturating_sub(1);
+                                    let (quiet, over) = (*silent >= silent_end, *left == 0);
+                                    if quiet {
+                                        ending = Ending::Done;
+                                    } else if over {
+                                        let total =
+                                            fade_request.fade_frames.load(Ordering::Relaxed).max(1);
+                                        ending = Ending::Fading { done: 0, total };
+                                    }
+                                    1.0
+                                }
+                                Ending::Fading { done, total } => {
+                                    let t = *done as f32 / *total as f32;
+                                    *done += 1;
+                                    let over = *done >= *total;
+                                    if over {
+                                        ending = Ending::Done;
+                                    }
+                                    // A cosine: smooth at both ends.
+                                    0.5 * (1.0 + (std::f32::consts::PI * t).cos())
+                                }
+                                Ending::Running | Ending::Done => break,
+                            };
+                            faded.extend(frame.iter().map(|x| x * gain));
+                            frames += 1;
+                            if matches!(ending, Ending::Done) {
+                                break;
+                            }
+                        }
+                        &faded
+                    };
+                    if failed.is_none()
+                        && !out.is_empty()
+                        && let Err(e) = encoder.push(out, &mut scratch)
+                    {
+                        failed = Some(e);
+                    }
+                    if matches!(ending, Ending::Done) {
+                        break;
+                    }
+                }
+                chunk.commit_all();
+                shared.written.fetch_add(frames, Ordering::Relaxed);
+            }
+        }
+        if matches!(ending, Ending::Done) {
+            // The audio thread stops handing blocks over.
+            shared.recording.store(false, Ordering::Release);
+            break;
+        }
+        if available == 0 {
+            if stopping {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(5));
+        }
+    }
+    shared.fading.store(false, Ordering::Release);
+    let result = match failed {
+        Some(e) => Err(e),
+        None => encoder.finish(),
+    };
+    if let Err(e) = result {
+        *shared.error.lock().expect("no poisoning") = Some(e);
     }
 }

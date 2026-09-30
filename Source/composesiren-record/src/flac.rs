@@ -32,14 +32,27 @@ fn other(e: impl std::fmt::Debug) -> io::Error {
 
 impl FlacWriter {
     /// Creates the file and writes a provisional header.
-    pub fn create(file: File, sample_rate: usize, channels: usize, bits: usize) -> io::Result<Self> {
+    pub fn create(
+        file: File,
+        sample_rate: usize,
+        channels: usize,
+        bits: usize,
+    ) -> io::Result<Self> {
         let mut header = Stream::new(sample_rate, channels, bits).map_err(other)?;
-        header.stream_info_mut().set_block_sizes(BLOCK_SIZE, BLOCK_SIZE).map_err(other)?;
+        header
+            .stream_info_mut()
+            .set_block_sizes(BLOCK_SIZE, BLOCK_SIZE)
+            .map_err(other)?;
         let mut w = FlacWriter {
             file: BufWriter::new(file),
-            config: config::Encoder::default().into_verified().map_err(|(_, e)| other(e))?,
+            config: config::Encoder::default()
+                .into_verified()
+                .map_err(|(_, e)| other(e))?,
             header,
-            buf: (FrameBuf::with_size(channels, BLOCK_SIZE).map_err(other)?, Context::new(bits, channels)),
+            buf: (
+                FrameBuf::with_size(channels, BLOCK_SIZE).map_err(other)?,
+                Context::new(bits, channels),
+            ),
             channels,
             pending: Vec::with_capacity(BLOCK_SIZE * channels * 2),
         };
@@ -57,8 +70,13 @@ impl FlacWriter {
         let chunk: Vec<i32> = self.pending.drain(..frames * self.channels).collect();
         self.buf.fill_interleaved(&chunk).map_err(other)?;
         let number = self.buf.1.current_frame_number().unwrap_or(0);
-        let frame = flacenc::encode_fixed_size_frame(&self.config, &self.buf.0, number, self.header.stream_info())
-            .map_err(other)?;
+        let frame = flacenc::encode_fixed_size_frame(
+            &self.config,
+            &self.buf.0,
+            number,
+            self.header.stream_info(),
+        )
+        .map_err(other)?;
         self.header.stream_info_mut().update_frame_info(&frame);
         let mut sink = MemSink::<u8>::new();
         frame.write(&mut sink).map_err(other)?;
@@ -87,7 +105,8 @@ impl FlacWriter {
         // The spec leaves the last block out of the minimum block size: a
         // fixed-block stream keeps min = max (Apple's decoder otherwise takes
         // it for a variable-block stream and fails).
-        info.set_block_sizes(BLOCK_SIZE, BLOCK_SIZE).map_err(other)?;
+        info.set_block_sizes(BLOCK_SIZE, BLOCK_SIZE)
+            .map_err(other)?;
         self.file.flush()?;
         self.file.seek(SeekFrom::Start(0))?;
         self.write_header()?;

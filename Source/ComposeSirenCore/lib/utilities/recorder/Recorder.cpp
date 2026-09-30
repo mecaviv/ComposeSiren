@@ -51,6 +51,15 @@ juce::Result Recorder::stop()
     return juce::Result::ok();
 }
 
+juce::Result Recorder::stopFading(double waitSeconds, double fadeSeconds)
+{
+    char error[256] = {};
+    const auto ms = [](double s) { return static_cast<uint32_t>(juce::jmax(0, juce::roundToInt(s * 1000.0))); };
+    if (cs_rec_stop_fading(rec, ms(waitSeconds), ms(fadeSeconds), error, sizeof(error)) != 0)
+        return juce::Result::fail(juce::String::fromUTF8(error));
+    return juce::Result::ok();
+}
+
 Recorder::Status Recorder::status() const
 {
     cs_rec_status_t raw {};
@@ -63,6 +72,7 @@ Recorder::Status Recorder::status() const
     s.channels = static_cast<int>(raw.channels);
     s.framesWritten = static_cast<juce::int64>(raw.frames_written);
     s.framesDropped = static_cast<juce::int64>(raw.frames_dropped);
+    s.fading = raw.fading != 0;
     char text[1024] = {};
     if (cs_rec_path(rec, text, sizeof(text)) > 0)
         s.file = juce::File(juce::String::fromUTF8(text));

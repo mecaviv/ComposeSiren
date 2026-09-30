@@ -286,6 +286,7 @@ std::string McpControl::recording(const juce::String& op, const juce::var& reque
         auto object = okObject();
         auto* o = object.getDynamicObject();
         o->setProperty("recording", s.recording);
+        o->setProperty("fading", s.fading);
         o->setProperty("path", s.file.getFullPathName());
         o->setProperty("format", s.format ? Recorder::name(*s.format) : juce::String());
         o->setProperty("sampleRate", s.sampleRate);
@@ -315,7 +316,14 @@ std::string McpControl::recording(const juce::String& op, const juce::var& reque
         return jsonOf(describe()).toStdString();
     }
     if (op == "stop_recording") {
-        const auto result = recorder->stop();
+        // fade: end without cutting a sound short (see Recorder::stopFading);
+        // the reply comes at once, recording_status says when it has ended.
+        const auto fade = static_cast<bool>(request.getProperty("fade", false));
+        const auto wait = request.getProperty("wait_seconds", {});
+        const auto length = request.getProperty("fade_seconds", {});
+        const auto result = fade ? recorder->stopFading(wait.isVoid() ? 2.0 : static_cast<double>(wait),
+                                                        length.isVoid() ? 3.0 : static_cast<double>(length))
+                                 : recorder->stop();
         if (result.failed())
             return jsonOf(failure(result.getErrorMessage())).toStdString();
         return jsonOf(describe()).toStdString();

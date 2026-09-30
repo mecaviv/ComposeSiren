@@ -34,6 +34,8 @@ typedef struct {
     uint64_t frames_dropped;
     // 1 if the writer stopped on an error (see `cs_rec_error`).
     int failed;
+    // 1 while a fading stop is under way (the recording ends by itself).
+    int fading;
 } cs_rec_status_t;
 
 #ifdef __cplusplus
@@ -86,6 +88,20 @@ int cs_rec_start(const cs_rec_t *rec,
 //
 // As for `cs_rec_start`.
 int cs_rec_stop(const cs_rec_t *rec, char *error, uint32_t error_len);
+
+// Asks the recording to end: it goes on for up to `wait_ms`, ending as soon
+// as the sound has died out; if it still sounds then, it fades out over
+// `fade_ms` and ends. Returns at once (0, or -1 with the reason in `error`);
+// `cs_rec_status` says when it has ended.
+//
+// # Safety
+//
+// As for `cs_rec_start`.
+int cs_rec_stop_fading(const cs_rec_t *rec,
+                       uint32_t wait_ms,
+                       uint32_t fade_ms,
+                       char *error,
+                       uint32_t error_len);
 
 // The running recording, or the last one.
 //

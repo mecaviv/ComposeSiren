@@ -27,10 +27,14 @@ RecordDialog::RecordDialog(Recorder& r) : recorder(r)
     file.setMinimumHorizontalScale(0.6f);
     choose.onClick = [this] { chooseFile(); };
     startStop.onClick = [this] { startOrStop(); };
+    fadeOut.setToggleState(true, juce::dontSendNotification);
+    fadeOut.setTooltip("On Stop, wait up to 2 s for the sound to die out; if it still sounds (a drone), fade it out over 3 s.");
+    fadeOut.setColour(juce::ToggleButton::textColourId, juce::Colours::whitesmoke);
+    fadeOut.setColour(juce::ToggleButton::tickColourId, juce::Colours::whitesmoke);
     status.setJustificationType(juce::Justification::centredLeft);
 
     for (auto* c : std::initializer_list<juce::Component*> { &formatLabel, &format, &fileLabel, &file, &choose,
-                                                             &startStop, &status })
+                                                             &startStop, &fadeOut, &status })
         addAndMakeVisible(c);
     setSize(460, 170);
     refresh();
@@ -77,8 +81,11 @@ void RecordDialog::chooseFile()
 
 void RecordDialog::startOrStop()
 {
-    if (recorder.status().recording) {
-        const auto result = recorder.stop();
+    const auto current = recorder.status();
+    if (current.fading)
+        return;
+    if (current.recording) {
+        const auto result = fadeOut.getToggleState() ? recorder.stopFading() : recorder.stop();
         if (result.failed())
             juce::AlertWindow::showMessageBoxAsync(juce::MessageBoxIconType::WarningIcon, "Record",
                                                    result.getErrorMessage());
@@ -102,7 +109,8 @@ void RecordDialog::timerCallback()
 void RecordDialog::refresh()
 {
     const auto s = recorder.status();
-    startStop.setButtonText(s.recording ? "Stop" : "Start recording");
+    startStop.setButtonText(s.fading ? "Fading out..." : s.recording ? "Stop" : "Start recording");
+    startStop.setEnabled(!s.fading);
     startStop.setColour(juce::TextButton::buttonColourId, s.recording ? juce::Colours::darkred : juce::Colour { 0xff37474f });
     format.setEnabled(!s.recording);
     choose.setEnabled(!s.recording);
@@ -115,7 +123,9 @@ void RecordDialog::refresh()
                      juce::dontSendNotification);
 
     juce::String text;
-    if (s.recording)
+    if (s.fading)
+        text << "Fading out  " << clock(s.seconds());
+    else if (s.recording)
         text << "Recording  " << clock(s.seconds());
     else if (s.file != juce::File())
         text << "Last: " << s.file.getFileName() << "  (" << clock(s.seconds()) << ")";
@@ -158,6 +168,8 @@ void RecordDialog::resized()
     file.setBounds(r);
     r = row(30);
     startStop.setBounds(r.removeFromLeft(160));
+    r.removeFromLeft(12);
+    fadeOut.setBounds(r.removeFromLeft(120));
     r = row(24);
     status.setBounds(r.withTrimmedLeft(20));
 }

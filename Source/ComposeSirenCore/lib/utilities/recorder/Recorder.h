@@ -33,6 +33,8 @@ public:
         juce::int64 framesDropped = 0;
         juce::File file;
         juce::String error;
+        // A fading stop is under way: the recording ends by itself.
+        bool fading = false;
 
         double seconds() const { return sampleRate > 0 ? static_cast<double>(framesWritten) / sampleRate : 0; }
     };
@@ -52,6 +54,10 @@ public:
 
     juce::Result start(const juce::File& file, Format format);
     juce::Result stop();
+    // Ends the recording without cutting a sound short: it goes on for up to
+    // waitSeconds, ending as soon as the sound has died out; if it still
+    // sounds then (a drone), it fades out over fadeSeconds. Returns at once.
+    juce::Result stopFading(double waitSeconds = 2.0, double fadeSeconds = 3.0);
     Status status() const;
 
     // ~/Music/ComposeSiren/ComposeSiren-<date>-<time>.<ext>

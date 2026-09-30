@@ -11,7 +11,8 @@ fn main() {
     println!("cargo::rerun-if-changed=src");
     println!("cargo::rerun-if-changed=cbindgen.toml");
 
-    let config = cbindgen::Config::from_file(crate_dir.join("cbindgen.toml")).expect("cbindgen.toml is valid");
+    let config = cbindgen::Config::from_file(crate_dir.join("cbindgen.toml"))
+        .expect("cbindgen.toml is valid");
     cbindgen::Builder::new()
         .with_crate(&crate_dir)
         .with_config(config)

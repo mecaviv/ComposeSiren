@@ -3,7 +3,9 @@
 use std::ffi::{CStr, c_char, c_int};
 use std::path::Path;
 
-use crate::recorder::{Format, Recorder};
+use std::time::Duration;
+
+use crate::recorder::{Fade, Format, Recorder};
 
 /// Opaque recorder.
 #[allow(non_camel_case_types)]
@@ -27,6 +29,8 @@ pub struct cs_rec_status_t {
     pub frames_dropped: u64,
     /// 1 if the writer stopped on an error (see `cs_rec_error`).
     pub failed: c_int,
+    /// 1 while a fading stop is under way (the recording ends by itself).
+    pub fading: c_int,
 }
 
 /// A new recorder, not recording. Free it with `cs_rec_destroy`.
@@ -57,7 +61,12 @@ pub unsafe extern "C" fn cs_rec_destroy(rec: *mut cs_rec_t) {
 ///
 /// `rec` is valid; `data` holds `channels` pointers, each to `frames` floats.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn cs_rec_process(rec: *const cs_rec_t, data: *const *const f32, channels: u32, frames: u32) {
+pub unsafe extern "C" fn cs_rec_process(
+    rec: *const cs_rec_t,
+    data: *const *const f32,
+    channels: u32,
+    frames: u32,
+) {
     const MAX_CHANNELS: usize = 16;
     if rec.is_null() || data.is_null() || channels == 0 || channels as usize > MAX_CHANNELS {
         return;
@@ -116,9 +125,14 @@ pub unsafe extern "C" fn cs_rec_start(
         return -1;
     };
     // SAFETY: null-terminated, as the caller guarantees.
-    let path = unsafe { CStr::from_ptr(path) }.to_string_lossy().into_owned();
+    let path = unsafe { CStr::from_ptr(path) }
+        .to_string_lossy()
+        .into_owned();
     // SAFETY: valid, as the caller guarantees.
-    match unsafe { &*rec }.0.start(Path::new(&path), format, sample_rate, channels) {
+    match unsafe { &*rec }
+        .0
+        .start(Path::new(&path), format, sample_rate, channels)
+    {
         Ok(()) => 0,
         Err(e) => {
             write_message(&e, error, error_len);
@@ -134,13 +148,50 @@ pub unsafe extern "C" fn cs_rec_start(
 ///
 /// As for `cs_rec_start`.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn cs_rec_stop(rec: *const cs_rec_t, error: *mut c_char, error_len: u32) -> c_int {
+pub unsafe extern "C" fn cs_rec_stop(
+    rec: *const cs_rec_t,
+    error: *mut c_char,
+    error_len: u32,
+) -> c_int {
     if rec.is_null() {
         return -1;
     }
     // SAFETY: valid, as the caller guarantees.
     match unsafe { &*rec }.0.stop() {
         Ok(_) => 0,
+        Err(e) => {
+            write_message(&e, error, error_len);
+            -1
+        }
+    }
+}
+
+/// Asks the recording to end: it goes on for up to `wait_ms`, ending as soon
+/// as the sound has died out; if it still sounds then, it fades out over
+/// `fade_ms` and ends. Returns at once (0, or -1 with the reason in `error`);
+/// `cs_rec_status` says when it has ended.
+///
+/// # Safety
+///
+/// As for `cs_rec_start`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn cs_rec_stop_fading(
+    rec: *const cs_rec_t,
+    wait_ms: u32,
+    fade_ms: u32,
+    error: *mut c_char,
+    error_len: u32,
+) -> c_int {
+    if rec.is_null() {
+        return -1;
+    }
+    let fade = Fade {
+        wait: Duration::from_millis(u64::from(wait_ms)),
+        length: Duration::from_millis(u64::from(fade_ms)),
+    };
+    // SAFETY: valid, as the caller guarantees.
+    match unsafe { &*rec }.0.stop_fading(fade) {
+        Ok(()) => 0,
         Err(e) => {
             write_message(&e, error, error_len);
             -1
@@ -170,6 +221,7 @@ pub unsafe extern "C" fn cs_rec_status(rec: *const cs_rec_t, out: *mut cs_rec_st
             frames_written: s.frames_written,
             frames_dropped: s.frames_dropped,
             failed: c_int::from(s.error.is_some()),
+            fading: c_int::from(s.fading),
         };
     }
 }
@@ -186,7 +238,12 @@ pub unsafe extern "C" fn cs_rec_path(rec: *const cs_rec_t, out: *mut c_char, len
         return 0;
     }
     // SAFETY: valid, as the caller guarantees.
-    let path = unsafe { &*rec }.0.status().path.map(|p| p.to_string_lossy().into_owned()).unwrap_or_default();
+    let path = unsafe { &*rec }
+        .0
+        .status()
+        .path
+        .map(|p| p.to_string_lossy().into_owned())
+        .unwrap_or_default();
     write_message(&path, out, len);
     path.len() as u32
 }

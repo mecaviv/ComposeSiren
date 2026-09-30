@@ -230,6 +230,22 @@ struct StartRecordingArgs {
     format: Option<String>,
 }
 
+#[cfg(feature = "record")]
+#[derive(Debug, Deserialize, JsonSchema)]
+struct StopRecordingArgs {
+    /// End without cutting a sound short: wait for it to die out, and if it
+    /// still sounds (a drone), fade it out. The reply comes at once; call
+    /// `recording_status` until `recording` is false.
+    #[serde(default)]
+    fade: bool,
+    /// Seconds to wait for the sound to die out (default 2).
+    #[serde(default)]
+    wait_seconds: Option<f64>,
+    /// Seconds the fade-out lasts (default 3).
+    #[serde(default)]
+    fade_seconds: Option<f64>,
+}
+
 /// The recording tools, with the `record` feature (`COMPOSESIREN_RECORD`).
 #[cfg(feature = "record")]
 #[tool_router(router = record_router)]
@@ -246,9 +262,14 @@ impl ComposeSirenServer {
         })))
     }
 
-    #[tool(description = "Stop recording and complete the file. Returns its path, duration and dropped frames.")]
-    fn stop_recording(&self) -> Result<CallToolResult, McpError> {
-        self.finish(self.dispatch.call(json!({"op": "stop_recording"})))
+    #[tool(description = "Stop recording and complete the file, at once or (fade) once the sound has died out or faded out. Returns its path, duration and dropped frames.")]
+    fn stop_recording(&self, Parameters(args): Parameters<StopRecordingArgs>) -> Result<CallToolResult, McpError> {
+        self.finish(self.dispatch.call(json!({
+            "op": "stop_recording",
+            "fade": args.fade,
+            "wait_seconds": args.wait_seconds,
+            "fade_seconds": args.fade_seconds,
+        })))
     }
 
     #[tool(description = "Whether a recording is running, its file, duration so far and dropped frames.")]

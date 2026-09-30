@@ -42,3 +42,5 @@ missing_errors_doc = "allow"
 missing_panics_doc = "allow"
 cast_possible_truncation = "allow"
 cast_precision_loss = "allow"
+# Durations and frame counts: never negative.
+cast_sign_loss = "allow"
