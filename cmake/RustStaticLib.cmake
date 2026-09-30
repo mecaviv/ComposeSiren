@@ -10,10 +10,12 @@
 #     [LINK_FRAMEWORKS <name>...] # macOS frameworks the crate needs
 #   )
 #
-# Corrosion builds one Rust target triple. For a macOS universal build (several
-# CMAKE_OSX_ARCHITECTURES), the crate is built with cargo for each
-# architecture and merged with lipo into one .a, behind an INTERFACE target.
-# Everywhere else, Corrosion (fetched once, at configure time) imports it.
+# On Apple, cargo is invoked with --target for each CMAKE_OSX_ARCHITECTURES
+# entry (one arch for a host-only build, both for MACOS_UNIVERSAL). Several
+# architectures are merged with lipo. Corrosion is not used on Apple: it
+# builds the host triple unless Rust_CARGO_TARGET is forced, and a leftover
+# host .a then fails the linker with "Undefined symbols for architecture …".
+# Everywhere else, Corrosion (fetched once, at configure time) imports the crate.
 #
 # Debug builds use cargo's dev profile, other configurations release.
 # MACOSX_DEPLOYMENT_TARGET is passed to cargo when CMAKE_OSX_DEPLOYMENT_TARGET
@@ -21,14 +23,8 @@
 
 include_guard(GLOBAL)
 
-list(LENGTH CMAKE_OSX_ARCHITECTURES _cs_rust_arch_count)
-if(APPLE AND _cs_rust_arch_count GREATER 1)
-  set(COMPOSESIREN_RUST_UNIVERSAL ON)
-else()
-  set(COMPOSESIREN_RUST_UNIVERSAL OFF)
-endif()
-
-if(COMPOSESIREN_RUST_UNIVERSAL)
+if(APPLE)
+  set(COMPOSESIREN_RUST_APPLE_CARGO ON)
   find_program(COMPOSESIREN_CARGO cargo
     HINTS "$ENV{CARGO_HOME}/bin" "$ENV{HOME}/.cargo/bin"
     REQUIRED)
@@ -44,6 +40,7 @@ if(COMPOSESIREN_RUST_UNIVERSAL)
       OUTPUT_STRIP_TRAILING_WHITESPACE)
   endif()
 else()
+  set(COMPOSESIREN_RUST_APPLE_CARGO OFF)
   # At file scope, not in the function: the variables Corrosion sets stay
   # visible to corrosion_import_crate.
   include(FetchContent)
@@ -77,8 +74,8 @@ function(composesiren_add_rust_staticlib)
     list(APPEND cargo_env "MACOSX_DEPLOYMENT_TARGET=${CMAKE_OSX_DEPLOYMENT_TARGET}")
   endif()
 
-  if(COMPOSESIREN_RUST_UNIVERSAL)
-    # -- macOS universal: cargo per architecture, then lipo --------------------
+  if(COMPOSESIREN_RUST_APPLE_CARGO)
+    # -- macOS: cargo --target per architecture, lipo when there are several --
     set(target_dir "${CMAKE_CURRENT_BINARY_DIR}/${crate}-target")
     set(profile "$<IF:$<CONFIG:Debug>,dev,release>")
     set(profile_dir "$<IF:$<CONFIG:Debug>,debug,release>")
@@ -98,7 +95,7 @@ function(composesiren_add_rust_staticlib)
       endif()
       if(COMPOSESIREN_RUSTUP AND NOT COMPOSESIREN_RUST_INSTALLED_TARGETS MATCHES "(^|\n)${triple}(\n|$)")
         message(FATAL_ERROR
-          "${crate}: the universal build needs the Rust target ${triple}. "
+          "${crate}: needs the Rust target ${triple}. "
           "Install it with: rustup target add ${triple}")
       endif()
       list(APPEND target_flags "--target=${triple}")
@@ -112,8 +109,9 @@ function(composesiren_add_rust_staticlib)
       list(APPEND feature_flags "--features=${features}")
     endif()
 
-    # Always runs: cargo decides what is up to date.
-    add_custom_target(${arg_TARGET}_universal
+    # Always runs: cargo decides what is up to date. lipo -create with one
+    # input is a copy, so a host-only build and a universal build share this.
+    add_custom_target(${arg_TARGET}_cargo
       COMMAND "${CMAKE_COMMAND}" -E env
         ${cargo_env}
         "CARGO_TARGET_DIR=${target_dir}"
@@ -133,7 +131,7 @@ function(composesiren_add_rust_staticlib)
 
     add_library(${arg_TARGET} INTERFACE)
     target_link_libraries(${arg_TARGET} INTERFACE "${lib}")
-    add_dependencies(${arg_TARGET} ${arg_TARGET}_universal)
+    add_dependencies(${arg_TARGET} ${arg_TARGET}_cargo)
   else()
     # -- every other platform: Corrosion ---------------------------------------
     set(corrosion_features "")

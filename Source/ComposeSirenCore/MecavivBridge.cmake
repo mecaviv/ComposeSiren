@@ -10,8 +10,8 @@
 # The crate depends on the mecaviv-v1 crate of mecaviv-rs through a relative
 # path: mecaviv-rs must be checked out next to ComposeSiren.
 #
-# See cmake/RustStaticLib.cmake for the build (lipo for a macOS universal
-# build, Corrosion otherwise).
+# See cmake/RustStaticLib.cmake for the build (cargo per architecture on
+# macOS, lipo when universal, Corrosion otherwise).
 
 cmake_path(ABSOLUTE_PATH CMAKE_SOURCE_DIR NORMALIZE OUTPUT_VARIABLE _mecaviv_cs_root)
 cmake_path(GET _mecaviv_cs_root PARENT_PATH _mecaviv_checkouts)
