@@ -52,6 +52,13 @@ if(APPLE AND _cs_mcp_arch_count GREATER 1)
       "${_cs_mcp_target_dir}/${_triple}/${_cs_mcp_profile_dir}/${_cs_mcp_lib_name}")
   endforeach()
 
+  # The recording tools with COMPOSESIREN_RECORD (an empty list otherwise: no
+  # empty argument reaches cargo).
+  set(_cs_mcp_feature_flags "")
+  if(COMPOSESIREN_RECORD)
+    list(APPEND _cs_mcp_feature_flags "--features=record")
+  endif()
+
   add_custom_target(composesiren_mcp_universal
     COMMAND "${CMAKE_COMMAND}" -E env
       ${_cs_mcp_cargo_env}
@@ -59,6 +66,7 @@ if(APPLE AND _cs_mcp_arch_count GREATER 1)
       "${COMPOSESIREN_MCP_CARGO}" build
         --manifest-path "${COMPOSESIREN_MCP_CRATE_DIR}/Cargo.toml"
         --lib
+        ${_cs_mcp_feature_flags}
         "--profile=${_cs_mcp_profile}"
         ${_cs_mcp_target_flags}
     COMMAND "${CMAKE_COMMAND}" -E make_directory
@@ -82,9 +90,14 @@ else()
   )
   FetchContent_MakeAvailable(Corrosion)
 
+  set(_cs_mcp_features "")
+  if(COMPOSESIREN_RECORD)
+    set(_cs_mcp_features FEATURES record)
+  endif()
   corrosion_import_crate(
     MANIFEST_PATH "${COMPOSESIREN_MCP_CRATE_DIR}/Cargo.toml"
     CRATE_TYPES staticlib
+    ${_cs_mcp_features}
   )
   if(_cs_mcp_cargo_env)
     corrosion_set_env_vars(composesiren_mcp ${_cs_mcp_cargo_env})

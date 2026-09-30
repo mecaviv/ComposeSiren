@@ -130,6 +130,32 @@ $ cmake -B cmake-build-debug -DCMAKE_BUILD_TYPE=Debug
 $ cmake --build cmake-build-debug --target OneSiren_Standalone
 ```
 
+### Recorder
+
+SirenOrchestra can record its audio output, after the reverb, to FLAC (24-bit)
+or WAV (24-bit, or 32-bit float). It is off by default; turn it on with
+`-DCOMPOSESIREN_RECORD=ON`.
+
+- **Dialog:** a Record... button in the top row opens it. It has the format,
+  the file (by default `~/Music/ComposeSiren/ComposeSiren-<date>-<time>.flac`),
+  start and stop, and the duration and any dropped frames.
+- **MCP tools** (with `COMPOSESIREN_MCP`): `start_recording` (optional `path`,
+  and `format`: `flac`, `wav` or `wav-float`), `stop_recording`, and
+  `recording_status`.
+- **The crate:** `Source/composesiren-record`, pure Rust (`flacenc`, `hound`),
+  with no JUCE, so it also works for the DSP outside the plugin.
+  - The audio thread only copies each block into a lock-free ring buffer.
+  - A writer thread encodes and writes the file.
+  - A recording cut short (a crash) still decodes up to its last complete
+    FLAC frame.
+- **Rust:** it needs a toolchain like the MCP server. See
+  `Source/ComposeSirenCore/Record.cmake`.
+
+```
+$ cmake -B cmake-build-debug -DCMAKE_BUILD_TYPE=Debug -DCOMPOSESIREN_RECORD=ON
+$ cmake --build cmake-build-debug --target SirenOrchestra_Standalone
+```
+
 ### dependencies
 
 #### linux

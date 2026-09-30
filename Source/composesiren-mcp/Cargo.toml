@@ -11,6 +11,11 @@ publish = false
 [lib]
 crate-type = ["staticlib", "rlib"]
 
+[features]
+# The recording tools (start_recording, stop_recording, recording_status), for
+# a plugin built with COMPOSESIREN_RECORD.
+record = []
+
 [dependencies]
 axum = "0.8"
 fs2 = "0.4"

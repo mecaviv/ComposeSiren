@@ -51,6 +51,9 @@ SirenOrchestraPluginProcessor::SirenOrchestraPluginProcessor() :
     mcp(*this, "SirenOrchestra", "MvSO")
 {
     ssm.subscribe(&ensemble);
+#if COMPOSESIREN_RECORD
+    mcp.setRecorder(&recorder);
+#endif
     router.sendAllCurrentParameterValues();
     ensembleParameterBridges.sendParameterValues();
     reverbParameterBridges.sendParameterValues();
@@ -67,6 +70,9 @@ void SirenOrchestraPluginProcessor::prepareToPlay(double sampleRate, int samples
 {
     lastSampleRate = sampleRate;
     lastSamplesPerBlock = samplesPerBlock;
+#if COMPOSESIREN_RECORD
+    recorder.setAudioFormat(sampleRate, getTotalNumOutputChannels());
+#endif
 
     reverb.setSampleRate(sampleRate);
     ensemble.setSampleRate(sampleRate);
@@ -282,6 +288,11 @@ void SirenOrchestraPluginProcessor::processBlock(juce::AudioBuffer<float>& audio
     // now we can safely delete the previous siren pointer
     // (if it's already nullptr, delete will just do nothing)
     ensemble.deleteDiscarded();
+
+#if COMPOSESIREN_RECORD
+    // what goes out, after the reverb: copied to the recorder's ring only
+    recorder.process(audio);
+#endif
 }
 
 //==============================================================================

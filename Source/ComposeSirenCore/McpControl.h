@@ -10,6 +10,8 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 
+#include "Recorder.h"
+
 #ifndef COMPOSESIREN_MCP
 #define COMPOSESIREN_MCP 0
 #endif
@@ -40,6 +42,11 @@ public:
     void drainMidi(juce::MidiBuffer& midi) const;
 
     int getPort() const { return port; }
+
+#if COMPOSESIREN_RECORD
+    // The recorder the recording commands drive (null: they fail).
+    void setRecorder(Recorder* r) { recorder = r; }
+#endif
 
 private:
     struct Job
@@ -77,4 +84,8 @@ private:
     std::shared_ptr<State> state;
     cs_mcp_server_t* server = nullptr;
     int port = 0;
+#if COMPOSESIREN_RECORD
+    Recorder* recorder = nullptr;
+    std::string recording(const juce::String& op, const juce::var& request) const;
+#endif
 };

@@ -22,6 +22,7 @@
 #include "SirenUdpBridge.h"
 #endif
 #include <McpControl.h>
+#include <Recorder.h>
 
 class SirenOrchestraPluginProcessor :
     public juce::AudioProcessor,
@@ -50,6 +51,9 @@ public:
     bool physicalSirensEnabled() override;
     juce::String physicalSirensTooltip() override;
     void stAllSwitched(bool) override;
+#endif
+#if COMPOSESIREN_RECORD
+    Recorder* getRecorder() override { return &recorder; }
 #endif
 
     // Timer callback (called from UI thread)
@@ -122,6 +126,11 @@ private:
 #if COMPOSESIREN_PARK_BRIDGE
     // mirror du MIDI routé vers les sirènes physiques (protocole Pd sirenMidi2Udp)
     SirenUdpBridge udpBridge;
+#endif
+
+#if COMPOSESIREN_RECORD
+    // before mcp, which drives it: destroyed after it
+    Recorder recorder;
 #endif
 
     McpControl mcp;
