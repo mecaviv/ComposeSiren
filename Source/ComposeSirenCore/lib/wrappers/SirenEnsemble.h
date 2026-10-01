@@ -54,6 +54,9 @@ private:
 
 class SirenEnsemble {
 public:
+    // one-based MIDI channel for ensemble-wide controls (e.g. CC 121)
+    static constexpr int kGlobalControlChannel = 16;
+
     SirenEnsemble(const std::vector<sirenId>& ids,
                   const std::string& resourcesPath);
     ~SirenEnsemble() = default;

@@ -214,6 +214,16 @@ void SirenOrchestraPluginProcessor::processBlock(juce::AudioBuffer<float>& audio
         // - dump them as is into scheduler
         // - forward them to UI for monitoring (with scoped guards)
         router.handleMessage(scheduler, msg, metadata.samplePosition);
+
+        // global Reset All Controllers (CC 121, channel 16): the ensemble
+        // resets every siren, the physical ones get the reset frame too
+        if (msg.isControllerOfType(121)
+            && msg.getChannel() == SirenEnsemble::kGlobalControlChannel) {
+            scheduler.schedule(msg, metadata.samplePosition);
+#if COMPOSESIREN_PARK_BRIDGE
+            udpBridge.pushResetAll();
+#endif
+        }
     }
 
     // schedule MIDI output from UI/host control
