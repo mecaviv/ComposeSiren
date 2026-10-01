@@ -41,6 +41,27 @@ typedef enum {
 // Opaque handle to a bridge.
 typedef struct mecaviv_bridge_t mecaviv_bridge_t;
 
+// Calls made to the daemon since the bridge was created. All zero when the
+// bridge never used the daemon.
+typedef struct {
+    // Sessions opened.
+    uint64_t sessions;
+    // Session attempts that failed.
+    uint64_t session_failures;
+    // MIDI messages sent.
+    uint64_t midi;
+    // MIDI messages dropped because the daemon does not carry them.
+    uint64_t midi_ignored;
+    // Resets of one siren.
+    uint64_t resets;
+    // Resets of every siren.
+    uint64_t reset_all;
+    // ST of every siren.
+    uint64_t st_all;
+    // Drive-state records received.
+    uint64_t drive_states;
+} mecaviv_daemon_stats_t;
+
 #ifdef __cplusplus
 extern "C" {
 #endif // __cplusplus
@@ -129,6 +150,14 @@ mecaviv_bridge_backend_t mecaviv_bridge_backend(const mecaviv_bridge_t *bridge);
 //
 // `bridge` is null or a live handle.
 const char *mecaviv_bridge_backend_tooltip(const mecaviv_bridge_t *bridge);
+
+// Calls made to the daemon since the bridge was created. All zero for a
+// null handle.
+//
+// # Safety
+//
+// `bridge` is null or a live handle.
+mecaviv_daemon_stats_t mecaviv_bridge_daemon_stats(const mecaviv_bridge_t *bridge);
 
 // The library version, `major.minor.patch`, as a static NUL-terminated
 // string. Do not free it.

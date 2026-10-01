@@ -22,11 +22,13 @@ mod daemon;
 pub mod ffi;
 mod link;
 mod park;
+mod stats;
 
 pub use bridge::{Backend, Bridge};
 pub use mecaviv_v1::SirenId;
 pub use mecaviv_v1::keb::DriveState;
 pub use park::{ParkTable, SirenEndpoints};
+pub use stats::DaemonStats;
 
 /// The library's version, reported through the C ABI.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

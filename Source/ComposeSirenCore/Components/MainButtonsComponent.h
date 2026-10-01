@@ -31,6 +31,9 @@ public:
         virtual bool physicalSirensEnabled() { return false; }
         virtual juce::String physicalSirensTooltip() { return {}; }
         virtual void stAllSwitched(bool) {}
+        // optionnel : un bouton About... ouvre la fenêtre que showAbout() ouvre.
+        virtual bool hasAbout() { return false; }
+        virtual void showAbout(juce::Component* /*parent*/) {}
 #if COMPOSESIREN_RECORD
         // optionnel : l'enregistreur de la sortie audio ; un bouton Record...
         // ouvre son dialogue quand il y en a un.
@@ -75,6 +78,14 @@ public:
             addAndMakeVisible(recordButton);
         }
 #endif
+
+        if (listener.hasAbout()) {
+            aboutButton.setColour(juce::TextButton::buttonColourId, juce::Colour { 0xff37474f });
+            aboutButton.setColour(juce::TextButton::textColourOffId, juce::Colours::whitesmoke);
+            aboutButton.setButtonText("About...");
+            aboutButton.addListener(this);
+            addAndMakeVisible(aboutButton);
+        }
 
         if (hasResetAllButton) {
             resetAllButton.setColour(juce::TextButton::buttonColourId, juce::Colours::darkred);
@@ -167,6 +178,13 @@ public:
             fb.items.add(item);
         }
 #endif
+        if (aboutButton.isVisible()) {
+            item = juce::FlexItem(aboutButton).withMinWidth(90)
+                                              .withMinHeight(btnsHeight)
+                                              .withFlex(0,0);
+            item.margin = juce::FlexItem::Margin(0.f, 0.f, 0.f, margin);
+            fb.items.add(item);
+        }
         item = juce::FlexItem(resetButton).withMinWidth(75)
                                           .withMinHeight(btnsHeight)
                                           .withFlex(0,0);
@@ -221,6 +239,10 @@ public:
             return;
         }
 #endif
+        if (btn == &aboutButton) {
+            listener.showAbout(getTopLevelComponent());
+            return;
+        }
         if (btn == &resetButton) {
             listener.resetSiren(currentSirenId);
             return;
@@ -284,6 +306,7 @@ private:
     juce::TextButton recordButton;
 
     #endif
+    juce::TextButton aboutButton;
     juce::TextButton resetAllButton;
     juce::TextButton selectResourcesButton;
 #if COMPOSESIREN_PARK_BRIDGE

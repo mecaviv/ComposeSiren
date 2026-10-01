@@ -24,6 +24,7 @@ use mecaviv_v1::keb::DriveState;
 use crate::daemon::{self, Client};
 use crate::link::Link;
 use crate::park::ParkTable;
+use crate::stats::{DaemonCounters, DaemonStats};
 
 /// MIDI messages that can wait for the worker. Beyond that, pushes fail.
 const MIDI_QUEUE: usize = 1024;
@@ -108,6 +109,8 @@ struct Shared {
     backend: AtomicU8,
     /// Try this socket on enable. `None` for [`Bridge::with_park`].
     daemon_socket: Option<PathBuf>,
+    /// What was sent to the daemon.
+    daemon_stats: DaemonCounters,
 }
 
 impl Bridge {
@@ -150,6 +153,7 @@ impl Bridge {
             states: std::array::from_fn(|_| AtomicI8::new(state_code(DriveState::Unknown))),
             backend: AtomicU8::new(BACKEND_NONE),
             daemon_socket,
+            daemon_stats: DaemonCounters::default(),
         });
         let (midi, queue) = mpsc::sync_channel(MIDI_QUEUE);
         let worker = thread::Builder::new()
@@ -191,6 +195,12 @@ impl Bridge {
             Some(path) if daemon::available(path) => Backend::Daemon,
             Some(_) | None => Backend::InProcess,
         }
+    }
+
+    /// Calls made to the daemon since this bridge was created.
+    #[must_use]
+    pub fn daemon_stats(&self) -> DaemonStats {
+        self.shared.daemon_stats.snapshot()
     }
 
     /// Queues a 3-byte MIDI message. Real-time safe.
@@ -301,14 +311,18 @@ fn run(shared: &Shared, queue: &Receiver<[u8; 3]>, mut link: Option<Link>) {
 fn start_transport(shared: &Shared, daemon: &mut Option<Client>, link: &mut Option<Link>) {
     *daemon = None;
     if let Some(path) = shared.daemon_socket.as_deref() {
-        if let Ok(mut client) = Client::connect(path) {
-            if client.reset_all().is_ok() {
+        let session = Client::connect(path).and_then(|mut client| client.reset_all().map(|()| client));
+        match session {
+            Ok(client) => {
+                DaemonCounters::add(&shared.daemon_stats.sessions);
+                DaemonCounters::add(&shared.daemon_stats.reset_all);
                 *daemon = Some(client);
                 shared
                     .backend
                     .store(Backend::Daemon.code(), Ordering::Release);
                 return;
             }
+            Err(_) => DaemonCounters::add(&shared.daemon_stats.session_failures),
         }
     }
     fallback_to_link(shared, daemon, link);
@@ -342,26 +356,37 @@ fn fallback_to_link(shared: &Shared, daemon: &mut Option<Client>, link: &mut Opt
 
 /// `true` when the daemon session is dead and the worker should fall back.
 fn drive_daemon(shared: &Shared, queue: &Receiver<[u8; 3]>, client: &mut Client) -> bool {
+    let stats = &shared.daemon_stats;
     let resets = shared.resets.swap(0, Ordering::AcqRel);
     for siren in SirenId::all() {
-        if resets & (1 << (siren.get() - 1)) != 0 && client.reset(siren).is_err() {
-            return true;
+        if resets & (1 << (siren.get() - 1)) != 0 {
+            if client.reset(siren).is_err() {
+                return true;
+            }
+            DaemonCounters::add(&stats.resets);
         }
     }
     match shared.st.swap(ST_NONE, Ordering::AcqRel) {
         ST_NONE => {}
-        st if client.st_all(st != 0).is_err() => return true,
-        _ => {}
+        st => {
+            if client.st_all(st != 0).is_err() {
+                return true;
+            }
+            DaemonCounters::add(&stats.st_all);
+        }
     }
     while let Ok(bytes) = queue.try_recv() {
-        if client.midi(bytes).is_err() {
-            return true;
+        match client.midi(bytes) {
+            Ok(true) => DaemonCounters::add(&stats.midi),
+            Ok(false) => DaemonCounters::add(&stats.midi_ignored),
+            Err(_) => return true,
         }
     }
     match client.poll() {
         Ok(messages) => {
             for message in messages {
                 if let ServerMessage::DriveState { siren, state } = message {
+                    DaemonCounters::add(&stats.drive_states);
                     shared.states[usize::from(siren.get() - 1)]
                         .store(state_code(state), Ordering::Release);
                 }

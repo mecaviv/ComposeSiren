@@ -13,7 +13,7 @@ use std::ptr;
 use mecaviv_v1::SirenId;
 use mecaviv_v1::keb::DriveState;
 
-use crate::{Backend, Bridge};
+use crate::{Backend, Bridge, DaemonStats};
 
 /// Number of sirens: siren numbers are 1 to `MECAVIV_BRIDGE_NUM_SIRENS`.
 pub const MECAVIV_BRIDGE_NUM_SIRENS: u8 = 7;
@@ -229,6 +229,58 @@ pub unsafe extern "C" fn mecaviv_bridge_backend_tooltip(
 ) -> *const c_char {
     // SAFETY: guaranteed by the caller.
     tooltip_ptr(unsafe { get(bridge) }.map_or(Backend::None, Bridge::backend))
+}
+
+/// Calls made to the daemon since the bridge was created. All zero when the
+/// bridge never used the daemon.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct mecaviv_daemon_stats_t {
+    /// Sessions opened.
+    pub sessions: u64,
+    /// Session attempts that failed.
+    pub session_failures: u64,
+    /// MIDI messages sent.
+    pub midi: u64,
+    /// MIDI messages dropped because the daemon does not carry them.
+    pub midi_ignored: u64,
+    /// Resets of one siren.
+    pub resets: u64,
+    /// Resets of every siren.
+    pub reset_all: u64,
+    /// ST of every siren.
+    pub st_all: u64,
+    /// Drive-state records received.
+    pub drive_states: u64,
+}
+
+impl From<DaemonStats> for mecaviv_daemon_stats_t {
+    fn from(s: DaemonStats) -> Self {
+        Self {
+            sessions: s.sessions,
+            session_failures: s.session_failures,
+            midi: s.midi,
+            midi_ignored: s.midi_ignored,
+            resets: s.resets,
+            reset_all: s.reset_all,
+            st_all: s.st_all,
+            drive_states: s.drive_states,
+        }
+    }
+}
+
+/// Calls made to the daemon since the bridge was created. All zero for a
+/// null handle.
+///
+/// # Safety
+///
+/// `bridge` is null or a live handle.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mecaviv_bridge_daemon_stats(
+    bridge: *const mecaviv_bridge_t,
+) -> mecaviv_daemon_stats_t {
+    // SAFETY: guaranteed by the caller.
+    unsafe { get(bridge) }.map_or_else(Default::default, |bridge| bridge.daemon_stats().into())
 }
 
 /// The library version, `major.minor.patch`, as a static NUL-terminated

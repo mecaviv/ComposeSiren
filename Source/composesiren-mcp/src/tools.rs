@@ -1,18 +1,24 @@
 //! MCP tools. Each one forwards a JSON command to the plugin.
 
+use rmcp::handler::server::tool::ToolCallContext;
 use rmcp::handler::server::wrapper::Parameters;
-use rmcp::{tool, tool_handler, tool_router, ErrorData as McpError, ServerHandler};
-use rmcp::model::{CallToolResult, ContentBlock, Implementation, ProtocolVersion, ServerCapabilities, ServerConfig};
+use rmcp::service::RequestContext;
+use rmcp::{tool, tool_handler, tool_router, ErrorData as McpError, RoleServer, ServerHandler};
+use rmcp::model::{CallToolRequestParams, CallToolResponse, CallToolResult, ContentBlock, Implementation, ProtocolVersion, ServerCapabilities, ServerConfig};
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde_json::{Value, json};
 
+use std::sync::Arc;
+
 use crate::dispatch::Dispatch;
+use crate::stats::Stats;
 
 /// The MCP endpoint mounted at `/mcp`.
 #[derive(Clone)]
 pub struct ComposeSirenServer {
     dispatch: Dispatch,
+    stats: Arc<Stats>,
     tool_router: rmcp::handler::server::tool::ToolRouter<Self>,
 }
 
@@ -86,12 +92,12 @@ struct SetMidiOutputArgs {
 
 #[tool_router]
 impl ComposeSirenServer {
-    pub fn new(dispatch: Dispatch) -> Self {
+    pub fn new(dispatch: Dispatch, stats: Arc<Stats>) -> Self {
         #[cfg(feature = "record")]
         let tool_router = Self::tool_router() + Self::record_router();
         #[cfg(not(feature = "record"))]
         let tool_router = Self::tool_router();
-        Self { dispatch, tool_router }
+        Self { dispatch, stats, tool_router }
     }
 
     #[tool(description = "List every automatable parameter with its id, value, and range.")]
@@ -280,8 +286,24 @@ impl ComposeSirenServer {
 
 // The field, not the macro's default `Self::tool_router()`: with the `record`
 // feature, `new` adds the recording tools to it.
+//
+// `call_tool` is written out, rather than left to the macro, to count each tool.
 #[tool_handler(router = self.tool_router)]
 impl ServerHandler for ComposeSirenServer {
+    async fn call_tool(
+        &self,
+        request: CallToolRequestParams,
+        context: RequestContext<RoleServer>,
+    ) -> Result<CallToolResponse, McpError> {
+        let name = request.name.to_string();
+        let result = self
+            .tool_router
+            .call(ToolCallContext::new(self, request, context))
+            .await;
+        self.stats.record(&name, result.is_err());
+        result
+    }
+
     fn get_info(&self) -> ServerConfig {
         ServerConfig::new(
             ServerCapabilities::builder().enable_tools().build(),
