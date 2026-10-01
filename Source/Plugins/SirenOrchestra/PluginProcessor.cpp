@@ -17,6 +17,9 @@ SirenOrchestraPluginProcessor::SirenOrchestraPluginProcessor() :
         .withInput("Input", juce::AudioChannelSet::stereo(), true)
 #endif
         .withOutput("Output", juce::AudioChannelSet::stereo(), true)
+#if COMPOSESIREN_CLIC
+        .withOutput("Clic", juce::AudioChannelSet::stereo(), true)
+#endif
 #endif
     ),
 #endif
@@ -87,6 +90,10 @@ void SirenOrchestraPluginProcessor::prepareToPlay(double sampleRate, int samples
 
     reverb.setSampleRate(sampleRate);
     ensemble.setSampleRate(sampleRate);
+#if COMPOSESIREN_CLIC
+    clicEngine.setSampleRate(sampleRate);
+    clicEvents.reserve(512);
+#endif
 }
 
 void SirenOrchestraPluginProcessor::releaseResources()
@@ -111,6 +118,15 @@ bool SirenOrchestraPluginProcessor::isBusesLayoutSupported(const BusesLayout& la
 #if !JucePlugin_IsSynth
     if (layouts.getMainOutputChannelSet() != layouts.getMainInputChannelSet())
         return false;
+#endif
+
+#if COMPOSESIREN_CLIC
+    // the Clic bus: stereo, or disabled
+    if (layouts.outputBuses.size() > 1) {
+        const auto& clicBus = layouts.outputBuses.getReference(1);
+        if (!clicBus.isDisabled() && clicBus != juce::AudioChannelSet::stereo())
+            return false;
+    }
 #endif
 
     return true;
@@ -211,6 +227,9 @@ void SirenOrchestraPluginProcessor::processBlock(juce::AudioBuffer<float>& audio
 
     mcp.drainMidi(midiIn);
     scheduler.reset();
+#if COMPOSESIREN_CLIC
+    collectClicMidi(midiIn);
+#endif
 
     // the Reset buttons: the same as a CC 121 on the siren's channel (or 16)
     if (const auto mask = pendingResets.exchange(0, std::memory_order_acquire)) {
@@ -256,6 +275,9 @@ void SirenOrchestraPluginProcessor::processBlock(juce::AudioBuffer<float>& audio
 
     if (!ensemble.getRawSirenHandles()) {
         audio.clear();
+#if COMPOSESIREN_CLIC
+        renderClic(audio);
+#endif
         return;
     }
 
@@ -315,11 +337,56 @@ void SirenOrchestraPluginProcessor::processBlock(juce::AudioBuffer<float>& audio
     // (if it's already nullptr, delete will just do nothing)
     ensemble.deleteDiscarded();
 
+#if COMPOSESIREN_CLIC
+    renderClic(audio);
+#endif
+
 #if COMPOSESIREN_RECORD
     // what goes out, after the reverb: copied to the recorder's ring only
     recorder.process(audio);
 #endif
 }
+
+#if COMPOSESIREN_CLIC
+void SirenOrchestraPluginProcessor::collectClicMidi(const juce::MidiBuffer& midi)
+{
+    clicEvents.clear();
+    for (const auto metadata : midi) {
+        const auto& m = metadata.getMessage();
+        const auto* raw = m.getRawData();
+        if (m.getRawDataSize() < 2 || (raw[0] & 0xf0) == 0xf0 || (raw[0] & 0x0f) != 9)
+            continue; // channel 10 only
+        if (clicEvents.size() == clicEvents.capacity())
+            break; // never reallocate on the audio thread
+        clicEvents.push_back({ metadata.samplePosition, raw[0], raw[1],
+                               static_cast<std::uint8_t>(m.getRawDataSize() > 2 ? raw[2] : 0) });
+    }
+}
+
+void SirenOrchestraPluginProcessor::renderClic(juce::AudioBuffer<float>& audio)
+{
+    if (getBusCount(false) < 2)
+        return;
+    auto bus = getBusBuffer(audio, false, 1);
+    if (bus.getNumChannels() < 2) {
+        // bus disabled: the events still reach the engine
+        for (const auto& e : clicEvents)
+            clicEngine.midi(e.status, e.data1, e.data2);
+        return;
+    }
+    auto* l = bus.getWritePointer(0);
+    auto* r = bus.getWritePointer(1);
+    const int n = bus.getNumSamples();
+    int done = 0;
+    for (const auto& e : clicEvents) {
+        const int at = juce::jlimit(done, n, e.position);
+        clicEngine.render(l + done, r + done, at - done);
+        clicEngine.midi(e.status, e.data1, e.data2);
+        done = at;
+    }
+    clicEngine.render(l + done, r + done, n - done);
+}
+#endif
 
 //==============================================================================
 bool SirenOrchestraPluginProcessor::hasEditor() const
