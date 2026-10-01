@@ -114,10 +114,8 @@ void MidiIn::handleControlChange(int cc, int value) {
     // - pitch bend range (cc 16)
     // - effect order switch (cc 42) but this one is not implemented in firmware
     switch (cc) {
-        case 121: // Reset All Controllers (standard MIDI)
-            if (value > 0) {
-                resetSirene();
-            }
+        case 121: // Reset All Controllers: any value, as the firmware does
+            resetSirene();
             break;
         case 1 : { // vibrato depth
             control[1] = value ;
@@ -408,8 +406,12 @@ void MidiIn::resetSirene() {
     control[9] = 0;
     control[11] = 0;
     control[15] = 0;
-    control[17] = 0;
+    control[17] = 100; // as reset_sirene() (m_seq/s_un_in.c)
     control[18] = 0;
+    control[20] = 0;
+    control[21] = 0;
+    control[22] = 0;
+    control[23] = 0;
     control[92] = 0;
     control[72] = 0;
     control[73] = 0;
@@ -421,6 +423,7 @@ void MidiIn::resetSirene() {
     tourMoteur = 0.0;
     noteOnFinal = 0.0;
     volumeFinal = 0.0;
+    control[6] = 64;
     control[12] = 127.;
     control[13] = 127.;
     // why this ?

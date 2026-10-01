@@ -150,13 +150,10 @@ void SirenOrchestraPluginProcessor::resetSiren(std::optional<sirenId> id)
 {
     ensemble.stop(id);
 
-#if COMPOSESIREN_PARK_BRIDGE
-    // relayer le reset aux sirènes physiques (trame [8, 10, 0...] du patch Pd)
-    if (id.has_value())
-        udpBridge.pushReset(static_cast<int>(id.value()) + 1);
-    else
-        udpBridge.pushResetAll();
-#endif
+    // then the CC 121 itself, on the audio thread (processBlock)
+    pendingResets.fetch_or(
+        id.has_value() ? (1u << static_cast<int>(id.value())) : 0x7Fu,
+        std::memory_order_release);
 }
 
 std::string SirenOrchestraPluginProcessor::getResourcesPath()
@@ -205,6 +202,14 @@ void SirenOrchestraPluginProcessor::processBlock(juce::AudioBuffer<float>& audio
     mcp.drainMidi(midiIn);
     scheduler.reset();
 
+    // the Reset buttons: the same as a CC 121 on the siren's channel (or 16)
+    if (const auto mask = pendingResets.exchange(0, std::memory_order_acquire)) {
+        for (const auto& [id, props] : sirenPropertiesById) {
+            if (mask & (1u << static_cast<int>(id)))
+                router.resetSirens(scheduler, props->oneBasedMidiChannel, 127, 0);
+        }
+    }
+
     for (const auto metadata : midiIn) {
         const auto& msg = metadata.getMessage();
         // - discard unknown CC messages
@@ -214,16 +219,6 @@ void SirenOrchestraPluginProcessor::processBlock(juce::AudioBuffer<float>& audio
         // - dump them as is into scheduler
         // - forward them to UI for monitoring (with scoped guards)
         router.handleMessage(scheduler, msg, metadata.samplePosition);
-
-        // global Reset All Controllers (CC 121, channel 16): the ensemble
-        // resets every siren, the physical ones get the reset frame too
-        if (msg.isControllerOfType(121)
-            && msg.getChannel() == SirenEnsemble::kGlobalControlChannel) {
-            scheduler.schedule(msg, metadata.samplePosition);
-#if COMPOSESIREN_PARK_BRIDGE
-            udpBridge.pushResetAll();
-#endif
-        }
     }
 
     // schedule MIDI output from UI/host control
