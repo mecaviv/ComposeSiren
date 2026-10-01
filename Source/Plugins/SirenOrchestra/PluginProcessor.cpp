@@ -154,6 +154,16 @@ void SirenOrchestraPluginProcessor::resetSiren(std::optional<sirenId> id)
     pendingResets.fetch_or(
         id.has_value() ? (1u << static_cast<int>(id.value())) : 0x7Fu,
         std::memory_order_release);
+
+#if COMPOSESIREN_PARK_BRIDGE
+    // relayer le reset aux sirènes physiques (trame [8, 10, 0...] du patch Pd).
+    // The CC 121 above also reaches them through the MIDI mirror; the
+    // CMD_RESET frame is the one known to work, and a second reset is harmless.
+    if (id.has_value())
+        udpBridge.pushReset(static_cast<int>(id.value()) + 1);
+    else
+        udpBridge.pushResetAll();
+#endif
 }
 
 std::string SirenOrchestraPluginProcessor::getResourcesPath()
