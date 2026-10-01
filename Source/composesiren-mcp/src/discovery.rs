@@ -7,10 +7,9 @@
 
 use std::fs::OpenOptions;
 use std::io::{self, Read, Seek, SeekFrom, Write};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use fs2::FileExt;
-use serde::{Deserialize, Serialize};
 
 /// First port tried. Gearmulator starts at 13710, so a host can run both.
 pub(crate) const FIRST_PORT: u16 = 13_720;
@@ -18,33 +17,7 @@ pub(crate) const FIRST_PORT: u16 = 13_720;
 /// How many consecutive ports to try when the first is taken.
 pub(crate) const PORT_ATTEMPTS: u16 = 32;
 
-/// One running ComposeSiren instance.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Instance {
-    /// Plugin name, "OneSiren" or "SirenOrchestra".
-    pub plugin_name: String,
-    /// Four-character plugin code, "MvOS" or "MvSO". Gearmulator calls this `plugin4CC`.
-    #[serde(rename = "plugin4CC")]
-    pub plugin_4cc: String,
-    /// TCP port of the MCP HTTP server on 127.0.0.1.
-    pub port: u16,
-    /// Operating-system process id of the host.
-    pub pid: u32,
-    /// `CLAUDE_CODE_SESSION_ID` of the host process, or empty.
-    pub session_id: String,
-    /// True when this process is the standalone and can change audio and MIDI devices.
-    pub standalone: bool,
-}
-
-/// `~/.composesiren_mcp.json`, or `%USERPROFILE%\.composesiren_mcp.json`.
-#[must_use]
-pub fn default_path() -> PathBuf {
-    let home = std::env::var_os("HOME")
-        .or_else(|| std::env::var_os("USERPROFILE"))
-        .map_or_else(|| PathBuf::from("."), PathBuf::from);
-    home.join(".composesiren_mcp.json")
-}
+pub use composesiren_mcp_api::discovery::{Instance, default_path, pid_alive};
 
 /// Session id inherited from the environment, if any.
 #[must_use]
@@ -96,27 +69,6 @@ fn with_locked(path: &Path, edit: impl FnOnce(&mut Vec<Instance>)) -> io::Result
     file.write_all(b"\n")?;
     file.unlock()?;
     Ok(())
-}
-
-fn pid_alive(pid: u32) -> bool {
-    if pid == 0 {
-        return false;
-    }
-    #[cfg(unix)]
-    {
-        // SAFETY: `kill` with signal 0 only checks that the process exists.
-        let rc = unsafe { libc::kill(pid as i32, 0) };
-        if rc == 0 {
-            return true;
-        }
-        // EPERM: the process exists but belongs to another user.
-        std::io::Error::last_os_error().raw_os_error() == Some(libc::EPERM)
-    }
-    #[cfg(not(unix))]
-    {
-        let _ = pid;
-        true
-    }
 }
 
 /// Current process id.

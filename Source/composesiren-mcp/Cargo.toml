@@ -17,6 +17,8 @@ crate-type = ["staticlib", "rlib"]
 record = []
 
 [dependencies]
+# What the server and its clients agree on (public, same repository).
+composesiren-mcp-api = { path = "../composesiren-mcp-api", features = ["schema"] }
 axum = "0.8"
 fs2 = "0.4"
 libc = "0.2"

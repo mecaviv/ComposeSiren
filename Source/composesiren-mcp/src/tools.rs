@@ -5,11 +5,15 @@ use rmcp::handler::server::wrapper::Parameters;
 use rmcp::service::RequestContext;
 use rmcp::{tool, tool_handler, tool_router, ErrorData as McpError, RoleServer, ServerHandler};
 use rmcp::model::{CallToolRequestParams, CallToolResponse, CallToolResult, ContentBlock, Implementation, ProtocolVersion, ServerCapabilities, ServerConfig};
-use schemars::JsonSchema;
-use serde::Deserialize;
 use serde_json::{Value, json};
 
 use std::sync::Arc;
+
+use composesiren_mcp_api::args::{
+    ParameterId, SendMidi, SendNote, SetAudioDevice, SetMidiInput, SetMidiOutput, SetParameter,
+};
+#[cfg(feature = "record")]
+use composesiren_mcp_api::args::{StartRecording, StopRecording};
 
 use crate::dispatch::Dispatch;
 use crate::stats::Stats;
@@ -20,74 +24,6 @@ pub struct ComposeSirenServer {
     dispatch: Dispatch,
     stats: Arc<Stats>,
     tool_router: rmcp::handler::server::tool::ToolRouter<Self>,
-}
-
-#[derive(Debug, Deserialize, JsonSchema)]
-struct ParameterIdArgs {
-    /// JUCE parameter id, for example `S1 | Volume` or `S | PitchBend`.
-    id: String,
-}
-
-#[derive(Debug, Deserialize, JsonSchema)]
-struct SetParameterArgs {
-    /// JUCE parameter id, for example `S1 | Volume`.
-    id: String,
-    /// Value in the parameter's own units, not the normalised 0..1 range.
-    value: f64,
-}
-
-#[derive(Debug, Deserialize, JsonSchema)]
-struct SendMidiArgs {
-    /// MIDI status byte, 0 to 255.
-    status: u8,
-    /// First data byte, 0 to 127.
-    data1: u8,
-    /// Second data byte, 0 to 127.
-    #[serde(default)]
-    data2: u8,
-}
-
-#[derive(Debug, Deserialize, JsonSchema)]
-struct SendNoteArgs {
-    /// MIDI channel, 1 to 16. SirenOrchestra uses the channel to pick the siren.
-    channel: u8,
-    /// Note number, 0 to 127.
-    note: u8,
-    /// Velocity, 0 to 127. Zero sends a note off.
-    velocity: u8,
-    /// Milliseconds before the matching note off. Zero sends no note off.
-    #[serde(default)]
-    duration_ms: u64,
-}
-
-#[derive(Debug, Deserialize, JsonSchema)]
-struct SetAudioDeviceArgs {
-    /// Output device name. Omit to keep the current output.
-    #[serde(default)]
-    output: Option<String>,
-    /// Input device name. An empty string selects no input. Omit to keep the current input.
-    #[serde(default)]
-    input: Option<String>,
-    /// Sample rate in Hz. Omit to keep the current rate.
-    #[serde(default)]
-    sample_rate: Option<f64>,
-    /// Buffer size in samples. Omit to keep the current size.
-    #[serde(default)]
-    buffer_size: Option<i32>,
-}
-
-#[derive(Debug, Deserialize, JsonSchema)]
-struct SetMidiInputArgs {
-    /// Device identifier from `list_midi_devices`.
-    identifier: String,
-    /// Open or close the device.
-    enabled: bool,
-}
-
-#[derive(Debug, Deserialize, JsonSchema)]
-struct SetMidiOutputArgs {
-    /// Device identifier from `list_midi_devices`. Empty clears the default output.
-    identifier: String,
 }
 
 #[tool_router]
@@ -108,7 +44,7 @@ impl ComposeSirenServer {
     #[tool(description = "Read one parameter by its JUCE id.")]
     fn get_parameter(
         &self,
-        Parameters(args): Parameters<ParameterIdArgs>,
+        Parameters(args): Parameters<ParameterId>,
     ) -> Result<CallToolResult, McpError> {
         self.finish(self.dispatch.call(json!({"op": "get_parameter", "id": args.id})))
     }
@@ -116,7 +52,7 @@ impl ComposeSirenServer {
     #[tool(description = "Set one parameter by its JUCE id. The value uses the parameter's own units.")]
     fn set_parameter(
         &self,
-        Parameters(args): Parameters<SetParameterArgs>,
+        Parameters(args): Parameters<SetParameter>,
     ) -> Result<CallToolResult, McpError> {
         self.finish(
             self.dispatch
@@ -125,7 +61,7 @@ impl ComposeSirenServer {
     }
 
     #[tool(description = "Queue a MIDI message into the next audio block, as if the host had sent it.")]
-    fn send_midi(&self, Parameters(args): Parameters<SendMidiArgs>) -> Result<CallToolResult, McpError> {
+    fn send_midi(&self, Parameters(args): Parameters<SendMidi>) -> Result<CallToolResult, McpError> {
         self.finish(self.dispatch.call(json!({
             "op": "send_midi",
             "status": args.status,
@@ -135,7 +71,7 @@ impl ComposeSirenServer {
     }
 
     #[tool(description = "Send a note on, and a note off after duration_ms. Channel 1 is siren S1 in SirenOrchestra.")]
-    fn send_note(&self, Parameters(args): Parameters<SendNoteArgs>) -> Result<CallToolResult, McpError> {
+    fn send_note(&self, Parameters(args): Parameters<SendNote>) -> Result<CallToolResult, McpError> {
         if !(1..=16).contains(&args.channel) {
             return Err(McpError::invalid_params("channel must be 1 to 16", None));
         }
@@ -171,7 +107,7 @@ impl ComposeSirenServer {
     #[tool(description = "Switch the standalone's audio device, sample rate, or buffer size. This restarts the device.")]
     fn set_audio_device(
         &self,
-        Parameters(args): Parameters<SetAudioDeviceArgs>,
+        Parameters(args): Parameters<SetAudioDevice>,
     ) -> Result<CallToolResult, McpError> {
         self.finish(self.dispatch.call(json!({
             "op": "set_audio_device",
@@ -190,7 +126,7 @@ impl ComposeSirenServer {
     #[tool(description = "Open or close a MIDI input on the standalone.")]
     fn set_midi_input(
         &self,
-        Parameters(args): Parameters<SetMidiInputArgs>,
+        Parameters(args): Parameters<SetMidiInput>,
     ) -> Result<CallToolResult, McpError> {
         self.finish(self.dispatch.call(json!({
             "op": "set_midi_input",
@@ -202,7 +138,7 @@ impl ComposeSirenServer {
     #[tool(description = "Choose the standalone's default MIDI output. Pass an empty identifier to clear it.")]
     fn set_midi_output(
         &self,
-        Parameters(args): Parameters<SetMidiOutputArgs>,
+        Parameters(args): Parameters<SetMidiOutput>,
     ) -> Result<CallToolResult, McpError> {
         self.finish(self.dispatch.call(json!({
             "op": "set_midi_output",
@@ -225,33 +161,6 @@ impl ComposeSirenServer {
     }
 }
 
-#[cfg(feature = "record")]
-#[derive(Debug, Deserialize, JsonSchema)]
-struct StartRecordingArgs {
-    /// File to write. Omit for ~/Music/ComposeSiren/ComposeSiren-<date>-<time>.<ext>.
-    #[serde(default)]
-    path: Option<String>,
-    /// `flac` (24-bit, the default), `wav` (24-bit) or `wav-float` (32-bit float).
-    #[serde(default)]
-    format: Option<String>,
-}
-
-#[cfg(feature = "record")]
-#[derive(Debug, Deserialize, JsonSchema)]
-struct StopRecordingArgs {
-    /// End without cutting a sound short: wait for it to die out, and if it
-    /// still sounds (a drone), fade it out. The reply comes at once; call
-    /// `recording_status` until `recording` is false.
-    #[serde(default)]
-    fade: bool,
-    /// Seconds to wait for the sound to die out (default 2).
-    #[serde(default)]
-    wait_seconds: Option<f64>,
-    /// Seconds the fade-out lasts (default 3).
-    #[serde(default)]
-    fade_seconds: Option<f64>,
-}
-
 /// The recording tools, with the `record` feature (`COMPOSESIREN_RECORD`).
 #[cfg(feature = "record")]
 #[tool_router(router = record_router)]
@@ -259,7 +168,7 @@ impl ComposeSirenServer {
     #[tool(description = "Start recording the audio output to a FLAC or WAV file. Returns the file's path.")]
     fn start_recording(
         &self,
-        Parameters(args): Parameters<StartRecordingArgs>,
+        Parameters(args): Parameters<StartRecording>,
     ) -> Result<CallToolResult, McpError> {
         self.finish(self.dispatch.call(json!({
             "op": "start_recording",
@@ -269,7 +178,7 @@ impl ComposeSirenServer {
     }
 
     #[tool(description = "Stop recording and complete the file, at once or (fade) once the sound has died out or faded out. Returns its path, duration and dropped frames.")]
-    fn stop_recording(&self, Parameters(args): Parameters<StopRecordingArgs>) -> Result<CallToolResult, McpError> {
+    fn stop_recording(&self, Parameters(args): Parameters<StopRecording>) -> Result<CallToolResult, McpError> {
         self.finish(self.dispatch.call(json!({
             "op": "stop_recording",
             "fade": args.fade,
@@ -317,5 +226,35 @@ impl ServerHandler for ComposeSirenServer {
              ~/.composesiren_mcp.json."
                 .to_owned(),
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use composesiren_mcp_api::tool;
+
+    use super::ComposeSirenServer;
+
+    /// The tools the server offers are the ones `composesiren-mcp-api` declares, so a
+    /// client built on it never asks for one that is not there, or misses a new one.
+    #[test]
+    fn the_tools_are_the_ones_the_api_declares() {
+        let mut offered: Vec<String> =
+            ComposeSirenServer::tool_router().list_all().iter().map(|t| t.name.to_string()).collect();
+        offered.sort();
+        let mut declared: Vec<String> = tool::ALWAYS.iter().map(|t| (*t).to_owned()).collect();
+        declared.sort();
+        assert_eq!(offered, declared);
+    }
+
+    #[cfg(feature = "record")]
+    #[test]
+    fn the_recording_tools_are_the_ones_the_api_declares() {
+        let router = ComposeSirenServer::record_router();
+        let mut offered: Vec<String> = router.list_all().iter().map(|t| t.name.to_string()).collect();
+        offered.sort();
+        let mut declared: Vec<String> = tool::RECORDING.iter().map(|t| (*t).to_owned()).collect();
+        declared.sort();
+        assert_eq!(offered, declared);
     }
 }

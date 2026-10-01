@@ -120,6 +120,12 @@ It is on by default (`-DCOMPOSESIREN_MCP=ON`). It does not use the park bridge
 or mecaviv-rs. Turn it off with `-DCOMPOSESIREN_MCP=OFF`.
 
 - The crate lives in `Source/composesiren-mcp`.
+- `Source/composesiren-mcp-api` is what the server and its clients agree on: the tools'
+  names, their arguments and replies, the discovery file's format, and a small blocking
+  client (feature `client`). The server builds its tools from those types, and a test
+  checks that the tools it offers are the ones the crate declares. A client in another
+  repository (for example `tap-viewer`) depends on it by path. It depends on nothing
+  outside this repository, so the MCP server still builds without any sibling checkout.
 - A running instance writes `~/.composesiren_mcp.json` with `pluginName`,
   `plugin4CC`, `port`, `pid`, `sessionId`, and `standalone`.
 - Streamable HTTP is at `http://127.0.0.1:<port>/mcp`. The first port tried is
