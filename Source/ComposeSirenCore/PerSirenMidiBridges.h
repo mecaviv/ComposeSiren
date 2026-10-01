@@ -103,12 +103,31 @@ public:
         pitchBendBridge->setPending();
     }
 
+    // The controller values the firmware's reset_sirene() (m_seq/s_un_in.c)
+    // puts back, for the knobs that exist here: volume (7) and the two
+    // "ctr12/ctr13" (12 mute, 13 timbre) at 127, the others at 0. The pitch
+    // bend range (16) is not touched by the firmware reset, nor here.
+    // The DSP resets its own registers on CC 121 (MidiIn::resetSirene).
+    void resetKnobs() {
+        static const std::map<int, int> afterReset = {
+            {1, 0}, {5, 0}, {7, 127}, {9, 0}, {11, 0}, {12, 127}, {13, 127},
+            {15, 0}, {72, 0}, {73, 0}, {92, 0}
+        };
+        for (const auto& [cc, value] : afterReset) {
+            if (const auto it = bridgeByCCNumber.find(cc); it != bridgeByCCNumber.end()) {
+                it->second->setNormalizedSilently(static_cast<float>(value) / 127.0f);
+            }
+        }
+        pitchBendBridge->setNormalizedSilently(0.5f);
+    }
+
     void handleMessage(MidiScheduler& scheduler,
                        const juce::MidiMessage& msg,
                        int samplePosition)
     {
         if (msg.isController() && bridgeByCCNumber.contains(msg.getControllerNumber())) {
             bridgeByCCNumber[msg.getControllerNumber()]->handleIncomingEvent(msg, samplePosition, scheduler);
+            if (msg.getControllerNumber() == 121) { resetKnobs(); }
         } else if (msg.isPitchWheel()) {
             pitchBendBridge->handleIncomingEvent(msg, samplePosition, scheduler);
         } else if (msg.isNoteOnOrOff()) {

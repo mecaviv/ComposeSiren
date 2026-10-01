@@ -150,8 +150,15 @@ void SirenOrchestraPluginProcessor::resetSiren(std::optional<sirenId> id)
 {
     ensemble.stop(id);
 
+    // then the CC 121 itself, on the audio thread (processBlock)
+    pendingResets.fetch_or(
+        id.has_value() ? (1u << static_cast<int>(id.value())) : 0x7Fu,
+        std::memory_order_release);
+
 #if COMPOSESIREN_PARK_BRIDGE
-    // relayer le reset aux sirènes physiques (trame [8, 10, 0...] du patch Pd)
+    // relayer le reset aux sirènes physiques (trame [8, 10, 0...] du patch Pd).
+    // The CC 121 above also reaches them through the MIDI mirror; the
+    // CMD_RESET frame is the one known to work, and a second reset is harmless.
     if (id.has_value())
         udpBridge.pushReset(static_cast<int>(id.value()) + 1);
     else
@@ -204,6 +211,14 @@ void SirenOrchestraPluginProcessor::processBlock(juce::AudioBuffer<float>& audio
 
     mcp.drainMidi(midiIn);
     scheduler.reset();
+
+    // the Reset buttons: the same as a CC 121 on the siren's channel (or 16)
+    if (const auto mask = pendingResets.exchange(0, std::memory_order_acquire)) {
+        for (const auto& [id, props] : sirenPropertiesById) {
+            if (mask & (1u << static_cast<int>(id)))
+                router.resetSirens(scheduler, props->oneBasedMidiChannel, 127, 0);
+        }
+    }
 
     for (const auto metadata : midiIn) {
         const auto& msg = metadata.getMessage();

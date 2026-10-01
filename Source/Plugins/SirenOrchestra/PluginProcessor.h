@@ -45,6 +45,7 @@ public:
     // MainButtonsComponents::Listener callbacks
     //--------------------------------------------------------------------------
     void resetSiren(std::optional<sirenId>) override;
+    std::atomic<unsigned> pendingResets{0}; // bit per sirenId, see resetSiren
     std::string getResourcesPath() override;
     void selectedNewResourcesPath(const std::string&) override;
 #if COMPOSESIREN_PARK_BRIDGE

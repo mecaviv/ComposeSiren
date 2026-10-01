@@ -90,6 +90,20 @@ public:
         defaultInputChannel = ch;
     }
 
+    // Moves the parameter (the knob) without sending anything to the DSP, and
+    // forgets what the user was about to send: for resets, where the DSP
+    // already put its own registers back.
+    void setNormalizedSilently(float value)
+    {
+        {
+            ScopedGuard g(updatingFromMidi);
+            audioParam.setValueNotifyingHost(value);
+        }
+        Event dropped;
+        while (mailbox.pop(dropped)) {}
+        pending.store(false, std::memory_order_release);
+    }
+
     void setPending()
     {
         // pendingValue.store(

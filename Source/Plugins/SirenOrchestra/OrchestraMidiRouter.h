@@ -41,10 +41,34 @@ public:
     void handleMessage(MidiScheduler& scheduler,
                        const juce::MidiMessage& msg,
                        int samplePosition) {
+        // CC 121 on channel 16 is "Reset All": the same as a CC 121 on each
+        // siren's own channel (that one reaches the DSP and the physical
+        // sirens like any other message)
+        if (msg.isControllerOfType(121) && msg.getChannel() == resetAllChannel) {
+            resetSirens(scheduler, std::nullopt, msg.getControllerValue(), samplePosition);
+            return;
+        }
         OneBasedMidiChannel ch = {.oneBased=msg.getChannel()};
         const auto& it = midiBridges.find(ch);
         if (it != midiBridges.end()) {
             it->second->handleMessage(scheduler, msg, samplePosition);
+        }
+    }
+
+    static constexpr int resetAllChannel = 16;
+
+    // CC 121 as if it came in on `siren`'s channel, or on every siren's.
+    void resetSirens(MidiScheduler& scheduler,
+                     std::optional<OneBasedMidiChannel> siren,
+                     int value,
+                     int samplePosition) {
+        for (const auto& [ch, bridges] : midiBridges) {
+            if (!siren.has_value() || siren.value() == ch) {
+                bridges->handleMessage(
+                    scheduler,
+                    juce::MidiMessage::controllerEvent(ch.oneBased, 121, value),
+                    samplePosition);
+            }
         }
     }
 
