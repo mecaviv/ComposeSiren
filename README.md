@@ -120,12 +120,18 @@ It is on by default (`-DCOMPOSESIREN_MCP=ON`). It does not use the park bridge
 or mecaviv-rs. Turn it off with `-DCOMPOSESIREN_MCP=OFF`.
 
 - The crate lives in `Source/composesiren-mcp`.
-- `Source/composesiren-mcp-api` is what the server and its clients agree on: the tools'
-  names, their arguments and replies, the discovery file's format, and a small blocking
-  client (feature `client`). The server builds its tools from those types, and a test
+- `Source/mcp-discovery` is the generic part, for any MCP server of the mecaviv projects: the
+  discovery file (`Registry`: read, register and unregister under a file lock, the running
+  instances) and a blocking client (feature `client`). It knows no application: it takes the
+  file's name.
+- `Source/composesiren-mcp-api` is what the server and its clients agree on, on top of it: the
+  tools' names, their arguments and replies, and which file is ComposeSiren's
+  (`~/.composesiren_mcp.json`). The server builds its tools from those types, and a test
   checks that the tools it offers are the ones the crate declares. A client in another
-  repository (for example `tap-viewer`) depends on it by path. It depends on nothing
-  outside this repository, so the MCP server still builds without any sibling checkout.
+  repository (for example `tap-viewer`) depends on it by path.
+- Both depend on nothing outside this repository, so the MCP server still builds without any
+  sibling checkout. Another MCP server of the projects uses `mcp-discovery` the same way:
+  its own discovery file name, its own API crate.
 - A running instance writes `~/.composesiren_mcp.json` with `pluginName`,
   `plugin4CC`, `port`, `pid`, `sessionId`, and `standalone`.
 - Streamable HTTP is at `http://127.0.0.1:<port>/mcp`. The first port tried is

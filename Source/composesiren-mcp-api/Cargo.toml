@@ -12,17 +12,16 @@ publish = false
 [features]
 # schemars::JsonSchema on the argument types (the server derives its tool schemas from them).
 schema = ["dep:schemars"]
-# A blocking client of the server (plain HTTP on 127.0.0.1).
-client = ["dep:ureq"]
+# A blocking client of the server (plain HTTP on 127.0.0.1), from mcp-discovery.
+client = ["mcp-discovery/client"]
 
 # Public and small on purpose: ComposeSiren's MCP server is built by people
 # who have none of the private repositories, so nothing here may depend on them.
 [dependencies]
-libc = "0.2"
+mcp-discovery = { path = "../mcp-discovery" }
 schemars = { version = "1", optional = true }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-ureq = { version = "3", default-features = false, optional = true }
 
 [lints.rust]
 unsafe_code = "deny"

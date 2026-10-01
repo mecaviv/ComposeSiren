@@ -9,7 +9,7 @@ use serde_json::{Value, json};
 use tokio::net::TcpListener;
 use tokio_util::sync::CancellationToken;
 
-use crate::discovery::{self, Instance, FIRST_PORT, PORT_ATTEMPTS};
+use crate::discovery::{self, Instance, Registry, FIRST_PORT, PORT_ATTEMPTS};
 use crate::dispatch::Dispatch;
 use crate::stats::Stats;
 use crate::tools::ComposeSirenServer;
@@ -19,7 +19,7 @@ pub struct Running {
     runtime: Option<tokio::runtime::Runtime>,
     cancel: CancellationToken,
     port: u16,
-    discovery_path: std::path::PathBuf,
+    registry: Registry,
     stats: Arc<Stats>,
 }
 
@@ -56,8 +56,8 @@ impl Running {
             session_id: discovery::session_id_from_env(),
             standalone,
         };
-        let discovery_path = discovery::default_path();
-        discovery::register(&discovery_path, &instance).map_err(|err| err.to_string())?;
+        let registry = discovery::registry();
+        registry.register(&instance).map_err(|err| err.to_string())?;
 
         let health = json!({
             "status": "ok",
@@ -80,7 +80,7 @@ impl Running {
             runtime: Some(runtime),
             cancel,
             port,
-            discovery_path,
+            registry,
             stats,
         })
     }
@@ -102,7 +102,7 @@ impl Drop for Running {
     fn drop(&mut self) {
         // Advertise the instance as gone before the runtime winds down, so a
         // client does not keep a port whose listener is already stopping.
-        let _ = discovery::unregister(&self.discovery_path, self.port);
+        let _ = self.registry.unregister(self.port);
         self.cancel.cancel();
         if let Some(runtime) = self.runtime.take() {
             runtime.shutdown_timeout(std::time::Duration::from_secs(2));

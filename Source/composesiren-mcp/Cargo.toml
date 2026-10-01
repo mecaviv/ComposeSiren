@@ -19,8 +19,9 @@ record = []
 [dependencies]
 # What the server and its clients agree on (public, same repository).
 composesiren-mcp-api = { path = "../composesiren-mcp-api", features = ["schema"] }
+# The discovery file, with its locking.
+mcp-discovery = { path = "../mcp-discovery" }
 axum = "0.8"
-fs2 = "0.4"
 libc = "0.2"
 rmcp = { version = "3.4", features = ["server", "macros", "transport-streamable-http-server"] }
 schemars = "1"
