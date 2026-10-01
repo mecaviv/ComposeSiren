@@ -139,6 +139,17 @@ void SirenEnsemble::handleMidi(int status, int value1, int value2) {
     if (status > 0xFF) { return; } // sanitize
     OneBasedMidiChannel channel = {.oneBased = (status & 0x0F) + 1};
 
+    // global "Reset All Controllers" : CC 121 on the control channel (16)
+    // is broadcast to every siren, like the CustomMix plugin does
+    if ((status & 0xF0) == 0xB0 && channel.oneBased == kGlobalControlChannel
+        && value1 == 121) {
+        for (const auto& props : sirenPropertiesByChannel | std::views::values) {
+            tracks.at(props->id)->handleMidi(
+                0xB0 | (props->oneBasedMidiChannel.oneBased - 1), 121, value2);
+        }
+        return;
+    }
+
     auto it = sirenPropertiesByChannel.find(channel);
     if (it != sirenPropertiesByChannel.end()) {
         auto id = it->second->id;
