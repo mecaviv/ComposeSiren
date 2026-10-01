@@ -23,6 +23,14 @@
 #endif
 #include <lib/net/mcp/McpControl.h>
 #include <lib/utilities/recorder/Recorder.h>
+#ifndef COMPOSESIREN_CLIC
+#define COMPOSESIREN_CLIC 0
+#endif
+#if COMPOSESIREN_CLIC
+#include <clic_composesiren.hpp>
+#include <cstdint>
+#include <vector>
+#endif
 #include <juce_gui_basics/juce_gui_basics.h>
 
 class SirenOrchestraPluginProcessor :
@@ -140,10 +148,29 @@ private:
 
     McpControl mcp;
 
+#if COMPOSESIREN_CLIC
+    // the click box's engine, on the second output bus ("Clic")
+    clic::Engine clicEngine { 44100.0 };
+#endif
+
     // the About window is not owned by the editor: it can outlive it
     juce::Component::SafePointer<juce::DialogWindow> aboutWindow;
 
 private:
+#if COMPOSESIREN_CLIC
+    // channel 10 messages of the block, with their sample positions: taken
+    // before the router (which has no siren on channel 10), played after
+    // the sirens. Reserved in prepareToPlay: no allocation on the audio thread.
+    struct ClicEvent
+    {
+        int position;
+        std::uint8_t status, data1, data2;
+    };
+    std::vector<ClicEvent> clicEvents;
+    void collectClicMidi(const juce::MidiBuffer& midi);
+    void renderClic(juce::AudioBuffer<float>& audio);
+#endif
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SirenOrchestraPluginProcessor)
 };
 

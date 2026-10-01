@@ -112,6 +112,17 @@ composesiren_option(COMPOSESIREN_MECAVIV_BRIDGE
         "Drive the park with mecaviv-bridge-composesiren (Rust) instead of SirenLink (requires COMPOSESIREN_PARK_BRIDGE)"
         OFF)
 
+# DEAL WITH THE CLICK OUTPUT ###################################################
+# SirenOrchestra gets a second stereo output bus, "Clic", played by the click
+# box's engine (Rust crate Source/clic-composesiren, on ClicRaspberry/rs of
+# firmwares-artila, checked out next to ComposeSiren). MIDI channel 10: note on
+# with note > 1 and velocity > 1, even note = strong click, odd = weak click;
+# program change = choice of click. See Source/ComposeSirenCore/Clic.cmake.
+
+composesiren_option(COMPOSESIREN_CLIC
+        "Click output: a Clic stereo bus on SirenOrchestra, MIDI channel 10 (Rust, firmwares-artila next to ComposeSiren)"
+        OFF)
+
 # DEAL WITH THE MCP SERVER #####################################################
 # Each plugin instance can run an in-process MCP server (Rust crate
 # Source/composesiren-mcp). It does not use mecaviv-rs. See
