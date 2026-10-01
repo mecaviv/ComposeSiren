@@ -114,7 +114,7 @@ composesiren_option(COMPOSESIREN_MECAVIV_BRIDGE
 
 # DEAL WITH THE CLICK OUTPUT ###################################################
 # SirenOrchestra gets a second stereo output bus, "Clic", played by the click
-# box's engine (Rust crate Source/clic-composesiren, on ClicRaspberry/rs of
+# box's engine (Rust crate Source/clic-composesiren, on ClicRaspberry/clic-core of
 # firmwares-artila, checked out next to ComposeSiren). MIDI channel 10: note on
 # with note > 1 and velocity > 1, even note = strong click, odd = weak click;
 # program change = choice of click. See Source/ComposeSirenCore/Clic.cmake.
