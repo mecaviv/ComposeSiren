@@ -7,6 +7,7 @@
 #include <pathUtilities.h>
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
+#include "AboutDialog.h"
 
 SirenOrchestraPluginProcessor::SirenOrchestraPluginProcessor() :
 #ifndef JucePlugin_PreferredChannelConfigurations
@@ -63,6 +64,16 @@ SirenOrchestraPluginProcessor::SirenOrchestraPluginProcessor() :
 SirenOrchestraPluginProcessor::~SirenOrchestraPluginProcessor()
 {
     stopTimer();
+    // reads the MCP server and the bridge, which are destroyed with this object
+    delete aboutWindow.getComponent();
+}
+
+void SirenOrchestraPluginProcessor::showAbout(juce::Component* parent)
+{
+    if (aboutWindow != nullptr)
+        aboutWindow->toFront(true);
+    else
+        aboutWindow = AboutDialog::show(*this, parent);
 }
 
 //==============================================================================

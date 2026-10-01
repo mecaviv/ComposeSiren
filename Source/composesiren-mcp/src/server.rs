@@ -11,6 +11,7 @@ use tokio_util::sync::CancellationToken;
 
 use crate::discovery::{self, Instance, FIRST_PORT, PORT_ATTEMPTS};
 use crate::dispatch::Dispatch;
+use crate::stats::Stats;
 use crate::tools::ComposeSirenServer;
 
 /// A running server. Dropping it unregisters the discovery entry and stops the runtime.
@@ -19,6 +20,7 @@ pub struct Running {
     cancel: CancellationToken,
     port: u16,
     discovery_path: std::path::PathBuf,
+    stats: Arc<Stats>,
 }
 
 impl Running {
@@ -39,6 +41,8 @@ impl Running {
         let cancel_for_task = cancel.clone();
         let plugin_name = plugin_name.to_owned();
         let plugin_4cc = plugin_4cc.to_owned();
+
+        let stats = Arc::new(Stats::default());
 
         let (port, listener) = runtime
             .block_on(bind_first_free())
@@ -65,8 +69,9 @@ impl Running {
             "mcp": format!("http://127.0.0.1:{port}/mcp"),
         });
 
+        let stats_for_task = Arc::clone(&stats);
         runtime.spawn(async move {
-            if let Err(err) = serve(listener, dispatch_for_task, health, cancel_for_task).await {
+            if let Err(err) = serve(listener, dispatch_for_task, stats_for_task, health, cancel_for_task).await {
                 eprintln!("composesiren-mcp stopped: {err}");
             }
         });
@@ -76,7 +81,14 @@ impl Running {
             cancel,
             port,
             discovery_path,
+            stats,
         })
+    }
+
+    /// Per-tool call counts.
+    #[must_use]
+    pub fn stats(&self) -> &Stats {
+        &self.stats
     }
 
     /// Port the server bound.
@@ -118,11 +130,12 @@ async fn bind_first_free() -> std::io::Result<(u16, TcpListener)> {
 async fn serve(
     listener: TcpListener,
     dispatch: Dispatch,
+    stats: Arc<Stats>,
     health: Value,
     cancel: CancellationToken,
 ) -> Result<(), String> {
     let service = StreamableHttpService::new(
-        move || Ok(ComposeSirenServer::new(dispatch)),
+        move || Ok(ComposeSirenServer::new(dispatch, Arc::clone(&stats))),
         Arc::new(LocalSessionManager::default()),
         StreamableHttpServerConfig::default()
             .with_cancellation_token(cancel.clone()),

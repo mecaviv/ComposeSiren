@@ -352,6 +352,28 @@ mod daemon {
     }
 
     #[test]
+    fn counts_the_calls_made_to_the_daemon() {
+        let mock = spawn_mock();
+        let bridge = Bridge::with_socket(mock.path.clone()).unwrap();
+        assert_eq!(bridge.daemon_stats(), mecaviv_bridge_composesiren::DaemonStats::default());
+
+        bridge.set_enabled(true);
+        assert!(wait_for(|| bridge.daemon_stats().sessions == 1));
+        assert!(wait_for(|| bridge.daemon_stats().drive_states >= 1));
+        assert!(bridge.push_midi([0x90, 60, 100]));
+        assert!(bridge.push_midi([0xF8, 0, 0])); // not carried by the daemon
+        bridge.reset(siren(2));
+        bridge.set_st_all(true);
+        assert!(wait_for(|| {
+            let s = bridge.daemon_stats();
+            s.midi == 1 && s.midi_ignored == 1 && s.resets == 1 && s.st_all == 1
+        }));
+        let stats = bridge.daemon_stats();
+        assert_eq!(stats.reset_all, 1, "the enable handshake");
+        assert_eq!(stats.session_failures, 0);
+    }
+
+    #[test]
     fn with_park_does_not_talk_to_the_daemon() {
         let mock = spawn_mock();
         let park = FakePark::new();

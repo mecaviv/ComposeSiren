@@ -53,6 +53,22 @@ cs_mcp_server_t *cs_mcp_start(const char *plugin_name,
 // call on it follows.
 void cs_mcp_stop(cs_mcp_server_t *server);
 
+// Per-tool call counts since the server started, as a null-terminated JSON
+// object `{"tools": {"<tool>": {"calls": n, "errors": n}}}`. Free the string
+// with `cs_mcp_free_string`. Returns null if `server` is null.
+//
+// # Safety
+//
+// `server` is null or was returned by `cs_mcp_start` and not stopped.
+char *cs_mcp_stats_json(const cs_mcp_server_t *server);
+
+// Free a string returned by `cs_mcp_stats_json`.
+//
+// # Safety
+//
+// `text` is null or came from `cs_mcp_stats_json` and was not freed.
+void cs_mcp_free_string(char *text);
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus

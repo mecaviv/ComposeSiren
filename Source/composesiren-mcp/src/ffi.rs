@@ -1,6 +1,6 @@
 //! C ABI. `build.rs` generates `include/composesiren_mcp.h` from this file.
 
-use std::ffi::{CStr, c_char, c_int, c_void};
+use std::ffi::{CStr, CString, c_char, c_int, c_void};
 use std::ptr;
 
 use crate::dispatch::{Dispatch, DispatchFn};
@@ -63,6 +63,35 @@ pub unsafe extern "C" fn cs_mcp_stop(server: *mut cs_mcp_server_t) {
     if !server.is_null() {
         // SAFETY: the caller owns this pointer.
         drop(unsafe { Box::from_raw(server) });
+    }
+}
+
+/// Per-tool call counts since the server started, as a null-terminated JSON
+/// object `{"tools": {"<tool>": {"calls": n, "errors": n}}}`. Free the string
+/// with `cs_mcp_free_string`. Returns null if `server` is null.
+///
+/// # Safety
+///
+/// `server` is null or was returned by `cs_mcp_start` and not stopped.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn cs_mcp_stats_json(server: *const cs_mcp_server_t) -> *mut c_char {
+    // SAFETY: guaranteed by the caller.
+    let Some(server) = (unsafe { server.as_ref() }) else {
+        return ptr::null_mut();
+    };
+    CString::new(server.0.stats().to_json().to_string()).map_or(ptr::null_mut(), CString::into_raw)
+}
+
+/// Free a string returned by `cs_mcp_stats_json`.
+///
+/// # Safety
+///
+/// `text` is null or came from `cs_mcp_stats_json` and was not freed.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn cs_mcp_free_string(text: *mut c_char) {
+    if !text.is_null() {
+        // SAFETY: the caller got it from `CString::into_raw`.
+        drop(unsafe { CString::from_raw(text) });
     }
 }
 

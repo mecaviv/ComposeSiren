@@ -1,10 +1,11 @@
 cmake_minimum_required(VERSION 3.22.0)
+include("${CMAKE_CURRENT_LIST_DIR}/cmake/BuildInfo.cmake") # composesiren_option, build info
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 if (APPLE)
   # Host architecture by default. Fat x86_64+arm64 binaries: -DMACOS_UNIVERSAL=ON
-  option(MACOS_UNIVERSAL
+  composesiren_option(MACOS_UNIVERSAL
           "Build a universal (x86_64 and arm64) macOS binary"
           OFF)
   if(MACOS_UNIVERSAL)
@@ -73,7 +74,7 @@ set(PLUGIN_MANUFACTURER_CODE "McVv")
 
 # DEAL WITH PLUGIN RESOURCES PROCESSING ########################################
 
-option(PROCESS_RESOURCES
+composesiren_option(PROCESS_RESOURCES
         "Use ResourcesProcessing outputs instead of original Resources"
         ON)
 
@@ -103,11 +104,11 @@ endif()
 # is also ON, with mecaviv-bridge-composesiren (Rust). See
 # Source/ComposeSirenCore/MecavivBridge.cmake.
 
-option(COMPOSESIREN_PARK_BRIDGE
+composesiren_option(COMPOSESIREN_PARK_BRIDGE
         "Compile the park UDP bridge (C++ SirenLink or Rust mecaviv-bridge) and show Sirenes physiques / ST"
         OFF)
 
-option(COMPOSESIREN_MECAVIV_BRIDGE
+composesiren_option(COMPOSESIREN_MECAVIV_BRIDGE
         "Drive the park with mecaviv-bridge-composesiren (Rust) instead of SirenLink (requires COMPOSESIREN_PARK_BRIDGE)"
         OFF)
 
@@ -116,7 +117,7 @@ option(COMPOSESIREN_MECAVIV_BRIDGE
 # Source/composesiren-mcp). It does not use mecaviv-rs. See
 # Source/ComposeSirenCore/Mcp.cmake.
 
-option(COMPOSESIREN_MCP
+composesiren_option(COMPOSESIREN_MCP
         "In-process MCP server for parameters, MIDI, and standalone audio/MIDI devices"
         ON)
 
@@ -126,7 +127,7 @@ option(COMPOSESIREN_MCP
 # the start_recording, stop_recording and recording_status tools. See
 # Source/ComposeSirenCore/Record.cmake.
 
-option(COMPOSESIREN_RECORD
+composesiren_option(COMPOSESIREN_RECORD
         "Record the audio output to FLAC or WAV (dialog, and MCP tools with COMPOSESIREN_MCP)"
         OFF)
 
@@ -151,6 +152,8 @@ endif()
 if (APPLE)
   list(APPEND FORMATS "AU")
 endif()
+
+composesiren_add_build_info() # after the options: it records them
 
 add_subdirectory(Assets)
 add_subdirectory(Source)

@@ -43,6 +43,21 @@ public:
 
     int getPort() const { return port; }
 
+    // Whether the server is listening (COMPOSESIREN_MCP, and it could bind a port).
+    bool isRunning() const { return server != nullptr; }
+
+    struct ToolCount
+    {
+        juce::String tool;
+        juce::int64 calls = 0;
+        juce::int64 errors = 0;
+    };
+
+    // Calls per tool since the server started, by tool name. Empty when it
+    // is not running or no tool was called. Call from any thread; takes a lock
+    // in Rust for the length of a map copy.
+    std::vector<ToolCount> toolCounts() const;
+
 #if COMPOSESIREN_RECORD
     // The recorder the recording commands drive (null: they fail).
     void setRecorder(Recorder* r) { recorder = r; }

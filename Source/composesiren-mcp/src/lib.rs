@@ -10,4 +10,5 @@ mod discovery;
 mod dispatch;
 pub mod ffi;
 mod server;
+mod stats;
 mod tools;

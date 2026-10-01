@@ -23,6 +23,7 @@
 #endif
 #include <lib/net/mcp/McpControl.h>
 #include <lib/utilities/recorder/Recorder.h>
+#include <juce_gui_basics/juce_gui_basics.h>
 
 class SirenOrchestraPluginProcessor :
     public juce::AudioProcessor,
@@ -55,6 +56,8 @@ public:
 #if COMPOSESIREN_RECORD
     Recorder* getRecorder() override { return &recorder; }
 #endif
+    bool hasAbout() override { return true; }
+    void showAbout(juce::Component* parent) override;
 
     // Timer callback (called from UI thread)
     //--------------------------------------------------------------------------
@@ -98,6 +101,7 @@ public:
 #if COMPOSESIREN_PARK_BRIDGE
     SirenUdpBridge& getUdpBridge() { return udpBridge; }
 #endif
+    McpControl& getMcp() { return mcp; }
 
 private:
     // needed by DSP
@@ -134,6 +138,9 @@ private:
 #endif
 
     McpControl mcp;
+
+    // the About window is not owned by the editor: it can outlive it
+    juce::Component::SafePointer<juce::DialogWindow> aboutWindow;
 
 private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SirenOrchestraPluginProcessor)

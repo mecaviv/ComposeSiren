@@ -66,6 +66,27 @@ McpControl::~McpControl()
     state->processor = nullptr;
 }
 
+std::vector<McpControl::ToolCount> McpControl::toolCounts() const
+{
+    std::vector<ToolCount> counts;
+#if COMPOSESIREN_MCP
+    if (server == nullptr)
+        return counts;
+    char* text = cs_mcp_stats_json(server);
+    if (text == nullptr)
+        return counts;
+    const auto parsed = juce::JSON::parse(juce::String::fromUTF8(text));
+    cs_mcp_free_string(text);
+    if (auto* tools = parsed.getProperty("tools", {}).getDynamicObject()) {
+        for (const auto& entry : tools->getProperties())
+            counts.push_back({ entry.name.toString(),
+                               static_cast<juce::int64>(entry.value.getProperty("calls", 0)),
+                               static_cast<juce::int64>(entry.value.getProperty("errors", 0)) });
+    }
+#endif
+    return counts;
+}
+
 void McpControl::pump()
 {
     if (!state->alive.load() || state->processor == nullptr)

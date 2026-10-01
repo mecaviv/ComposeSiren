@@ -80,6 +80,12 @@ public:
         return mecaviv_bridge_backend_tooltip(handle);
     }
 
+    // Calls made to the daemon since this bridge was created.
+    mecaviv_daemon_stats_t daemonStats() const noexcept
+    {
+        return mecaviv_bridge_daemon_stats(handle);
+    }
+
     static const char* version() noexcept { return mecaviv_bridge_version(); }
 
 private:
