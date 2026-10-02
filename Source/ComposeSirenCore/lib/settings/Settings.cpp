@@ -1,0 +1,121 @@
+#include "Settings.h"
+
+namespace cs {
+
+namespace meta = mecaviv::metadata;
+
+Settings::Settings()
+{
+#if COMPOSESIREN_SETTINGS
+    juce::PropertiesFile::Options options;
+    options.applicationName = "ComposeSiren";
+    options.filenameSuffix = ".settings";
+    options.folderName = "Mecanique Vivante";
+    options.osxLibrarySubFolder = "Application Support";
+    options.storageFormat = juce::PropertiesFile::storeAsXML;
+    options.millisecondsBeforeSaving = 500;
+    file = std::make_unique<juce::PropertiesFile>(options);
+#endif
+
+    for (std::size_t i = 0; i < meta::settingCount; ++i) {
+        const auto id = idAt(i);
+        juce::var v = describe(id).defaultValue;
+#if COMPOSESIREN_SETTINGS
+        if (file->containsKey(key(id).toString()))
+            v = file->getValue(key(id).toString()).getDoubleValue();
+#endif
+        tree.setProperty(key(id), normalised(id, v), nullptr);
+    }
+    tree.addListener(this);
+}
+
+Settings::~Settings()
+{
+    tree.removeListener(this);
+#if COMPOSESIREN_SETTINGS
+    file->saveIfNeeded();
+#endif
+}
+
+const meta::Setting& Settings::describe(Id id)
+{
+    return meta::settings[static_cast<std::size_t>(id)];
+}
+
+bool Settings::isAvailable(Id id)
+{
+    const auto option = describe(id).requiredOption;
+    if (option.empty()) return true;
+    if (option == "COMPOSESIREN_SIREN_WAVES") return COMPOSESIREN_SIREN_WAVES != 0;
+    if (option == "COMPOSESIREN_SETTINGS") return COMPOSESIREN_SETTINGS != 0;
+    if (option == "COMPOSESIREN_MCP") return COMPOSESIREN_MCP != 0;
+    if (option == "COMPOSESIREN_RECORD") return COMPOSESIREN_RECORD != 0;
+    if (option == "COMPOSESIREN_PARK_BRIDGE") return COMPOSESIREN_PARK_BRIDGE != 0;
+    if (option == "COMPOSESIREN_CLIC") return COMPOSESIREN_CLIC != 0;
+    return false; // an option this build doesn't know about
+}
+
+juce::Identifier Settings::key(Id id)
+{
+    const auto name = describe(id).id;
+    return juce::Identifier(juce::String(name.data(), name.size()));
+}
+
+// Clamped to the setting's range, as the type the property components expect.
+juce::var Settings::normalised(Id id, const juce::var& v)
+{
+    const auto& d = describe(id);
+    const double x = juce::jlimit(d.minimum, d.maximum, static_cast<double>(v));
+    switch (d.type) {
+        case meta::SettingType::Bool:   return x >= 0.5;
+        case meta::SettingType::Int:
+        case meta::SettingType::Choice: return static_cast<int>(std::lround(x));
+        case meta::SettingType::Float:  return x;
+    }
+    return x;
+}
+
+double Settings::get(Id id) const
+{
+    return static_cast<double>(tree.getProperty(key(id), describe(id).defaultValue));
+}
+
+void Settings::set(Id id, double value)
+{
+    tree.setProperty(key(id), normalised(id, value), nullptr);
+}
+
+void Settings::resetToDefaults()
+{
+    for (std::size_t i = 0; i < meta::settingCount; ++i)
+        set(idAt(i), describe(idAt(i)).defaultValue);
+}
+
+juce::Value Settings::getValueObject(Id id)
+{
+    return tree.getPropertyAsValue(key(id), nullptr);
+}
+
+void Settings::valueTreePropertyChanged(juce::ValueTree&, const juce::Identifier& property)
+{
+    if (normalising) return;
+    for (std::size_t i = 0; i < meta::settingCount; ++i) {
+        const auto id = idAt(i);
+        if (key(id) != property) continue;
+
+        // values typed in a property component arrive unclamped
+        const auto current = tree.getProperty(property);
+        const auto clean = normalised(id, current);
+        if (clean != current || clean.isBool() != current.isBool()) {
+            const juce::ScopedValueSetter<bool> guard(normalising, true);
+            tree.setProperty(property, clean, nullptr);
+        }
+#if COMPOSESIREN_SETTINGS
+        file->setValue(property.toString(), static_cast<double>(clean));
+#endif
+        listeners.call([id](Listener& l) { l.settingChanged(id); });
+        return;
+    }
+}
+
+} // namespace cs
