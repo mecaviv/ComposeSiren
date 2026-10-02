@@ -251,7 +251,8 @@ void SirenVoice::notifyListeners()
     for (const auto& l : listeners) {
         l->currentSirenState(id.value(), {
             getIsNoteOn(),
-            getCurrentPitch()
+            getCurrentPitch(),
+            getLevel()
         });
     }
 }
