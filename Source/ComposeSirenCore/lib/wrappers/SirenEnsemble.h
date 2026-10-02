@@ -71,6 +71,8 @@ public:
     void update();
     void setSampleRate(double sr);
     void stop(std::optional<sirenId> id = std::nullopt);
+    // thread-safe, see SirenVoice::requestReset (nullopt = every siren)
+    void requestReset(std::optional<sirenId> id = std::nullopt);
 
     void setPanning(sirenId id, float p);
     void setOutputGain(sirenId id, float g);
