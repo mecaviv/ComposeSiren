@@ -10,7 +10,7 @@ use serde_json::{Value, json};
 use std::sync::Arc;
 
 use composesiren_mcp_api::args::{
-    GetSetting, ParameterId, SendMidi, SendNote, SetAudioDevice, SetMidiInput, SetMidiOutput,
+    GetSetting, ParameterId, ResetControllers, SendMidi, SendNote, SetAudioDevice, SetMidiInput, SetMidiOutput,
     SetParameter, SetSetting,
 };
 #[cfg(feature = "record")]
@@ -101,6 +101,22 @@ impl ComposeSirenServer {
             return self.finish(stopped);
         }
         self.finish(started)
+    }
+
+    #[tool(description = "Reset the controllers of one siren, or of every siren when `siren` is omitted, like MIDI CC 121. \
+        Volume, pitch bend, pitch bend range, vibrato, tremolo, portamento, attack and release, transpose and the other \
+        siren parameters go back to their defaults, and sounding notes are cut. Reverb and master settings are kept.")]
+    fn reset_controllers(
+        &self,
+        Parameters(args): Parameters<ResetControllers>,
+    ) -> Result<CallToolResult, McpError> {
+        if args.siren.is_some_and(|siren| !(1..=7).contains(&siren)) {
+            return Err(McpError::invalid_params("siren must be 1 to 7", None));
+        }
+        self.finish(self.dispatch.call(json!({
+            "op": "reset_controllers",
+            "siren": args.siren.unwrap_or(0),
+        })))
     }
 
     #[tool(description = "List audio input and output devices. Only the standalone owns them.")]

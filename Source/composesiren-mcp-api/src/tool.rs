@@ -26,8 +26,7 @@ pub const LIST_SETTINGS: &str = "list_settings";
 pub const GET_SETTING: &str = "get_setting";
 /// `set_setting`.
 pub const SET_SETTING: &str = "set_setting";
-/// `reset_controllers`: not declared by the server in this repository (yet).
-/// `tap-viewer midi --reset` asks for it and goes on without it.
+/// `reset_controllers`.
 pub const RESET_CONTROLLERS: &str = "reset_controllers";
 /// `set_song_title` (a build with `COMPOSESIREN_SONG_TITLE`): show the playing
 /// song in the UI (title bar) with an optional progress bar. `tap-viewer midi
@@ -61,6 +60,7 @@ pub const ALWAYS: &[&str] = &[
     LIST_SETTINGS,
     GET_SETTING,
     SET_SETTING,
+    RESET_CONTROLLERS,
 ];
 
 /// Only a build with the song title bar has these.

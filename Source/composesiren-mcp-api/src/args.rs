@@ -128,6 +128,15 @@ pub struct SetSongProgress {
     pub duration_seconds: Option<f64>,
 }
 
+/// `reset_controllers`.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct ResetControllers {
+    /// Siren number, 1 to 7 (S1 to S7 in SirenOrchestra). Omit to reset every siren.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub siren: Option<u8>,
+}
+
 /// `start_recording`.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
