@@ -8,6 +8,7 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "../lib/definitions/palette.h"
 #include "../lib/definitions/sirenProperties.h"
+#include "../lib/net/mcp/McpControl.h"
 
 #ifndef COMPOSESIREN_PARK_BRIDGE
 #define COMPOSESIREN_PARK_BRIDGE 0
@@ -21,7 +22,9 @@
 #endif
 
 class MainButtonsComponent : public juce::Component,
-                             public juce::TextButton::Listener
+                             public juce::TextButton::Listener,
+                             private juce::Timer,
+                             private juce::ChangeListener
 {
 public:
     class Listener {
@@ -40,6 +43,9 @@ public:
         // optionnel : un bouton About... ouvre la fenêtre que showAbout() ouvre.
         virtual bool hasAbout() { return false; }
         virtual void showAbout(juce::Component* /*parent*/) {}
+        // optionnel : le serveur MCP, pour afficher le morceau en cours
+        // (set_song_title / clear_song_title) dans la barre de titre.
+        virtual McpControl* getMcpControl() { return nullptr; }
 #if COMPOSESIREN_RECORD
         // optionnel : l'enregistreur de la sortie audio ; un bouton Record...
         // ouvre son dialogue quand il y en a un.
@@ -103,9 +109,33 @@ public:
             addAndMakeVisible(stAllButton);
         }
 #endif
+
+        // The song tap-viewer is playing (set_song_title), on the left of the
+        // top row: its title, and a progress bar beside it when the length is
+        // known. Hidden again by clear_song_title.
+        songTitle.setJustificationType(juce::Justification::centredLeft);
+        songTitle.setColour(juce::Label::textColourId, juce::Colours::whitesmoke);
+        songTitle.setFont(juce::FontOptions(13.0f, juce::Font::bold));
+        songTitle.setInterceptsMouseClicks(false, false);
+        addChildComponent(songTitle);
+
+        songProgress = std::make_unique<juce::ProgressBar>(songFraction);
+        songProgress->setPercentageDisplay(false);
+        songProgress->setColour(juce::ProgressBar::backgroundColourId, juce::Colour{0xff37474f});
+        songProgress->setColour(juce::ProgressBar::foregroundColourId, juce::Colour{0xff48b848});
+        addChildComponent(*songProgress);
+
+        if (auto* mcp = listener.getMcpControl()) {
+            mcp->addChangeListener(this);
+            applySongDisplay(mcp->getSongDisplay(), false);
+        }
     }
 
-    ~MainButtonsComponent() override = default;
+    ~MainButtonsComponent() override
+    {
+        if (auto* mcp = listener.getMcpControl())
+            mcp->removeChangeListener(this);
+    }
 
     void paint(juce::Graphics& g) override
     {
@@ -125,6 +155,17 @@ public:
         fb.justifyContent = juce::FlexBox::JustifyContent::flexEnd;
 
         const float btnsHeight = static_cast<float>(bounds.getHeight());
+
+        // The song title and its progress bar, when one is playing.
+        if (songTitle.isVisible()) {
+            const bool hasBar = songProgress && songProgress->isVisible();
+            const float barWidth = hasBar ? juce::jmin(120.0f, bounds.getWidth() * 0.25f) : 0.0f;
+            const float titleWidth = juce::jmax(80.0f, bounds.getWidth() * 0.35f - barWidth);
+            auto songArea = bounds.removeFromLeft(static_cast<int>(titleWidth + barWidth + (hasBar ? margin : 0)));
+            songTitle.setBounds(songArea.removeFromLeft(static_cast<int>(titleWidth)));
+            if (hasBar && songProgress)
+                songProgress->setBounds(songArea.reduced(0, 6));
+        }
 
         auto add = [&](juce::Button& b, float minW) {
             juce::FlexItem item = juce::FlexItem(b).withMinWidth(minW)
@@ -152,6 +193,67 @@ public:
     {
         currentSirenId = id;
     }
+
+private:
+    // The song display: title on the left of the top row, a progress bar beside
+    // it when the length is known, and the same title in the window's title
+    // bar. `clear_song_title` puts both back.
+    void changeListenerCallback(juce::ChangeBroadcaster*) override
+    {
+        if (auto* mcp = listener.getMcpControl())
+            applySongDisplay(mcp->getSongDisplay(), true);
+    }
+
+    void timerCallback() override
+    {
+        if (!song.active)
+            return;
+        updateSongProgress();
+    }
+
+    void applySongDisplay(const SongDisplay& next, bool relayout)
+    {
+        const bool wasActive = song.active;
+        song = next;
+        songTitle.setText(song.active ? song.title : juce::String(), juce::dontSendNotification);
+        songTitle.setVisible(song.active);
+
+        const bool hasBar = song.active && song.durationSeconds > 0.0;
+        if (songProgress)
+            songProgress->setVisible(hasBar);
+        updateSongProgress();
+
+        if (song.active != wasActive)
+            updateWindowTitle();
+        if (relayout || song.active != wasActive)
+            resized();
+
+        if (song.active)
+            startTimerHz(15);
+        else
+            stopTimer();
+    }
+
+    void updateSongProgress()
+    {
+        if (!songProgress || !song.active || song.durationSeconds <= 0.0) {
+            songFraction = 0.0;
+            return;
+        }
+        songFraction = juce::jlimit(0.0, 1.0, song.currentPosition() / song.durationSeconds);
+    }
+
+    void updateWindowTitle()
+    {
+        auto* top = getTopLevelComponent();
+        if (top == nullptr)
+            return;
+        if (defaultWindowTitle.isEmpty())
+            defaultWindowTitle = top->getName();
+        top->setName(song.active && song.title.isNotEmpty() ? song.title : defaultWindowTitle);
+    }
+
+public:
 
 #if COMPOSESIREN_PARK_BRIDGE
     void refreshPhysicalSirensTooltip()
@@ -247,6 +349,13 @@ private:
     juce::ToggleButton physicalButton;
     juce::ToggleButton stAllButton;
 #endif
+
+    // the song in the title bar (set_song_title / clear_song_title)
+    SongDisplay song;
+    juce::String defaultWindowTitle;
+    juce::Label songTitle;
+    double songFraction = 0.0;
+    std::unique_ptr<juce::ProgressBar> songProgress;
 
     std::unique_ptr<juce::FileChooser> fileChooser;
 };

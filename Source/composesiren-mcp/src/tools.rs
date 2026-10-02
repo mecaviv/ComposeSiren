@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use composesiren_mcp_api::args::{
     GetSetting, ParameterId, SendMidi, SendNote, SetAudioDevice, SetMidiInput, SetMidiOutput,
-    SetParameter, SetSetting,
+    SetParameter, SetSetting, SetSongProgress, SetSongTitle,
 };
 #[cfg(feature = "record")]
 use composesiren_mcp_api::args::{StartRecording, StopRecording};
@@ -170,6 +170,35 @@ impl ComposeSirenServer {
             "id": args.id,
             "value": args.value,
         })))
+    }
+
+    #[tool(description = "Show the playing song in the UI title bar, with an optional progress bar when its length is known. Call clear_song_title when it ends.")]
+    fn set_song_title(
+        &self,
+        Parameters(args): Parameters<SetSongTitle>,
+    ) -> Result<CallToolResult, McpError> {
+        self.finish(self.dispatch.call(json!({
+            "op": "set_song_title",
+            "title": args.title,
+            "duration_seconds": args.duration_seconds,
+        })))
+    }
+
+    #[tool(description = "How far the song shown by set_song_title has played, so the progress bar can keep up with the board.")]
+    fn set_song_progress(
+        &self,
+        Parameters(args): Parameters<SetSongProgress>,
+    ) -> Result<CallToolResult, McpError> {
+        self.finish(self.dispatch.call(json!({
+            "op": "set_song_progress",
+            "position_seconds": args.position_seconds,
+            "duration_seconds": args.duration_seconds,
+        })))
+    }
+
+    #[tool(description = "The song is over: the title bar goes back to its usual look.")]
+    fn clear_song_title(&self) -> Result<CallToolResult, McpError> {
+        self.finish(self.dispatch.call(json!({"op": "clear_song_title"})))
     }
 
     fn finish(&self, value: Value) -> Result<CallToolResult, McpError> {

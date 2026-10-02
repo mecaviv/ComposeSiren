@@ -176,7 +176,7 @@ char* McpControl::duplicate(const std::string& text)
     return copy;
 }
 
-std::string McpControl::handle(const juce::var& request) const
+std::string McpControl::handle(const juce::var& request)
 {
     const auto op = request.getProperty("op", {}).toString();
 
@@ -191,6 +191,12 @@ std::string McpControl::handle(const juce::var& request) const
         return sendMidi(static_cast<int>(request.getProperty("status", 0)),
                         static_cast<int>(request.getProperty("data1", 0)),
                         static_cast<int>(request.getProperty("data2", 0)));
+    if (op == "set_song_title")
+        return setSongTitle(request);
+    if (op == "set_song_progress")
+        return setSongProgress(request);
+    if (op == "clear_song_title")
+        return clearSongTitle();
 
 #if COMPOSESIREN_SETTINGS || COMPOSESIREN_CLIC
     if (op == "list_settings")
@@ -390,6 +396,80 @@ std::string McpControl::sendMidi(int status, int data1, int data2) const
     auto object = okObject();
     object.getDynamicObject()->setProperty("queued", true);
     return jsonOf(object).toStdString();
+}
+
+namespace {
+
+juce::var songObject(const SongDisplay& song)
+{
+    auto object = okObject();
+    auto* o = object.getDynamicObject();
+    o->setProperty("title", song.title);
+    o->setProperty("position_seconds", song.currentPosition());
+    o->setProperty("duration_seconds", song.durationSeconds);
+    o->setProperty("active", song.active);
+    return object;
+}
+
+} // namespace
+
+SongDisplay McpControl::getSongDisplay() const
+{
+    std::lock_guard lock(songMutex);
+    return song;
+}
+
+std::string McpControl::setSongTitle(const juce::var& request)
+{
+    const auto title = request.getProperty("title", {}).toString().trim();
+    if (title.isEmpty())
+        return clearSongTitle();
+
+    SongDisplay next;
+    next.title = title;
+    next.durationSeconds = juce::jmax(0.0, static_cast<double>(request.getProperty("duration_seconds", 0)));
+    next.positionSeconds = 0.0;
+    next.updatedAtMs = juce::Time::getMillisecondCounter();
+    next.active = true;
+    {
+        std::lock_guard lock(songMutex);
+        song = next;
+    }
+    sendChangeMessage();
+    return jsonOf(songObject(next)).toStdString();
+}
+
+std::string McpControl::setSongProgress(const juce::var& request)
+{
+    SongDisplay next;
+    {
+        std::lock_guard lock(songMutex);
+        next = song;
+    }
+    if (!next.active)
+        return jsonOf(failure("no song title is set (set_song_title first)")).toStdString();
+
+    next.positionSeconds = juce::jmax(0.0, static_cast<double>(request.getProperty("position_seconds", 0)));
+    const auto duration = request.getProperty("duration_seconds", {});
+    if (!duration.isVoid())
+        next.durationSeconds = juce::jmax(0.0, static_cast<double>(duration));
+    next.updatedAtMs = juce::Time::getMillisecondCounter();
+    {
+        std::lock_guard lock(songMutex);
+        song = next;
+    }
+    sendChangeMessage();
+    return jsonOf(songObject(next)).toStdString();
+}
+
+std::string McpControl::clearSongTitle()
+{
+    {
+        std::lock_guard lock(songMutex);
+        song = {};
+    }
+    sendChangeMessage();
+    return jsonOf(okObject()).toStdString();
 }
 
 #if COMPOSESIREN_RECORD

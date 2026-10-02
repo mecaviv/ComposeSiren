@@ -121,6 +121,7 @@ public:
     SirenUdpBridge& getUdpBridge() { return udpBridge; }
 #endif
     McpControl& getMcp() { return mcp; }
+    McpControl* getMcpControl() override { return &mcp; }
 
 private:
     // needed by DSP
