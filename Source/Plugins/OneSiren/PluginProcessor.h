@@ -87,6 +87,8 @@ public:
     juce::MidiKeyboardState& getMidiKeyboardState();
     VoiceManagerState& getVoiceManagerState();
     SirenStateMonitor& getSirenStateMonitor();
+    McpControl& getMcp() { return mcp; }
+    McpControl* getMcpControl() override { return &mcp; }
 
 private:
     // void initialiseUiState();

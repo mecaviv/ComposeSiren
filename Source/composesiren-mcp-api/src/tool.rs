@@ -23,6 +23,14 @@ pub const SET_MIDI_OUTPUT: &str = "set_midi_output";
 /// `reset_controllers`: not declared by the server in this repository (yet).
 /// `tap-viewer midi --reset` asks for it and goes on without it.
 pub const RESET_CONTROLLERS: &str = "reset_controllers";
+/// `set_song_title`: show the playing song in the UI (title bar) with an
+/// optional progress bar. `tap-viewer midi --song` calls it and goes on
+/// without it when the tool is missing.
+pub const SET_SONG_TITLE: &str = "set_song_title";
+/// `set_song_progress`: how far the song is (the title is already set).
+pub const SET_SONG_PROGRESS: &str = "set_song_progress";
+/// `clear_song_title`: the song is over; the title bar goes back to normal.
+pub const CLEAR_SONG_TITLE: &str = "clear_song_title";
 /// `start_recording` (a build with `COMPOSESIREN_RECORD`).
 pub const START_RECORDING: &str = "start_recording";
 /// `stop_recording` (a build with `COMPOSESIREN_RECORD`).
@@ -42,6 +50,9 @@ pub const ALWAYS: &[&str] = &[
     LIST_MIDI_DEVICES,
     SET_MIDI_INPUT,
     SET_MIDI_OUTPUT,
+    SET_SONG_TITLE,
+    SET_SONG_PROGRESS,
+    CLEAR_SONG_TITLE,
 ];
 
 /// Only a build with the recorder has these.
