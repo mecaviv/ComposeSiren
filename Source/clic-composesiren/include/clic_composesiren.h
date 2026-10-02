@@ -57,6 +57,23 @@ void clic_midi(clic_t *clic, uint8_t status, uint8_t data1, uint8_t data2);
 // `left` and `right` are null or point to `frames` writable floats each.
 void clic_render(clic_t *clic, float *left, float *right, uintptr_t frames);
 
+// Renders `frames` frames with the two clicks panned: `spread` +1 places
+// clic1 left and clic2 right (−1 the opposite); `bias` moves both left or
+// right. `decay` 1 plays the full sample, 0 fades it in ~2 ms. See
+// [`crate::Clic::render_panned`].
+//
+// # Safety
+//
+// `clic` is null or a live handle from `clic_new`, not used concurrently;
+// `left` and `right` are null or point to `frames` writable floats each.
+void clic_render_panned(clic_t *clic,
+                        float *left,
+                        float *right,
+                        uintptr_t frames,
+                        float spread,
+                        float bias,
+                        float decay);
+
 // The chosen click (0 = the first), or -1 for a null handle.
 //
 // # Safety

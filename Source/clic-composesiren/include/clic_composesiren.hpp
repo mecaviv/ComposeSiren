@@ -32,6 +32,14 @@ public:
             clic_render(handle, left, right, static_cast<std::size_t>(frames));
     }
 
+    /// spread +1: clic1 left, clic2 right (−1 the opposite); bias moves both.
+    /// decay 1: full sample, 0: ~2 ms fade (just audible).
+    void renderPanned(float* left, float* right, int frames, float spread, float bias, float decay)
+    {
+        if (frames > 0)
+            clic_render_panned(handle, left, right, static_cast<std::size_t>(frames), spread, bias, decay);
+    }
+
     int current() const { return clic_current(handle); }
     int count() const { return clic_count(handle); }
 

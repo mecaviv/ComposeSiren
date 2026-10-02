@@ -82,6 +82,35 @@ pub unsafe extern "C" fn clic_render(clic: *mut clic_t, left: *mut f32, right: *
     c.0.render(l, r);
 }
 
+/// Renders `frames` frames with the two clicks panned: `spread` +1 places
+/// clic1 left and clic2 right (−1 the opposite); `bias` moves both left or
+/// right. `decay` 1 plays the full sample, 0 fades it in ~2 ms. See
+/// [`crate::Clic::render_panned`].
+///
+/// # Safety
+///
+/// `clic` is null or a live handle from `clic_new`, not used concurrently;
+/// `left` and `right` are null or point to `frames` writable floats each.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn clic_render_panned(
+    clic: *mut clic_t,
+    left: *mut f32,
+    right: *mut f32,
+    frames: usize,
+    spread: f32,
+    bias: f32,
+    decay: f32,
+) {
+    // SAFETY: the caller's contract
+    let Some(c) = (unsafe { clic.as_mut() }) else { return };
+    if left.is_null() || right.is_null() || frames == 0 {
+        return;
+    }
+    // SAFETY: frames writable floats each, per the contract
+    let (l, r) = unsafe { (std::slice::from_raw_parts_mut(left, frames), std::slice::from_raw_parts_mut(right, frames)) };
+    c.0.render_panned(l, r, spread, bias, decay);
+}
+
 /// The chosen click (0 = the first), or -1 for a null handle.
 ///
 /// # Safety
