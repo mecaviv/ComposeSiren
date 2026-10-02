@@ -23,7 +23,6 @@
 
 class MainButtonsComponent : public juce::Component,
                              public juce::TextButton::Listener,
-                             private juce::Timer,
                              private juce::ChangeListener
 {
 public:
@@ -111,8 +110,7 @@ public:
 #endif
 
         // The song tap-viewer is playing (set_song_title), on the left of the
-        // top row: its title with an ASCII progress bar, and the same line in
-        // the window's title bar. Hidden again by clear_song_title.
+        // top row and in the window's title bar. Hidden again by clear_song_title.
         songTitle.setJustificationType(juce::Justification::centredLeft);
         songTitle.setColour(juce::Label::textColourId, juce::Colours::whitesmoke);
         songTitle.setFont(juce::FontOptions(13.0f, juce::Font::bold));
@@ -150,7 +148,7 @@ public:
 
         const float btnsHeight = static_cast<float>(bounds.getHeight());
 
-        // The song title with its ASCII progress bar, when one is playing.
+        // The song title, when one is playing.
         if (songTitle.isVisible())
             songTitle.setBounds(bounds.removeFromLeft(
                 static_cast<int>(juce::jmax(160.0f, bounds.getWidth() * 0.42f))));
@@ -183,20 +181,12 @@ public:
     }
 
 private:
-    // The song display: title + ASCII progress bar on the left of the top
-    // row, and the same line in the window's title bar. `clear_song_title`
-    // puts both back.
+    // The song display: title on the left of the top row and in the window's
+    // title bar. `clear_song_title` puts both back.
     void changeListenerCallback(juce::ChangeBroadcaster*) override
     {
         if (auto* mcp = listener.getMcpControl())
             applySongDisplay(mcp->getSongDisplay(), true);
-    }
-
-    void timerCallback() override
-    {
-        if (!song.active)
-            return;
-        updateSongProgress();
     }
 
     void applySongDisplay(const SongDisplay& next, bool relayout)
@@ -204,57 +194,15 @@ private:
         const bool wasActive = song.active;
         song = next;
         songTitle.setVisible(song.active);
-        updateSongProgress();
+        updateSongTitle();
 
-        if (song.active != wasActive)
+        if (song.active != wasActive || relayout)
             resized();
-        else if (relayout)
-            resized();
-
-        if (song.active)
-            startTimerHz(15);
-        else
-            stopTimer();
     }
 
-    // Compact ASCII art for the bar: Title [=======|-------] 1:23
-    static juce::String formatSongLine(const SongDisplay& song)
+    void updateSongTitle()
     {
-        if (!song.active || song.title.isEmpty())
-            return {};
-
-        juce::String line = song.title;
-        if (song.durationSeconds > 0.0) {
-            constexpr int cells = 14;
-            const double fraction =
-                juce::jlimit(0.0, 1.0, song.currentPosition() / song.durationSeconds);
-            const int filled = juce::roundToInt(fraction * cells);
-
-            line << "  [";
-            for (int i = 0; i < cells; ++i) {
-                if (i < filled)
-                    line << '=';
-                else if (i == filled)
-                    line << '|';
-                else
-                    line << '-';
-            }
-            line << "]";
-
-            const int total = juce::roundToInt(song.durationSeconds);
-            const int at = juce::roundToInt(juce::jmin(song.currentPosition(),
-                                                       song.durationSeconds));
-            line << "  " << (at / 60) << ":"
-                 << juce::String(at % 60).paddedLeft('0', 2) << "/"
-                 << (total / 60) << ":"
-                 << juce::String(total % 60).paddedLeft('0', 2);
-        }
-        return line;
-    }
-
-    void updateSongProgress()
-    {
-        const auto line = formatSongLine(song);
+        const auto line = song.active ? song.title : juce::String();
         songTitle.setText(line, juce::dontSendNotification);
         updateWindowTitle(line);
     }
@@ -366,7 +314,7 @@ private:
     juce::ToggleButton stAllButton;
 #endif
 
-    // the song in the title bar (set_song_title / clear_song_title)
+    // the song title in the top bar and window title (set_song_title / clear_song_title)
     SongDisplay song;
     juce::String defaultWindowTitle;
     juce::Label songTitle;
