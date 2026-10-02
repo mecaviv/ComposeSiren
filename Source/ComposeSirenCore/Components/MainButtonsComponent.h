@@ -122,19 +122,13 @@ public:
 #endif
 
         // The song tap-viewer is playing (set_song_title), on the left of the
-        // top row: its title, and a progress bar beside it when the length is
-        // known. Hidden again by clear_song_title.
+        // top row: its title with an ASCII progress bar, and the same line in
+        // the window's title bar. Hidden again by clear_song_title.
         songTitle.setJustificationType(juce::Justification::centredLeft);
         songTitle.setColour(juce::Label::textColourId, juce::Colours::whitesmoke);
         songTitle.setFont(juce::FontOptions(13.0f, juce::Font::bold));
         songTitle.setInterceptsMouseClicks(false, false);
         addChildComponent(songTitle);
-
-        songProgress = std::make_unique<juce::ProgressBar>(songFraction);
-        songProgress->setPercentageDisplay(false);
-        songProgress->setColour(juce::ProgressBar::backgroundColourId, juce::Colour{0xff37474f});
-        songProgress->setColour(juce::ProgressBar::foregroundColourId, juce::Colour{0xff48b848});
-        addChildComponent(*songProgress);
 
         if (auto* mcp = listener.getMcpControl()) {
             mcp->addChangeListener(this);
@@ -170,17 +164,10 @@ public:
         const float btnsHeight = static_cast<float>(bounds.getHeight());
         juce::FlexItem item;
 
-        // The song title and its progress bar, when one is playing.
-        const bool showingSong = songTitle.isVisible();
-        if (showingSong) {
-            const bool hasBar = songProgress && songProgress->isVisible();
-            const float barWidth = hasBar ? juce::jmin(120.0f, bounds.getWidth() * 0.25f) : 0.0f;
-            const float titleWidth = juce::jmax(80.0f, bounds.getWidth() * 0.35f - barWidth);
-            auto songArea = bounds.removeFromLeft(static_cast<int>(titleWidth + barWidth + (hasBar ? margin : 0)));
-            songTitle.setBounds(songArea.removeFromLeft(static_cast<int>(titleWidth)));
-            if (hasBar && songProgress)
-                songProgress->setBounds(songArea.reduced(0, 6));
-        }
+        // The song title with its ASCII progress bar, when one is playing.
+        if (songTitle.isVisible())
+            songTitle.setBounds(bounds.removeFromLeft(
+                static_cast<int>(juce::jmax(160.0f, bounds.getWidth() * 0.42f))));
 
         // Left button /////////////////////////////////////////////////////////
         // fb.alignContent = juce::FlexBox::AlignContent::flexStart;
@@ -265,9 +252,9 @@ public:
     }
 
 private:
-    // The song display: title on the left of the top row, a progress bar beside
-    // it when the length is known, and the same title in the window's title
-    // bar. `clear_song_title` puts both back.
+    // The song display: title + ASCII progress bar on the left of the top
+    // row, and the same line in the window's title bar. `clear_song_title`
+    // puts both back.
     void changeListenerCallback(juce::ChangeBroadcaster*) override
     {
         if (auto* mcp = listener.getMcpControl())
@@ -285,17 +272,12 @@ private:
     {
         const bool wasActive = song.active;
         song = next;
-        songTitle.setText(song.active ? song.title : juce::String(), juce::dontSendNotification);
         songTitle.setVisible(song.active);
-
-        const bool hasBar = song.active && song.durationSeconds > 0.0;
-        if (songProgress)
-            songProgress->setVisible(hasBar);
         updateSongProgress();
 
         if (song.active != wasActive)
-            updateWindowTitle();
-        if (relayout || song.active != wasActive)
+            resized();
+        else if (relayout)
             resized();
 
         if (song.active)
@@ -304,23 +286,56 @@ private:
             stopTimer();
     }
 
-    void updateSongProgress()
+    // Compact ASCII art for the bar: Title [=======|-------] 1:23
+    static juce::String formatSongLine(const SongDisplay& song)
     {
-        if (!songProgress || !song.active || song.durationSeconds <= 0.0) {
-            songFraction = 0.0;
-            return;
+        if (!song.active || song.title.isEmpty())
+            return {};
+
+        juce::String line = song.title;
+        if (song.durationSeconds > 0.0) {
+            constexpr int cells = 14;
+            const double fraction =
+                juce::jlimit(0.0, 1.0, song.currentPosition() / song.durationSeconds);
+            const int filled = juce::roundToInt(fraction * cells);
+
+            line << "  [";
+            for (int i = 0; i < cells; ++i) {
+                if (i < filled)
+                    line << '=';
+                else if (i == filled)
+                    line << '|';
+                else
+                    line << '-';
+            }
+            line << "]";
+
+            const int total = juce::roundToInt(song.durationSeconds);
+            const int at = juce::roundToInt(juce::jmin(song.currentPosition(),
+                                                       song.durationSeconds));
+            line << "  " << (at / 60) << ":"
+                 << juce::String(at % 60).paddedLeft('0', 2) << "/"
+                 << (total / 60) << ":"
+                 << juce::String(total % 60).paddedLeft('0', 2);
         }
-        songFraction = juce::jlimit(0.0, 1.0, song.currentPosition() / song.durationSeconds);
+        return line;
     }
 
-    void updateWindowTitle()
+    void updateSongProgress()
+    {
+        const auto line = formatSongLine(song);
+        songTitle.setText(line, juce::dontSendNotification);
+        updateWindowTitle(line);
+    }
+
+    void updateWindowTitle(const juce::String& line)
     {
         auto* top = getTopLevelComponent();
         if (top == nullptr)
             return;
         if (defaultWindowTitle.isEmpty())
             defaultWindowTitle = top->getName();
-        top->setName(song.active && song.title.isNotEmpty() ? song.title : defaultWindowTitle);
+        top->setName(song.active && line.isNotEmpty() ? line : defaultWindowTitle);
     }
 
 public:
@@ -421,8 +436,6 @@ private:
     SongDisplay song;
     juce::String defaultWindowTitle;
     juce::Label songTitle;
-    double songFraction = 0.0;
-    std::unique_ptr<juce::ProgressBar> songProgress;
 
     std::unique_ptr<juce::FileChooser> fileChooser;
 };
