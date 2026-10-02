@@ -32,6 +32,8 @@ public:
     void setSampleRate(double newSampleRate);
     void stopSirene();
     void resetSirene();
+    void allSoundOff();
+    void allNotesOff();
 
 private:
 	// per-siren midi message management, refactored from MidiIn class :
