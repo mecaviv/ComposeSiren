@@ -5,6 +5,7 @@
 #include <lib/definitions/sirenProperties.h>
 #include <apvtsUtilities.h>
 #include <pathUtilities.h>
+#include <algorithm>
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 #include "AboutDialog.h"
@@ -59,6 +60,23 @@ SirenOrchestraPluginProcessor::SirenOrchestraPluginProcessor() :
     mcp(*this, "SirenOrchestra", "MvSO")
 {
     ssm.subscribe(&ensemble);
+    mcp.setResetHandler([this](int siren) {
+        std::optional<sirenId> id;
+        if (siren > 0) {
+            const auto candidate = static_cast<sirenId>(siren - 1);
+            if (std::find(allSirenIds.begin(), allSirenIds.end(), candidate) == allSirenIds.end())
+                return false;
+            id = candidate;
+        }
+        ensemble.requestReset(id);
+#if COMPOSESIREN_PARK_BRIDGE
+        if (id.has_value())
+            udpBridge.pushReset(static_cast<int>(id.value()) + 1);
+        else
+            udpBridge.pushResetAll();
+#endif
+        return true;
+    });
 #if COMPOSESIREN_RECORD
     mcp.setRecorder(&recorder);
 #endif
