@@ -47,6 +47,7 @@ public:
     void setSampleRate(double newSampleRate);
     void handleMidi(int status, int value1, int value2);
     void stopSiren();
+    void resetSiren();
 
     void beginProcessBlock();
     // this will compute the next sample to play and return it
@@ -73,6 +74,8 @@ class SirenVoice
     std::atomic<bool> sirenIsLoading { false };
 
     SirenVoiceUnit* rawSiren;
+    // set from any thread, consumed by the audio thread in beginProcessBlock
+    std::atomic<bool> resetRequested { false };
 
 protected:
     std::optional<sirenId> id { std::nullopt };
@@ -122,6 +125,9 @@ public:
     // those are using getRawSirenHandle internally :
     virtual void setSampleRate(double newSampleRate);
     void stop();
+    // Thread-safe : resets every controller, releases notes and silences the
+    // siren (like MIDI CC 121). Applied at the start of the next audio block.
+    void requestReset();
     void update();
 
     // those are not using getRawSirenHandle

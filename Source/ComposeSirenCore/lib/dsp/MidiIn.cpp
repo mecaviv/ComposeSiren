@@ -114,8 +114,18 @@ void MidiIn::handleControlChange(int cc, int value) {
     // - pitch bend range (cc 16)
     // - effect order switch (cc 42) but this one is not implemented in firmware
     switch (cc) {
+        case 120: // All Sound Off (standard MIDI)
+            if (value > 0) {
+                allSoundOff();
+            }
+            break;
         case 121: // Reset All Controllers: any value, as the firmware does
             resetSirene();
+            break;
+        case 123: // All Notes Off (standard MIDI)
+            if (value > 0) {
+                allNotesOff();
+            }
             break;
         case 1 : { // vibrato depth
             control[1] = value ;
@@ -397,7 +407,38 @@ void MidiIn::stopSirene() {
     ancienVolFinal = -1;
 }
 
+void MidiIn::allNotesOff() {
+    // the note goes through the release envelope, like a regular note off
+    if (velocite > 0.0) {
+        realTimeStopNote(static_cast<int>(noteOn));
+    }
+}
+
+void MidiIn::allSoundOff() {
+    // immediate silence : no release, and the attack / release ramps are
+    // cancelled so they cannot bring the volume back
+    if (isRampe) {
+        isRampe = false;
+        countCreateAttack--;
+    }
+    if (isRelease) {
+        isRelease = false;
+        countCreateRelease--;
+    }
+    velocite = 0.0;
+    volumeFinal = 0.0;
+    tremolo = 0.0;
+    veloFinal = 0;
+    vitesseClapet = 0;
+    ancienVelo = 0;
+    onVolumeChanged(0);
+}
+
 void MidiIn::resetSirene() {
+    // silence first : the reset used to leave a sounding note at its last
+    // volume, since nothing told the siren that the note was gone
+    allSoundOff();
+
     noteOnFinal = 0.0;
     ///////////////////////////////////////////////////****** Ferme les volets
     ancienVolFinal = -1;
@@ -423,6 +464,7 @@ void MidiIn::resetSirene() {
     tourMoteur = 0.0;
     noteOnFinal = 0.0;
     volumeFinal = 0.0;
+    controlFinal = 0;
     control[6] = 64;
     control[12] = 127.;
     control[13] = 127.;

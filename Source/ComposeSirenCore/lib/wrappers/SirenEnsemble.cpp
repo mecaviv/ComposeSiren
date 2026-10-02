@@ -120,6 +120,14 @@ void SirenEnsemble::stop(std::optional<sirenId> id) {
     }
 }
 
+void SirenEnsemble::requestReset(std::optional<sirenId> id) {
+    if (id.has_value()) {
+        tracks.at(id.value())->requestReset();
+    } else {
+        for (auto& t : tracks | std::views::values) { t->requestReset(); }
+    }
+}
+
 void SirenEnsemble::setPanning(sirenId id, float p) {
     tracks.at(id)->setPanning(p);
 }

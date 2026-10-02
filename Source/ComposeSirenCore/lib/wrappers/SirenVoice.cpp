@@ -60,6 +60,11 @@ void SirenVoiceUnit::handleMidi(int status, int value1, int value2) {
         ino = true;
     } else if (status >> 4 == 0xB) { // cc
         midiIn->handleControlChange(value1, value2);
+        // all sound off, reset all controllers, all notes off
+        // (CC 121 resets on any value like the firmware; 120/123 act on value > 0)
+        if (value1 == 121 || ((value1 == 120 || value1 == 123) && value2 > 0)) {
+            ino = false;
+        }
     } else if (status >> 4 & 0xE) { // pitch bend
         midiIn->handlePitchWheel(value1, value2);
     }
@@ -67,6 +72,11 @@ void SirenVoiceUnit::handleMidi(int status, int value1, int value2) {
 
 void SirenVoiceUnit::stopSiren() {
     midiIn->stopSirene();
+}
+
+void SirenVoiceUnit::resetSiren() {
+    midiIn->resetSirene();
+    ino = false;
 }
 
 void SirenVoiceUnit::beginProcessBlock()
@@ -212,6 +222,11 @@ void SirenVoice::stop()
     if (getRawSirenHandle()) { rawSiren->stopSiren(); }
 }
 
+void SirenVoice::requestReset()
+{
+    resetRequested.store(true, std::memory_order_release);
+}
+
 void SirenVoice::update()
 {
     if (getRawSirenHandle()) { rawSiren->update(); }
@@ -224,6 +239,9 @@ void SirenVoice::handleMidi(int status, int value1, int value2)
 
 void SirenVoice::beginProcessBlock()
 {
+    if (resetRequested.exchange(false, std::memory_order_acq_rel)) {
+        rawSiren->resetSiren();
+    }
     rawSiren->beginProcessBlock();
 }
 

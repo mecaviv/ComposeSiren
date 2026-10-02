@@ -20,8 +20,7 @@ pub const LIST_MIDI_DEVICES: &str = "list_midi_devices";
 pub const SET_MIDI_INPUT: &str = "set_midi_input";
 /// `set_midi_output`.
 pub const SET_MIDI_OUTPUT: &str = "set_midi_output";
-/// `reset_controllers`: not declared by the server in this repository (yet).
-/// `tap-viewer midi --reset` asks for it and goes on without it.
+/// `reset_controllers`.
 pub const RESET_CONTROLLERS: &str = "reset_controllers";
 /// `start_recording` (a build with `COMPOSESIREN_RECORD`).
 pub const START_RECORDING: &str = "start_recording";
@@ -42,6 +41,7 @@ pub const ALWAYS: &[&str] = &[
     LIST_MIDI_DEVICES,
     SET_MIDI_INPUT,
     SET_MIDI_OUTPUT,
+    RESET_CONTROLLERS,
 ];
 
 /// Only a build with the recorder has these.
