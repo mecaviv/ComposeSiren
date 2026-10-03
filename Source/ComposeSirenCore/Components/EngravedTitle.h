@@ -1,8 +1,15 @@
 //
-// Engraved group titles for the bottom strips (Clic, Reverb).
+// Engraved group titles for the bottom strips (Clic, Reverb-with-clic).
+// Only built with COMPOSESIREN_CLIC — the master Reverb path uses a Label.
 //
 
 #pragma once
+
+#ifndef COMPOSESIREN_CLIC
+#define COMPOSESIREN_CLIC 0
+#endif
+
+#if COMPOSESIREN_CLIC
 
 #include <juce_graphics/juce_graphics.h>
 #include <juce_gui_basics/juce_gui_basics.h>
@@ -44,3 +51,5 @@ public:
 private:
     juce::String text;
 };
+
+#endif // COMPOSESIREN_CLIC
