@@ -10,7 +10,8 @@ use serde_json::{Value, json};
 use std::sync::Arc;
 
 use composesiren_mcp_api::args::{
-    ParameterId, SendMidi, SendNote, SetAudioDevice, SetMidiInput, SetMidiOutput, SetParameter,
+    GetSetting, ParameterId, SendMidi, SendNote, SetAudioDevice, SetMidiInput, SetMidiOutput,
+    SetParameter, SetSetting,
 };
 #[cfg(feature = "record")]
 use composesiren_mcp_api::args::{StartRecording, StopRecording};
@@ -143,6 +144,31 @@ impl ComposeSirenServer {
         self.finish(self.dispatch.call(json!({
             "op": "set_midi_output",
             "identifier": args.identifier,
+        })))
+    }
+
+    #[tool(description = "List power-user settings (metadata id, type, value).")]
+    fn list_settings(&self) -> Result<CallToolResult, McpError> {
+        self.finish(self.dispatch.call(json!({"op": "list_settings"})))
+    }
+
+    #[tool(description = "Read one power-user setting by its metadata id (e.g. clic.output_device).")]
+    fn get_setting(
+        &self,
+        Parameters(args): Parameters<GetSetting>,
+    ) -> Result<CallToolResult, McpError> {
+        self.finish(self.dispatch.call(json!({"op": "get_setting", "id": args.id})))
+    }
+
+    #[tool(description = "Set one power-user setting. String settings take a device name or text; the others take a number.")]
+    fn set_setting(
+        &self,
+        Parameters(args): Parameters<SetSetting>,
+    ) -> Result<CallToolResult, McpError> {
+        self.finish(self.dispatch.call(json!({
+            "op": "set_setting",
+            "id": args.id,
+            "value": args.value,
         })))
     }
 

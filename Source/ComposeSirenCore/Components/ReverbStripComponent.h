@@ -10,18 +10,28 @@
 #include "GuiCellGroup.h"
 #include "SliderCell.h"
 #include "ToggleCell.h"
+#include "EngravedTitle.h"
 #include "LookAndFeels.h"
 #include "../apvtsUtilities.h"
 #include "../lib/definitions/parameterDefinitions.h"
 
-class ReverbStripComponent : public juce::Component//,
-                             // public juce::Slider::Listener,
-                             // public juce::Button::Listener,
-                             // private juce::Timer
+#ifndef COMPOSESIREN_CLIC
+#define COMPOSESIREN_CLIC 0
+#endif
+
+class ReverbStripComponent : public juce::Component
 {
     juce::AudioProcessorValueTreeState& apvts;
 
+#if COMPOSESIREN_CLIC
+    // clic build: engraved title + header enable (Enable cell lives in the header)
+    EngravedTitle titleLabel;
+    juce::ToggleButton titleSwitch;
+    HeaderSwitchLAF headerSwitchLAF;
+#else
+    // master layout: plain label (title is optional); Enable Reverb is a cell
     juce::Label titleLabel;
+#endif
     bool showTitle = true;
     bool showGroupLabels = true;
     bool showKnobLabels = true;
@@ -31,18 +41,27 @@ class ReverbStripComponent : public juce::Component//,
         juce::Colour{mecaviv::Colours::backgroundStripGrey}
     };
 
-    juce::ToggleButton reverbEnableButton;
-
+#if !COMPOSESIREN_CLIC
     GuiCellGroup enableGroup;
+#endif
     GuiCellGroup reverbGroup;
     GuiCellGroup filterGroup;
 
+#if COMPOSESIREN_CLIC
+    // denser / shorter knobs when CLIC borrows width; labels sit lower
+    const float ksw = controlStripLayout::minKnobSliderWidth * 0.82f;
+    const float sh = controlStripLayout::minSliderHeight * 0.72f;
+    const float lh = controlStripLayout::sliderLabelHeight * 0.5f;
+#else
     const float ksw = controlStripLayout::minKnobSliderWidth;
-    const float idsw = controlStripLayout::minIncDecSliderWidth;
     const float sh = controlStripLayout::minSliderHeight * 0.95f;
     const float lh = controlStripLayout::sliderLabelHeight * 0.75f;
+#endif
+    const float idsw = controlStripLayout::minIncDecSliderWidth;
 
+#if !COMPOSESIREN_CLIC
     ToggleCell enable     {ksw, sh, lh};
+#endif
 
     SliderCell dryWet     {ksw, sh, lh};
     SliderCell damping    {ksw, sh, lh};
@@ -65,6 +84,14 @@ public:
     void paint(juce::Graphics&) override;
     void resized() override;
 
+    void setTitle(const juce::String& t)
+    {
+#if COMPOSESIREN_CLIC
+        titleLabel.setText(t);
+#else
+        titleLabel.setText(t, juce::dontSendNotification);
+#endif
+    }
     void setShowTitle(bool s);
     void setShowGroupLabels(bool s);
     void setShowKnobLabels(bool s);

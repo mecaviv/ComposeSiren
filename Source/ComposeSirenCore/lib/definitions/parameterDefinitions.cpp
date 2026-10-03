@@ -88,6 +88,12 @@ ParameterClass ParameterIdGet::getClass(const ParameterId& parameter) {
         return ParameterClass::TrackControl;
     case ParameterId::MasterVolume:
         return ParameterClass::MasterControl;
+    case ParameterId::ClicEnable:
+    case ParameterId::ClicVolume:
+    case ParameterId::ClicSpread:
+    case ParameterId::ClicBias:
+    case ParameterId::ClicDecay:
+        return ParameterClass::ClicControl;
     // case ParameterId::MatrixNoteIn:
     //     return ParameterClass::MatrixControl;
     case ParameterId::Undefined:

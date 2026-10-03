@@ -40,6 +40,10 @@ SirenOrchestraPluginProcessor::SirenOrchestraPluginProcessor() :
                                         ParameterClass::ReverbControl));
         res.push_back(mkLayoutGroupData("M", "Master",
                                         ParameterClass::MasterControl));
+#if COMPOSESIREN_CLIC
+        res.push_back(mkLayoutGroupData("C", "Clic",
+                                        ParameterClass::ClicControl));
+#endif
         return res;
     }()),
     apvts(*this,
@@ -61,11 +65,27 @@ SirenOrchestraPluginProcessor::SirenOrchestraPluginProcessor() :
     router.sendAllCurrentParameterValues();
     ensembleParameterBridges.sendParameterValues();
     reverbParameterBridges.sendParameterValues();
+#if COMPOSESIREN_CLIC
+    clicEnableParam = apvts.getRawParameterValue(ParameterIdGet::toJuceParameterId("C", ParameterId::ClicEnable));
+    clicVolumeParam = apvts.getRawParameterValue(ParameterIdGet::toJuceParameterId("C", ParameterId::ClicVolume));
+    clicSpreadParam = apvts.getRawParameterValue(ParameterIdGet::toJuceParameterId("C", ParameterId::ClicSpread));
+    clicBiasParam = apvts.getRawParameterValue(ParameterIdGet::toJuceParameterId("C", ParameterId::ClicBias));
+    clicDecayParam = apvts.getRawParameterValue(ParameterIdGet::toJuceParameterId("C", ParameterId::ClicDecay));
+#endif
+#if COMPOSESIREN_SETTINGS
+    settings->addListener(this);
+#if COMPOSESIREN_CLIC
+    applyClicOutputSetting();
+#endif
+#endif
     startTimer(33);
 }
 
 SirenOrchestraPluginProcessor::~SirenOrchestraPluginProcessor()
 {
+#if COMPOSESIREN_SETTINGS
+    settings->removeListener(this);
+#endif
     stopTimer();
     // reads the MCP server and the bridge, which are destroyed with this object
     delete aboutWindow.getComponent();
@@ -93,6 +113,7 @@ void SirenOrchestraPluginProcessor::prepareToPlay(double sampleRate, int samples
 #if COMPOSESIREN_CLIC
     clicEngine.setSampleRate(sampleRate);
     clicEvents.reserve(512);
+    clicScratch.assign(static_cast<size_t>(juce::jmax(samplesPerBlock, 256)) * 2, 0.0f);
 #endif
 }
 
@@ -363,28 +384,78 @@ void SirenOrchestraPluginProcessor::collectClicMidi(const juce::MidiBuffer& midi
     }
 }
 
+void SirenOrchestraPluginProcessor::applyClicOutputSetting()
+{
+#if COMPOSESIREN_SETTINGS
+    clicSecondary.setDevice(settings->getString(cs::Settings::Id::clicOutputDevice));
+#endif
+}
+
 void SirenOrchestraPluginProcessor::renderClic(juce::AudioBuffer<float>& audio)
 {
     if (getBusCount(false) < 2)
         return;
     auto bus = getBusBuffer(audio, false, 1);
-    if (bus.getNumChannels() < 2) {
-        // bus disabled: the events still reach the engine
+    const int n = bus.getNumSamples();
+    // ClicEnable is a master override: OFF ⇒ silent regardless of ClicVolume
+    const bool enabled = clicEnableParam == nullptr
+                             || clicEnableParam->load(std::memory_order_relaxed) > 0.5f;
+    const float knobVol = clicVolumeParam != nullptr ? clicVolumeParam->load(std::memory_order_relaxed) : 1.0f;
+    const float vol = enabled ? knobVol : 0.0f;
+    const float spread = clicSpreadParam != nullptr ? clicSpreadParam->load(std::memory_order_relaxed) : 0.0f;
+    const float bias = clicBiasParam != nullptr ? clicBiasParam->load(std::memory_order_relaxed) : 0.0f;
+    const float decay = clicDecayParam != nullptr ? clicDecayParam->load(std::memory_order_relaxed) : 1.0f;
+    const bool secondary = clicSecondary.isActive();
+    const bool toBus = bus.getNumChannels() >= 2 && !secondary;
+    if (secondary && bus.getNumChannels() > 0)
+        bus.clear(); // the click plays alone on the secondary device
+
+    // scratch on the bus when it is silent, or on a reserved buffer when the
+    // click only goes to the secondary device (the bus must stay silent then)
+    float* l = nullptr;
+    float* r = nullptr;
+    if (toBus) {
+        l = bus.getWritePointer(0);
+        r = bus.getWritePointer(1);
+    } else if (secondary) {
+        if (clicScratch.size() < static_cast<size_t>(n) * 2)
+            clicScratch.assign(static_cast<size_t>(n) * 2, 0.0f); // prepareToPlay undersized
+        l = clicScratch.data();
+        r = clicScratch.data() + n;
+    } else {
+        // bus disabled and no secondary device: events still reach the engine
         for (const auto& e : clicEvents)
             clicEngine.midi(e.status, e.data1, e.data2);
         return;
     }
-    auto* l = bus.getWritePointer(0);
-    auto* r = bus.getWritePointer(1);
-    const int n = bus.getNumSamples();
+
     int done = 0;
     for (const auto& e : clicEvents) {
         const int at = juce::jlimit(done, n, e.position);
-        clicEngine.render(l + done, r + done, at - done);
+        clicEngine.renderPanned(l + done, r + done, at - done, spread, bias, decay);
         clicEngine.midi(e.status, e.data1, e.data2);
         done = at;
     }
-    clicEngine.render(l + done, r + done, n - done);
+    clicEngine.renderPanned(l + done, r + done, n - done, spread, bias, decay);
+
+    if (vol != 1.0f) {
+        juce::FloatVectorOperations::multiply(l, vol, n);
+        juce::FloatVectorOperations::multiply(r, vol, n);
+    }
+    if (secondary)
+        clicSecondary.push(l, r, n);
+}
+#endif
+
+#if COMPOSESIREN_SETTINGS
+void SirenOrchestraPluginProcessor::settingChanged(cs::Settings::Id id)
+{
+#if COMPOSESIREN_CLIC
+    if (id == cs::Settings::Id::clicOutputDevice)
+        applyClicOutputSetting();
+#else
+    juce::ignoreUnused(id);
+#endif
 }
 #endif
 

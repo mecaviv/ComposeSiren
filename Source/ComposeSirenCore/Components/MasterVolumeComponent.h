@@ -13,6 +13,10 @@
 #include "apvtsUtilities.h"
 #include "../lib/definitions/parameterDefinitions.h"
 
+#ifndef COMPOSESIREN_CLIC
+#define COMPOSESIREN_CLIC 0
+#endif
+
 //==============================================================================
 class MasterVolumeComponent : public juce::Component
 {
@@ -25,6 +29,7 @@ public:
     void resized() override;
 
     void setShowTitle(bool s);
+    void setTitle(const juce::String& t) { titleLabel.setText(t, juce::dontSendNotification); }
     void setShowGroupLabels(bool s);
     void setShowKnobLabels(bool s);
     void setShowTextBox(bool s);

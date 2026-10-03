@@ -85,6 +85,24 @@ pub struct SetMidiOutput {
     pub identifier: String,
 }
 
+/// `get_setting`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct GetSetting {
+    /// Setting id from `list_settings`, e.g. `clic.output_device`.
+    pub id: String,
+}
+
+/// `set_setting`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct SetSetting {
+    /// Setting id from `list_settings`, e.g. `clic.output_device`.
+    pub id: String,
+    /// String settings take text (a device name or "Main output"); the others take a number.
+    pub value: serde_json::Value,
+}
+
 /// `start_recording`.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]

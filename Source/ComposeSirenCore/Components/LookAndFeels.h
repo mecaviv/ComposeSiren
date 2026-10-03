@@ -451,6 +451,106 @@ public:
     }
 };
 
+/// Header master switch: same button as ToggleLAF (Enable Reverb), with the
+/// green LED on the **left** of the square instead of above it. `() [ ]`.
+class HeaderSwitchLAF : public juce::LookAndFeel_V4
+{
+public:
+    void drawToggleButton(juce::Graphics& g,
+                          juce::ToggleButton& button,
+                          bool shouldDrawButtonAsHighlighted,
+                          bool shouldDrawButtonAsDown) override
+    {
+        auto b = button.getLocalBounds().toFloat();
+        // square button (ToggleLAF uses a tall 0.5×1.5 pill — too narrow here)
+        const float btn = juce::jmin(b.getHeight() - 4.0f, 16.0f);
+        const float ledR = 4.0f;
+        const float gap = 4.0f;
+
+        // LED on the left of the square (ToggleLAF puts it above)
+        const float cx = b.getX() + ledR + 1.0f;
+        const float cy = b.getCentreY();
+        juce::Rectangle<float> ledBounds(cx - ledR, cy - ledR, ledR * 2.0f, ledR * 2.0f);
+        juce::Rectangle<float> tickBounds(cx + ledR + gap, cy - btn * 0.5f, btn, btn);
+
+        drawTickBox(g, button, tickBounds, ledBounds,
+                    button.getToggleState(), button.isEnabled(),
+                    shouldDrawButtonAsHighlighted, shouldDrawButtonAsDown);
+    }
+
+    void drawTickBox(juce::Graphics& g, juce::Component& component,
+                     float x, float y, float w, float h,
+                     const bool ticked,
+                     [[maybe_unused]] const bool isEnabled,
+                     [[maybe_unused]] const bool shouldDrawButtonAsHighlighted,
+                     [[maybe_unused]] const bool shouldDrawButtonAsDown) override
+    {
+        // default path: vertical LED above button (ToggleLAF geometry)
+        juce::Rectangle<float> tickBounds;
+        juce::Rectangle<float> ledBounds;
+        if (h > w) {
+            tickBounds = juce::Rectangle<float>(x, y + h - w, w, w);
+            ledBounds = juce::Rectangle<float>(x, y, w, h - w);
+        } else {
+            tickBounds = juce::Rectangle<float>(x, y, h, h);
+            ledBounds = juce::Rectangle<float>(x + w, y, h, w - h);
+        }
+        ledBounds = ledBounds.withCentre({ ledBounds.getCentreX(), ledBounds.getY() });
+        drawTickBox(g, component, tickBounds, ledBounds, ticked, isEnabled,
+                    shouldDrawButtonAsHighlighted, shouldDrawButtonAsDown);
+    }
+
+private:
+    void drawTickBox(juce::Graphics& g, juce::Component& component,
+                     juce::Rectangle<float> tickBounds,
+                     juce::Rectangle<float> ledBounds,
+                     const bool ticked,
+                     [[maybe_unused]] const bool isEnabled,
+                     [[maybe_unused]] const bool shouldDrawButtonAsHighlighted,
+                     [[maybe_unused]] const bool shouldDrawButtonAsDown)
+    {
+        juce::Path tickShape;
+        juce::Path tickMask;
+
+        g.setColour(juce::Colours::darkgreen);
+        g.fillEllipse(ledBounds.withSizeKeepingCentre(8, 8));
+
+        if (!ticked)
+        {
+            tickShape.addRoundedRectangle(tickBounds, 4.0f, 2.0f);
+            tickMask.addRoundedRectangle(tickBounds, 4.0f, 2.0f);
+            tickMask.setUsingNonZeroWinding(false);
+            juce::DropShadow ds(juce::Colours::black, 3, { 2, 2 });
+            ds.drawForPath(g, tickMask);
+
+            g.setColour(juce::Colours::whitesmoke);
+            g.fillRoundedRectangle(tickBounds, 4.0f);
+            g.setColour(juce::Colours::black);
+            g.drawRoundedRectangle(tickBounds, 4.0f, 2.0f);
+        }
+        else
+        {
+            g.setColour(juce::Colours::lightgreen);
+            g.fillEllipse(ledBounds.withSizeKeepingCentre(6, 6));
+
+            g.setColour(juce::Colours::black);
+            g.fillRoundedRectangle(tickBounds, 4.0f);
+            g.setColour(juce::Colours::black);
+            g.drawRoundedRectangle(tickBounds, 4.0f, 2.0f);
+
+            juce::Rectangle<float> tickBoundsExpanded = tickBounds.expanded(3, 3);
+            tickShape.addRoundedRectangle(tickBoundsExpanded, 4.0f, 2.0f);
+            tickMask.addRoundedRectangle(tickBounds, 4.0f, 2.0f);
+            tickMask.setUsingNonZeroWinding(true);
+            g.reduceClipRegion(component.getLocalBounds());
+            juce::DropShadow ds(juce::Colours::whitesmoke.withAlpha(0.9f), 2, { 2, 2 });
+            ds.drawForPath(g, tickMask);
+        }
+
+        juce::ignoreUnused(shouldDrawButtonAsHighlighted, shouldDrawButtonAsDown);
+    }
+};
+
 ///////////////////////////////////////////////////////////////////////////////
 /// SIMPLER LOOK AND FEELS (tintable procedural knob UIs with discrete shadows)
 ///

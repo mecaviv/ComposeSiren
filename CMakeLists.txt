@@ -142,6 +142,18 @@ composesiren_option(COMPOSESIREN_RECORD
         "Record the audio output to FLAC or WAV (dialog, and MCP tools with COMPOSESIREN_MCP)"
         OFF)
 
+# DEAL WITH THE SETTINGS #######################################################
+# Power-user settings of the plugins. What they are (type, range, default,
+# description) comes from Source/ComposeSirenCore/lib/definitions/generated/
+# SettingsMetadata.h, committed, generated from mecaviv-dev-root's
+# resources/metadata/composesiren-settings.csv (`franz doctor fix meta`).
+# On: stored per user, edited in a Settings... window. Off: every setting
+# keeps its default. See Source/ComposeSirenCore/lib/settings.
+
+composesiren_option(COMPOSESIREN_SETTINGS
+        "Power-user settings from the settings metadata, stored per user, Settings... window"
+        ON)
+
 #set(PLUGIN_TARGETS OneSiren)
 set(PLUGIN_TARGETS OneSiren SirenOrchestra)
 #set(PLUGIN_TARGETS CustomMix)

@@ -91,6 +91,9 @@ private:
     std::string getParameter(const juce::String& id) const;
     std::string setParameter(const juce::String& id, double value) const;
     std::string sendMidi(int status, int data1, int data2) const;
+    std::string listSettings() const;
+    std::string getSetting(const juce::String& id) const;
+    std::string setSetting(const juce::String& id, const juce::var& value) const;
     juce::RangedAudioParameter* findParameter(const juce::String& id) const;
     static juce::var parameterObject(juce::RangedAudioParameter& parameter);
     static char* duplicate(const std::string& text);

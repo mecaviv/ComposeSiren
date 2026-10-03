@@ -12,7 +12,13 @@
 #ifndef COMPOSESIREN_PARK_BRIDGE
 #define COMPOSESIREN_PARK_BRIDGE 0
 #endif
+#ifndef COMPOSESIREN_SETTINGS
+#define COMPOSESIREN_SETTINGS 0
+#endif
 #include "../lib/utilities/recorder/RecordDialog.h"
+#if COMPOSESIREN_SETTINGS
+#include "../lib/settings/SettingsDialog.h"
+#endif
 
 class MainButtonsComponent : public juce::Component,
                              public juce::TextButton::Listener
@@ -52,40 +58,20 @@ public:
 #if !COMPOSESIREN_PARK_BRIDGE
         juce::ignoreUnused(hasStAll);
 #endif
-        selectResourcesButton.setColour(
-            juce::TextButton::buttonColourId,
-            juce::Colour{mecaviv::Colours::darkTransparentBackground}
-        );
-        selectResourcesButton.setColour(juce::TextButton::textColourOffId , juce::Colours::whitesmoke);
-        selectResourcesButton.setButtonText("Set resources directory");
-        selectResourcesButton.addListener(this);
-#if COMPOSESIREN_DEV_BUILD
-        addAndMakeVisible(selectResourcesButton);
-#endif
+        // Secondary actions live in one Menu so the 30px top bar stays readable
+        // when Settings, Record, About and Reset All are all present.
+        menuButton.setColour(juce::TextButton::buttonColourId, juce::Colour { 0xff37474f });
+        menuButton.setColour(juce::TextButton::textColourOffId, juce::Colours::whitesmoke);
+        menuButton.setButtonText("Menu");
+        menuButton.setTooltip("Settings, Record, resources directory, About");
+        menuButton.onClick = [this] { showMenu(); };
+        addAndMakeVisible(menuButton);
 
         resetButton.setColour(juce::TextButton::buttonColourId, juce::Colours::darkred);
         resetButton.setColour(juce::TextButton::textColourOffId , juce::Colours::whitesmoke);
         resetButton.setButtonText ("Reset");
         resetButton.addListener(this);
         addAndMakeVisible(resetButton);
-
-#if COMPOSESIREN_RECORD
-        if (listener.getRecorder() != nullptr) {
-            recordButton.setColour(juce::TextButton::buttonColourId, juce::Colour { 0xff37474f });
-            recordButton.setColour(juce::TextButton::textColourOffId, juce::Colours::whitesmoke);
-            recordButton.setButtonText("Record...");
-            recordButton.addListener(this);
-            addAndMakeVisible(recordButton);
-        }
-#endif
-
-        if (listener.hasAbout()) {
-            aboutButton.setColour(juce::TextButton::buttonColourId, juce::Colour { 0xff37474f });
-            aboutButton.setColour(juce::TextButton::textColourOffId, juce::Colours::whitesmoke);
-            aboutButton.setButtonText("About...");
-            aboutButton.addListener(this);
-            addAndMakeVisible(aboutButton);
-        }
 
         if (hasResetAllButton) {
             resetAllButton.setColour(juce::TextButton::buttonColourId, juce::Colours::darkred);
@@ -94,6 +80,9 @@ public:
             resetAllButton.addListener(this);
             addAndMakeVisible(resetAllButton);
         }
+
+        selectResourcesButton.setButtonText("Set resources directory");
+        selectResourcesButton.addListener(this);
 
 #if COMPOSESIREN_PARK_BRIDGE
         if (hasStAllSwitch) {
@@ -120,8 +109,7 @@ public:
 
     void paint(juce::Graphics& g) override
     {
-        // g.setColour(juce::Colour{0xff314159});
-        // g.fillRect(getLocalBounds().toFloat());
+        juce::ignoreUnused(g);
     }
 
     void resized() override
@@ -130,89 +118,32 @@ public:
         auto bounds = getLocalBounds().reduced(static_cast<int>(margin));
 
         juce::FlexBox fb;
-
         fb.flexDirection = juce::FlexBox::Direction::row;
         fb.flexWrap = juce::FlexBox::Wrap::noWrap;
-        // fb.alignItems = juce::FlexBox::AlignItems::center;
         fb.alignItems = juce::FlexBox::AlignItems::flexEnd;
-        fb.alignContent = juce::FlexBox::AlignContent::spaceBetween;
-
-        const float btnsHeight = static_cast<float>(bounds.getHeight());
-        juce::FlexItem item;
-
-        // Left button /////////////////////////////////////////////////////////
-        // fb.alignContent = juce::FlexBox::AlignContent::flexStart;
-        // fb.justifyContent = juce::FlexBox::JustifyContent::flexStart;
-        //
-        // item = juce::FlexItem(resetButton).withMinWidth(75)
-        //                                   .withMinHeight(menuHeight)
-        //                                   .withFlex(0,0);
-        // fb.items.add(item);
-        // fb.performLayout(bounds);
-        // fb.items.clear();
-
-        // Right button ////////////////////////////////////////////////////////
-        // fb.alignContent = juce::FlexBox::AlignContent::flexEnd;
-        // fb.justifyContent = juce::FlexBox::JustifyContent::flexEnd;
-        //
-        // item = juce::FlexItem(selectResourcesButton).withMinWidth(230)
-        //                                             .withMinHeight(menuHeight)
-        //                                             .withFlex(0,1);
-        // fb.items.add(item);
-        // fb.performLayout(bounds);
-
-        // All buttons right ///////////////////////////////////////////////////
         fb.alignContent = juce::FlexBox::AlignContent::flexEnd;
         fb.justifyContent = juce::FlexBox::JustifyContent::flexEnd;
 
-        item = juce::FlexItem(selectResourcesButton).withMinWidth(230)
-                                                    .withMinHeight(btnsHeight)
-                                                    .withFlex(0,1);
-        fb.items.add(item);
-#if COMPOSESIREN_RECORD
-        if (recordButton.isVisible()) {
-            item = juce::FlexItem(recordButton).withMinWidth(90)
-                                               .withMinHeight(btnsHeight)
-                                               .withFlex(0,0);
-            item.margin = juce::FlexItem::Margin(0.f, 0.f, 0.f, margin);
-            fb.items.add(item);
-        }
-#endif
-        if (aboutButton.isVisible()) {
-            item = juce::FlexItem(aboutButton).withMinWidth(90)
-                                              .withMinHeight(btnsHeight)
-                                              .withFlex(0,0);
-            item.margin = juce::FlexItem::Margin(0.f, 0.f, 0.f, margin);
-            fb.items.add(item);
-        }
-        item = juce::FlexItem(resetButton).withMinWidth(75)
-                                          .withMinHeight(btnsHeight)
-                                          .withFlex(0,0);
-        item.margin = juce::FlexItem::Margin(0.f, 0.f, 0.f, margin);
-        fb.items.add(item);
+        const float btnsHeight = static_cast<float>(bounds.getHeight());
 
-        if (hasResetAllButton) {
-            item = juce::FlexItem(resetAllButton).withMinWidth(150)
-                                                 .withMinHeight(btnsHeight)
-                                                 .withFlex(0,0);
+        auto add = [&](juce::Button& b, float minW) {
+            juce::FlexItem item = juce::FlexItem(b).withMinWidth(minW)
+                                                   .withMinHeight(btnsHeight)
+                                                   .withFlex(0, 0);
             item.margin = juce::FlexItem::Margin(0.f, 0.f, 0.f, margin);
             fb.items.add(item);
-        }
+        };
 
 #if COMPOSESIREN_PARK_BRIDGE
         if (hasStAllSwitch) {
-            item = juce::FlexItem(physicalButton).withMinWidth(150)
-                                                 .withMinHeight(btnsHeight)
-                                                 .withFlex(0,0);
-            item.margin = juce::FlexItem::Margin(0.f, 0.f, 0.f, margin);
-            fb.items.add(item);
-            item = juce::FlexItem(stAllButton).withMinWidth(55)
-                                              .withMinHeight(btnsHeight)
-                                              .withFlex(0,0);
-            item.margin = juce::FlexItem::Margin(0.f, 0.f, 0.f, margin);
-            fb.items.add(item);
+            add(physicalButton, 130.f);
+            add(stAllButton, 44.f);
         }
 #endif
+        if (hasResetAllButton)
+            add(resetAllButton, 88.f);
+        add(resetButton, 70.f);
+        add(menuButton, 64.f);
 
         fb.performLayout(bounds);
     }
@@ -232,17 +163,6 @@ public:
 
     void buttonClicked(juce::Button* btn) override
     {
-#if COMPOSESIREN_RECORD
-        if (btn == &recordButton) {
-            if (auto* recorder = listener.getRecorder())
-                RecordDialog::show(*recorder, getTopLevelComponent());
-            return;
-        }
-#endif
-        if (btn == &aboutButton) {
-            listener.showAbout(getTopLevelComponent());
-            return;
-        }
         if (btn == &resetButton) {
             listener.resetSiren(currentSirenId);
             return;
@@ -279,7 +199,6 @@ public:
                 | juce::FileBrowserComponent::canSelectDirectories;
 
             fileChooser->launchAsync(flags,[this](const juce::FileChooser& chooser) {
-                // get the result to update resourcesPath
                 juce::File newResourcesPath = chooser.getResult();
                 listener.selectedNewResourcesPath(
                     juce::File::addTrailingSeparator(
@@ -288,6 +207,27 @@ public:
                 );
             });
         }
+    }
+
+    void showMenu()
+    {
+        juce::PopupMenu menu;
+#if COMPOSESIREN_SETTINGS
+        menu.addItem("Settings...", [this] { cs::SettingsDialog::show(getTopLevelComponent()); });
+#endif
+#if COMPOSESIREN_RECORD
+        if (listener.getRecorder() != nullptr)
+            menu.addItem("Record...", [this] {
+                if (auto* recorder = listener.getRecorder())
+                    RecordDialog::show(*recorder, getTopLevelComponent());
+            });
+#endif
+#if COMPOSESIREN_DEV_BUILD
+        menu.addItem("Set resources directory...", [this] { buttonClicked(&selectResourcesButton); });
+#endif
+        if (listener.hasAbout())
+            menu.addItem("About...", [this] { listener.showAbout(getTopLevelComponent()); });
+        menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&menuButton));
     }
 
 private:
@@ -299,14 +239,8 @@ private:
     bool hasStAllSwitch{false};
 #endif
 
+    juce::TextButton menuButton;
     juce::TextButton resetButton;
-
-    #if COMPOSESIREN_RECORD
-
-    juce::TextButton recordButton;
-
-    #endif
-    juce::TextButton aboutButton;
     juce::TextButton resetAllButton;
     juce::TextButton selectResourcesButton;
 #if COMPOSESIREN_PARK_BRIDGE

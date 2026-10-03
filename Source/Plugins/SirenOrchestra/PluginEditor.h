@@ -11,6 +11,9 @@
 #include <Components/DbRangesMidiKeyboardComponent.h>
 #include <Components/ReverbStripComponent.h>
 #include <Components/MasterVolumeComponent.h>
+#if COMPOSESIREN_CLIC
+#include <Components/ClicPane.h>
+#endif
 #include "PluginProcessor.h"
 
 constexpr std::array<sirenId, 7> sirenOrder = { S7, S6, S5, S2, S1, S4, S3 };
@@ -174,6 +177,9 @@ private:
     std::map<sirenId, std::unique_ptr<StLedComponent>> stLeds;
 #endif
     ReverbStripComponent rvbStrip;
+#if COMPOSESIREN_CLIC
+    ClicPane clicPane;
+#endif
     MasterVolumeComponent masterVolume;
     DbRangesMidiKeyboardComponent midiKeyboard;
 

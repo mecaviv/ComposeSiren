@@ -10,13 +10,33 @@ ReverbStripComponent::ReverbStripComponent(
 ) :
     apvts(vts)
 {
-
     const float gap = 0;//controlStripLayout::spacerSize;
 
+#if COMPOSESIREN_CLIC
+    addAndMakeVisible(titleSwitch);
+    addAndMakeVisible(titleLabel);
+    titleLabel.setText("Reverb");
+    // header enable: ToggleLAF button with LED on the left
+    titleSwitch.setButtonText({});
+    titleSwitch.setClickingTogglesState(true);
+    titleSwitch.setLookAndFeel(&headerSwitchLAF);
+    titleSwitch.onClick = [this, &vts, paramGroupId] {
+        const bool on = titleSwitch.getToggleState();
+        if (auto* p = vts.getParameter(
+                ParameterIdGet::toJuceParameterId(paramGroupId, ParameterId::ReverbEnable))) {
+            p->beginChangeGesture();
+            p->setValueNotifyingHost(p->convertTo0to1(on ? 1.0f : 0.0f));
+            p->endChangeGesture();
+        }
+    };
+#else
+    // master layout
+    addAndMakeVisible(titleLabel);
     enableGroup.setTitleText("Enable");
     enableGroup.setGap(gap);
     enableGroup.setWrap(false);
     addAndMakeVisible(enableGroup);
+#endif
 
     // Groups + spacers
     reverbGroup.setTitleText("Reverb");
@@ -29,101 +49,60 @@ ReverbStripComponent::ReverbStripComponent(
     filterGroup.setWrap(false);
     addAndMakeVisible(filterGroup);
 
-    // addAndMakeVisible(spacer1);
     addAndMakeVisible(spacer2);
     addAndMakeVisible(spacer3);
-    // addAndMakeVisible(spacer4);
 
-    juce::Colour c1 = juce::Colours::whitesmoke;//juce::Colours::lightgoldenrodyellow;
-    juce::Colour c2 = juce::Colours::whitesmoke;
-    juce::Colour c3 = c1;
+    juce::Colour c1 = juce::Colours::whitesmoke;
 
     auto setSliderFillColour = [&](SliderCell& sc, juce::Colour c) {
         sc.getSlider().setColour(juce::Slider::ColourIds::rotarySliderFillColourId, c);
     };
 
-    // --- reverb enable switch (horizontal) -----------------------------------
-
+#if !COMPOSESIREN_CLIC
+    // --- reverb enable switch (master: dedicated cell) -----------------------
     enable.setNameText("Enable Reverb");
     enable.setToggleAttachment(vts,
                                ParameterId::ReverbEnable,
                                paramGroupId);
-    juce::ToggleButton& es = enable.getToggle();
-    // es.addListener(this);
-    // setSliderFillColour(enable, c1);
     enableGroup.addAndMakeVisible(enable);
+#endif
 
     // --- reverb group knobs (horizontal) -------------------------------------
-
     dryWet.setNameText("DryWet");
-    dryWet.setSliderAttachment(vts,
-                               ParameterId::ReverbDryWet,
-                               paramGroupId);
-    // dryWet.setRange(0.0, 1.0, 0.01);
-    juce::Slider& dws = dryWet.getSlider();
-    // dws.addListener(this);
+    dryWet.setSliderAttachment(vts, ParameterId::ReverbDryWet, paramGroupId);
     setSliderFillColour(dryWet, c1);
     reverbGroup.addAndMakeVisible(dryWet);
 
     damping.setNameText("Damp");
-    damping.setSliderAttachment(vts,
-                                ParameterId::ReverbDamping,
-                                paramGroupId);
-    // damping.setRange(0.0, 1.0, 0.01);
-    juce::Slider& ds = damping.getSlider();
-    // ds.addListener(this);
+    damping.setSliderAttachment(vts, ParameterId::ReverbDamping, paramGroupId);
     setSliderFillColour(damping, c1);
     reverbGroup.addAndMakeVisible(damping);
 
     roomSize.setNameText("Size");
-    roomSize.setSliderAttachment(vts,
-                                 ParameterId::ReverbRoomSize,
-                                 paramGroupId);
-    // roomSize.setRange(0.0, 1.0, 0.01);
-    juce::Slider& rss = roomSize.getSlider();
-    // rss.addListener(this);
+    roomSize.setSliderAttachment(vts, ParameterId::ReverbRoomSize, paramGroupId);
     setSliderFillColour(roomSize, c1);
     reverbGroup.addAndMakeVisible(roomSize);
 
     width.setNameText("Width");
-    width.setSliderAttachment(vts,
-                              ParameterId::ReverbWidth,
-                              paramGroupId);
-    // width.setRange(0.0, 1.0, 0.01);
-    juce::Slider& ws = width.getSlider();
-    // ws.addListener(this);
+    width.setSliderAttachment(vts, ParameterId::ReverbWidth, paramGroupId);
     setSliderFillColour(width, c1);
     reverbGroup.addAndMakeVisible(width);
 
-    // --- reverb group knobs (horizontal) -------------------------------------
-
+    // --- filter group knobs --------------------------------------------------
     lowCut.setNameText("LowCut");
-    lowCut.setSliderAttachment(vts,
-                               ParameterId::ReverbLowCut,
-                               paramGroupId);
-    // lowCut.setRange(0.0, 1.0, 0.01);
-    juce::Slider& lcs = lowCut.getSlider();
-    // lcs.addListener(this);
+    lowCut.setSliderAttachment(vts, ParameterId::ReverbLowCut, paramGroupId);
     setSliderFillColour(lowCut, c1);
     filterGroup.addAndMakeVisible(lowCut);
 
     highCut.setNameText("HighCut");
-    highCut.setSliderAttachment(vts,
-                                ParameterId::ReverbHighCut,
-                                paramGroupId);
-    // highCut.setRange(0.0, 1.0, 0.01);
-    juce::Slider& hcs = highCut.getSlider();
-    // hcs.addListener(this);
+    highCut.setSliderAttachment(vts, ParameterId::ReverbHighCut, paramGroupId);
     setSliderFillColour(highCut, c1);
     filterGroup.addAndMakeVisible(highCut);
 }
 
-// ReverbStripComponent::~ReverbStripComponent() {}
-
 void ReverbStripComponent::paint(juce::Graphics& g)
 {
     auto area = getLocalBounds().toFloat();
-
     g.setColour(backgroundStripColour);
     g.fillRoundedRectangle(area, controlStripLayout::cornerSize);
 }
@@ -132,38 +111,56 @@ void ReverbStripComponent::resized()
 {
     auto area = getLocalBounds().reduced(controlStripLayout::spacerSize);
 
+#if COMPOSESIREN_CLIC
+    if (showTitle) {
+        auto header = area.removeFromTop(20);
+        titleSwitch.setBounds(header.removeFromLeft(44));
+        titleLabel.setBounds(header);
+    }
+#endif
+
     const int area_height = area.getHeight();
 
     juce::FlexBox root;
     root.flexDirection = juce::FlexBox::Direction::row;
     root.flexWrap = juce::FlexBox::Wrap::noWrap;
-    // root.justifyContent = juce::FlexBox::JustifyContent::spaceAround;
-    // root.justifyContent = juce::FlexBox::JustifyContent::flexEnd;
     root.justifyContent = juce::FlexBox::JustifyContent::center;
     root.alignItems = juce::FlexBox::AlignItems::center;
 
     const float gap = controlStripLayout::spacerSize;
 
-    // NB : withMinWidth is 52 for 1, 103 for 2, 154 for 3 etc
-    // root.items.add(juce::FlexItem(spacer1).withFlex(0,0).withWidth(gap).withHeight((float) area_height));
-    root.items.add(juce::FlexItem(enableGroup).withFlex(1/7.f,0)
-                                              .withWidth(enableGroup.getMinWidth())
-                                              .withHeight((float) area_height));
-    root.items.add(juce::FlexItem(spacer2).withFlex(0,0).withWidth(gap).withHeight((float) area_height));
-    root.items.add(juce::FlexItem(reverbGroup).withFlex(4/7.f,0)
+#if COMPOSESIREN_CLIC
+    // no Enable cell — 6 knobs take the width
+    root.items.add(juce::FlexItem(reverbGroup).withFlex(4/6.f, 0)
                                               .withMinWidth(reverbGroup.getMinWidth())
                                               .withHeight((float) area_height));
-    root.items.add(juce::FlexItem(spacer3).withFlex(0,0).withWidth(gap).withHeight((float) area_height));
-    root.items.add(juce::FlexItem(filterGroup).withFlex(2/7.f,0)
+    root.items.add(juce::FlexItem(spacer3).withFlex(0, 0).withWidth(gap).withHeight((float) area_height));
+    root.items.add(juce::FlexItem(filterGroup).withFlex(2/6.f, 0)
                                               .withMinWidth(filterGroup.getMinWidth())
                                               .withHeight((float) area_height));
-    // root.items.add(juce::FlexItem(spacer4).withFlex(0,0).withWidth(gap).withHeight((float) area_height));
 
     root.performLayout(area.toFloat());
+    reverbGroup.resized();
+    filterGroup.resized();
+#else
+    // master layout: Enable | Reverb (4) | Filter (2)
+    root.items.add(juce::FlexItem(enableGroup).withFlex(1/7.f, 0)
+                                              .withWidth(enableGroup.getMinWidth())
+                                              .withHeight((float) area_height));
+    root.items.add(juce::FlexItem(spacer2).withFlex(0, 0).withWidth(gap).withHeight((float) area_height));
+    root.items.add(juce::FlexItem(reverbGroup).withFlex(4/7.f, 0)
+                                              .withMinWidth(reverbGroup.getMinWidth())
+                                              .withHeight((float) area_height));
+    root.items.add(juce::FlexItem(spacer3).withFlex(0, 0).withWidth(gap).withHeight((float) area_height));
+    root.items.add(juce::FlexItem(filterGroup).withFlex(2/7.f, 0)
+                                              .withMinWidth(filterGroup.getMinWidth())
+                                              .withHeight((float) area_height));
 
+    root.performLayout(area.toFloat());
     enableGroup.resized();
     reverbGroup.resized();
     filterGroup.resized();
+#endif
 }
 
 void ReverbStripComponent::setShowTitle(bool s)
@@ -174,23 +171,25 @@ void ReverbStripComponent::setShowTitle(bool s)
 
 void ReverbStripComponent::setShowGroupLabels(bool s)
 {
+#if !COMPOSESIREN_CLIC
     enableGroup.setShowLabel(s);
+#endif
     reverbGroup.setShowLabel(s);
     filterGroup.setShowLabel(s);
-
     resized();
 }
 
 void ReverbStripComponent::setShowKnobLabels(bool s)
 {
+#if !COMPOSESIREN_CLIC
     enable.setShowLabel(s);
+#endif
     dryWet.setShowLabel(s);
     damping.setShowLabel(s);
     roomSize.setShowLabel(s);
     width.setShowLabel(s);
     lowCut.setShowLabel(s);
     highCut.setShowLabel(s);
-
     resized();
 }
 
@@ -207,7 +206,9 @@ void ReverbStripComponent::setShowTextBox(bool s)
 
 void ReverbStripComponent::setBackgroundColour(juce::Colour c)
 {
+#if !COMPOSESIREN_CLIC
     enableGroup.setBackgroundColour(c);
+#endif
     reverbGroup.setBackgroundColour(c);
     filterGroup.setBackgroundColour(c);
     repaint();
@@ -215,7 +216,9 @@ void ReverbStripComponent::setBackgroundColour(juce::Colour c)
 
 void ReverbStripComponent::setCellBackgroundColour(juce::Colour c)
 {
+#if !COMPOSESIREN_CLIC
     enableGroup.setCellBackgroundColour(c);
+#endif
     reverbGroup.setCellBackgroundColour(c);
     filterGroup.setCellBackgroundColour(c);
     repaint();

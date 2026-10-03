@@ -48,6 +48,11 @@ public:
         slider.setLookAndFeel(laf);
     }
 
+    /// Whimsote fill used by Reverb / siren knobs (KnobLAF).
+    void setSliderFillWhite() {
+        slider.setColour(juce::Slider::rotarySliderFillColourId, juce::Colours::whitesmoke);
+    }
+
     void setSliderAttachment(juce::AudioProcessorValueTreeState& vts,
                              ParameterId paramId, const std::string& groupId) {
         attachment = std::make_unique<juceSliderAttachment>(
