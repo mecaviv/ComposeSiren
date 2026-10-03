@@ -85,6 +85,31 @@ pub struct SetMidiOutput {
     pub identifier: String,
 }
 
+/// `set_song_title`: show this song in the UI (title bar) until
+/// `clear_song_title`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct SetSongTitle {
+    /// The song's title, usually its file name.
+    pub title: String,
+    /// How long the song is, in seconds, when known: the UI draws a progress
+    /// bar. Omit when it is not known yet (no bar).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub duration_seconds: Option<f64>,
+}
+
+/// `set_song_progress`: how far the song is. The title is already set with
+/// `set_song_title`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct SetSongProgress {
+    /// How many seconds of the song have played.
+    pub position_seconds: f64,
+    /// How long the song is, in seconds, when it has become known.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub duration_seconds: Option<f64>,
+}
+
 /// `start_recording`.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
