@@ -10,18 +10,18 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_gui_basics/juce_gui_basics.h>
 
+#ifndef COMPOSESIREN_CLIC
+#define COMPOSESIREN_CLIC 0
+#endif
+
+#if COMPOSESIREN_CLIC
+
 #include "EngravedTitle.h"
 #include "LookAndFeels.h"
 #include "SliderCell.h"
 #include "ToggleCell.h"
 #include "../lib/definitions/parameterDefinitions.h"
 #include "../lib/definitions/palette.h"
-
-#ifndef COMPOSESIREN_CLIC
-#define COMPOSESIREN_CLIC 0
-#endif
-
-#if COMPOSESIREN_CLIC
 
 class ClicPane : public juce::Component
 {

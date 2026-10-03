@@ -10,14 +10,15 @@
 #include "GuiCellGroup.h"
 #include "SliderCell.h"
 #include "ToggleCell.h"
-#include "EngravedTitle.h"
-#include "LookAndFeels.h"
-#include "../apvtsUtilities.h"
-#include "../lib/definitions/parameterDefinitions.h"
-
 #ifndef COMPOSESIREN_CLIC
 #define COMPOSESIREN_CLIC 0
 #endif
+#if COMPOSESIREN_CLIC
+#include "EngravedTitle.h"
+#endif
+#include "LookAndFeels.h"
+#include "../apvtsUtilities.h"
+#include "../lib/definitions/parameterDefinitions.h"
 
 class ReverbStripComponent : public juce::Component
 {

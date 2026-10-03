@@ -10,6 +10,10 @@
 #include "../lib/definitions/palette.h"
 #include "BinaryData.h"
 
+#ifndef COMPOSESIREN_CLIC
+#define COMPOSESIREN_CLIC 0
+#endif
+
 // LAYOUT VARS /////////////////////////////////////////////////////////////////
 
 namespace controlStripLayout
@@ -451,6 +455,7 @@ public:
     }
 };
 
+#if COMPOSESIREN_CLIC
 /// Header master switch: same button as ToggleLAF (Enable Reverb), with the
 /// green LED on the **left** of the square instead of above it. `() [ ]`.
 class HeaderSwitchLAF : public juce::LookAndFeel_V4
@@ -550,6 +555,7 @@ private:
         juce::ignoreUnused(shouldDrawButtonAsHighlighted, shouldDrawButtonAsDown);
     }
 };
+#endif // COMPOSESIREN_CLIC
 
 ///////////////////////////////////////////////////////////////////////////////
 /// SIMPLER LOOK AND FEELS (tintable procedural knob UIs with discrete shadows)
