@@ -9,6 +9,10 @@
 // #include <cstdint> // instead ?
 #include "sirenProperties.h"
 
+#ifndef COMPOSESIREN_CLIC
+#define COMPOSESIREN_CLIC 0
+#endif
+
 #if DEBUG
 #endif
 template<typename TBound> struct ParameterBounds {
@@ -47,6 +51,7 @@ enum class ParameterClass {
     , ReverbControl
     , TrackControl
     , MasterControl
+    , ClicControl
     // , MatrixControl
 };
 
@@ -88,6 +93,12 @@ enum class ParameterId {
     , TrackOutputGain
     // Mixer parameters ////////////////////////////////////
     , MasterVolume
+    // Clic (COMPOSESIREN_CLIC) ///////////////////////////
+    , ClicEnable
+    , ClicVolume
+    , ClicSpread
+    , ClicBias
+    , ClicDecay
     // Matrix parameters ///////////////////////////////////
     // , MatrixNoteIn
 };
@@ -272,6 +283,11 @@ inline const std::map<ParameterId, const char*> englishLabels =
     {ParameterId::TrackPanning         , "Track Panning"        },
     {ParameterId::TrackOutputGain      , "Track Output Gain"    },
     {ParameterId::MasterVolume         , "Master Volume"        },
+    {ParameterId::ClicEnable           , "Enable Clic"          },
+    {ParameterId::ClicVolume           , "Clic Volume"          },
+    {ParameterId::ClicSpread           , "Clic Spread"          },
+    {ParameterId::ClicBias             , "Clic Bias"            },
+    {ParameterId::ClicDecay            , "Clic Decay"           },
 
     // {ParameterId::MatrixNoteIn         , "Matrix Note In"       }
   };
@@ -313,6 +329,11 @@ inline const std::map<ParameterId, const char*> englishUnits =
     {ParameterId::TrackOutputGain      , "dB"        },
 
     {ParameterId::MasterVolume         , "dB"        },
+    {ParameterId::ClicEnable           , ""          },
+    {ParameterId::ClicVolume           , ""          },
+    {ParameterId::ClicSpread           , ""          },
+    {ParameterId::ClicBias             , ""          },
+    {ParameterId::ClicDecay            , ""          },
 
     // {ParameterId::MatrixNoteIn         , ""          }
   };
@@ -353,6 +374,16 @@ inline const std::vector<paramData> parameterDefinitions = {
   mkCCParam     (ParameterId::TrackOutputGain    ,   0.0f,  1.0f,   0.00f,   1.0f,   70        ),
 
   mkCCParam     (ParameterId::MasterVolume       ,   0.0f,  1.0f,   0.00f,   1.0f,   7         ),
+#if COMPOSESIREN_CLIC
+  // Host/automation layout rows only — enum + code names stay always-on
+  // so ofCodeName / tooling stay stable across builds.
+  mkCCParam     (ParameterId::ClicEnable         ,   0.0f,  1.0f,   1.00f,   1.0f,   0         ),
+  mkCCParam     (ParameterId::ClicVolume         ,   0.0f,  1.0f,   0.00f,   1.0f,   0         ),
+  mkCCParam     (ParameterId::ClicSpread         ,  -1.0f,  1.0f,   0.00f,   0.0f,   0         ),
+  mkCCParam     (ParameterId::ClicBias           ,  -1.0f,  1.0f,   0.00f,   0.0f,   0         ),
+  // 0: very fast fade (just audible), 1: the full click sample
+  mkCCParam     (ParameterId::ClicDecay          ,   0.0f,  1.0f,   0.00f,   1.0f,   0         ),
+#endif // COMPOSESIREN_CLIC
 
   // mkCCParam     (ParameterId::MatrixNoteIn       ,   0.0f, 127.0f,  1.00f,   0.0f,   10        ),
 };
@@ -398,7 +429,12 @@ inline const std::vector<parameterIdAndCodeName> parameterIdAndCodeNames = {
     { ParameterId::TrackPanning,            "TrackPanning" },
     { ParameterId::TrackOutputGain,         "TrackOutputGain" },
 
-    { ParameterId::MasterVolume,            "MasterVolume" }
+    { ParameterId::MasterVolume,            "MasterVolume" },
+    { ParameterId::ClicEnable,              "ClicEnable" },
+    { ParameterId::ClicVolume,              "ClicVolume" },
+    { ParameterId::ClicSpread,              "ClicSpread" },
+    { ParameterId::ClicBias,                "ClicBias" },
+    { ParameterId::ClicDecay,               "ClicDecay" }
 
     // { ParameterId::MatrixNoteIn,            "MatrixNoteIn" }
     // { ParameterId::Undefined,               "" } // Undefined must not be defined :-]

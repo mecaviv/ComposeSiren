@@ -82,6 +82,18 @@ else()
   target_compile_definitions(ComposeSirenCore PUBLIC COMPOSESIREN_RECORD=0)
 endif()
 
+# Settings metadata (committed) + power-user Settings / Settings.... The clic
+# secondary output device is one of the settings, so CLIC needs Settings too.
+if(COMPOSESIREN_SETTINGS OR COMPOSESIREN_CLIC)
+  target_sources(ComposeSirenCore PRIVATE lib/settings/Settings.cpp)
+endif()
+if(COMPOSESIREN_SETTINGS)
+  target_compile_definitions(ComposeSirenCore PUBLIC COMPOSESIREN_SETTINGS=1)
+  target_sources(ComposeSirenCore PRIVATE lib/settings/SettingsDialog.cpp)
+else()
+  target_compile_definitions(ComposeSirenCore PUBLIC COMPOSESIREN_SETTINGS=0)
+endif()
+
 target_link_libraries(ComposeSirenCore
   PRIVATE
     # copied from projucer project

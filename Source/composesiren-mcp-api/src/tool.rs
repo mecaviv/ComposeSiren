@@ -20,6 +20,12 @@ pub const LIST_MIDI_DEVICES: &str = "list_midi_devices";
 pub const SET_MIDI_INPUT: &str = "set_midi_input";
 /// `set_midi_output`.
 pub const SET_MIDI_OUTPUT: &str = "set_midi_output";
+/// `list_settings`.
+pub const LIST_SETTINGS: &str = "list_settings";
+/// `get_setting`.
+pub const GET_SETTING: &str = "get_setting";
+/// `set_setting`.
+pub const SET_SETTING: &str = "set_setting";
 /// `reset_controllers`: not declared by the server in this repository (yet).
 /// `tap-viewer midi --reset` asks for it and goes on without it.
 pub const RESET_CONTROLLERS: &str = "reset_controllers";
@@ -42,6 +48,9 @@ pub const ALWAYS: &[&str] = &[
     LIST_MIDI_DEVICES,
     SET_MIDI_INPUT,
     SET_MIDI_OUTPUT,
+    LIST_SETTINGS,
+    GET_SETTING,
+    SET_SETTING,
 ];
 
 /// Only a build with the recorder has these.

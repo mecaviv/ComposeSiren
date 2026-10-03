@@ -28,8 +28,15 @@
 #endif
 #if COMPOSESIREN_CLIC
 #include <clic_composesiren.hpp>
+#include <lib/utilities/clic/ClicSecondaryOutput.h>
 #include <cstdint>
 #include <vector>
+#endif
+#ifndef COMPOSESIREN_SETTINGS
+#define COMPOSESIREN_SETTINGS 0
+#endif
+#if COMPOSESIREN_SETTINGS
+#include <lib/settings/Settings.h>
 #endif
 #include <juce_gui_basics/juce_gui_basics.h>
 
@@ -37,6 +44,9 @@ class SirenOrchestraPluginProcessor :
     public juce::AudioProcessor,
     public MainButtonsComponent::Listener,
     public juce::Timer
+#if COMPOSESIREN_SETTINGS
+    , private cs::Settings::Listener
+#endif
 {
 public:
     SirenOrchestraPluginProcessor();
@@ -151,6 +161,15 @@ private:
 #if COMPOSESIREN_CLIC
     // the click box's engine, on the second output bus ("Clic")
     clic::Engine clicEngine { 44100.0 };
+    // when set, the click plays on this device alone instead of the Clic bus
+    ClicSecondaryOutput clicSecondary;
+    std::atomic<float>* clicEnableParam = nullptr;
+    std::atomic<float>* clicVolumeParam = nullptr;
+    std::atomic<float>* clicSpreadParam = nullptr;
+    std::atomic<float>* clicBiasParam = nullptr;
+    std::atomic<float>* clicDecayParam = nullptr;
+    // non-interleaved L/R scratch when the click goes only to clicSecondary
+    std::vector<float> clicScratch;
 #endif
 
     // the About window is not owned by the editor: it can outlive it
@@ -169,6 +188,11 @@ private:
     std::vector<ClicEvent> clicEvents;
     void collectClicMidi(const juce::MidiBuffer& midi);
     void renderClic(juce::AudioBuffer<float>& audio);
+    void applyClicOutputSetting();
+#endif
+#if COMPOSESIREN_SETTINGS
+    void settingChanged(cs::Settings::Id id) override;
+    juce::SharedResourcePointer<cs::Settings> settings;
 #endif
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SirenOrchestraPluginProcessor)

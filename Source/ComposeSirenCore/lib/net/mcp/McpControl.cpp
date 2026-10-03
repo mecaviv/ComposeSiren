@@ -3,6 +3,11 @@
 #include "McpDeviceHooks.h"
 
 #include <cstring>
+#include <optional>
+
+#if COMPOSESIREN_SETTINGS || COMPOSESIREN_CLIC
+#include "lib/settings/Settings.h"
+#endif
 
 namespace {
 
@@ -187,6 +192,16 @@ std::string McpControl::handle(const juce::var& request) const
                         static_cast<int>(request.getProperty("data1", 0)),
                         static_cast<int>(request.getProperty("data2", 0)));
 
+#if COMPOSESIREN_SETTINGS || COMPOSESIREN_CLIC
+    if (op == "list_settings")
+        return listSettings();
+    if (op == "get_setting")
+        return getSetting(request.getProperty("id", {}).toString());
+    if (op == "set_setting")
+        return setSetting(request.getProperty("id", {}).toString(),
+                          request.getProperty("value", {}));
+#endif
+
 #if COMPOSESIREN_RECORD
     if (op == "start_recording" || op == "stop_recording" || op == "recording_status")
         return recording(op, request);
@@ -276,6 +291,87 @@ std::string McpControl::setParameter(const juce::String& id, double value) const
     object.getDynamicObject()->setProperty("ok", true);
     return jsonOf(object).toStdString();
 }
+
+#if COMPOSESIREN_SETTINGS || COMPOSESIREN_CLIC
+namespace {
+
+std::optional<cs::Settings::Id> settingIdFromString(const juce::String& name)
+{
+    for (std::size_t i = 0; i < mecaviv::metadata::settingCount; ++i) {
+        const auto id = cs::Settings::idAt(i);
+        const auto& d = cs::Settings::describe(id);
+        if (name == juce::String(d.id.data(), d.id.size()))
+            return id;
+    }
+    return std::nullopt;
+}
+
+juce::var settingObject(cs::Settings& settings, cs::Settings::Id id)
+{
+    const auto& d = cs::Settings::describe(id);
+    auto* object = new juce::DynamicObject();
+    object->setProperty("id", juce::String(d.id.data(), d.id.size()));
+    object->setProperty("group", juce::String(d.group.data(), d.group.size()));
+    object->setProperty("name", juce::String(d.label.data(), d.label.size()));
+    object->setProperty("type", juce::String(
+        d.type == mecaviv::metadata::SettingType::String ? "string"
+        : d.type == mecaviv::metadata::SettingType::Bool ? "bool"
+        : d.type == mecaviv::metadata::SettingType::Int ? "int"
+        : d.type == mecaviv::metadata::SettingType::Choice ? "choice"
+                                                          : "float"));
+    object->setProperty("available", cs::Settings::isAvailable(id));
+    if (d.type == mecaviv::metadata::SettingType::String)
+        object->setProperty("value", settings.getString(id));
+    else
+        object->setProperty("value", settings.get(id));
+    return juce::var(object);
+}
+
+} // namespace
+
+std::string McpControl::listSettings() const
+{
+    juce::SharedResourcePointer<cs::Settings> settings;
+    juce::Array<juce::var> rows;
+    for (std::size_t i = 0; i < mecaviv::metadata::settingCount; ++i)
+        rows.add(settingObject(*settings, cs::Settings::idAt(i)));
+    auto* object = new juce::DynamicObject();
+    object->setProperty("ok", true);
+    object->setProperty("settings", rows);
+    return jsonOf(juce::var(object)).toStdString();
+}
+
+std::string McpControl::getSetting(const juce::String& id) const
+{
+    const auto parsed = settingIdFromString(id);
+    if (!parsed)
+        return jsonOf(failure("no setting named " + id)).toStdString();
+    juce::SharedResourcePointer<cs::Settings> settings;
+    auto object = settingObject(*settings, *parsed);
+    object.getDynamicObject()->setProperty("ok", true);
+    return jsonOf(object).toStdString();
+}
+
+std::string McpControl::setSetting(const juce::String& id, const juce::var& value) const
+{
+    const auto parsed = settingIdFromString(id);
+    if (!parsed)
+        return jsonOf(failure("no setting named " + id)).toStdString();
+    if (!cs::Settings::isAvailable(*parsed))
+        return jsonOf(failure("setting " + id + " is not in this build")).toStdString();
+
+    juce::SharedResourcePointer<cs::Settings> settings;
+    const auto& d = cs::Settings::describe(*parsed);
+    if (d.type == mecaviv::metadata::SettingType::String)
+        settings->setString(*parsed, value.toString());
+    else
+        settings->set(*parsed, static_cast<double>(value));
+
+    auto object = settingObject(*settings, *parsed);
+    object.getDynamicObject()->setProperty("ok", true);
+    return jsonOf(object).toStdString();
+}
+#endif
 
 std::string McpControl::sendMidi(int status, int data1, int data2) const
 {

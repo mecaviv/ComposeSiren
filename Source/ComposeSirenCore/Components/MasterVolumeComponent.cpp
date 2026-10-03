@@ -47,25 +47,7 @@ void MasterVolumeComponent::paint(juce::Graphics& g)
 void MasterVolumeComponent::resized()
 {
     auto area = getLocalBounds().reduced(controlStripLayout::spacerSize);
-    const int area_height = area.getHeight();
-
-    // Parent FlexBox: [ vibGroup ] [ spacer ] [ tremGroup ] [ spacer ] [ envGroup ]
-    juce::FlexBox root;
-    root.flexDirection = juce::FlexBox::Direction::row;
-    root.flexWrap = juce::FlexBox::Wrap::noWrap;
-    root.justifyContent = juce::FlexBox::JustifyContent::flexEnd;
-    // root.justifyContent = juce::FlexBox::JustifyContent::center;
-    root.alignItems = juce::FlexBox::AlignItems::center;
-
-    const float gap = controlStripLayout::spacerSize;
-
-    // root.items.add(juce::FlexItem(spacer0).withFlex(0,0).withWidth(gap).withHeight((float) area_height));
-    root.items.add(juce::FlexItem(masterGroup).withFlex(1,0)
-                                              .withMinWidth(masterGroup.getMinWidth())
-                                              .withHeight((float) area_height));
-    // root.items.add(juce::FlexItem(spacer1).withFlex(0,0).withWidth(gap).withHeight((float) area_height));
-
-    root.performLayout(area.toFloat());
+    masterGroup.setBounds(area);
     masterGroup.resized();
 }
 

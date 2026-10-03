@@ -37,6 +37,9 @@ SirenOrchestraPluginEditor::SirenOrchestraPluginEditor(SirenOrchestraPluginProce
         )
     ),
     rvbStrip(p.getAudioProcessorValueTreeState(), "R"),
+#if COMPOSESIREN_CLIC
+    clicPane(p.getAudioProcessorValueTreeState()),
+#endif
     masterVolume(p.getAudioProcessorValueTreeState(), "M"),
     midiKeyboard(p.getMidiKeyboardState(),
                  p.getVoiceManagerState(),
@@ -59,6 +62,9 @@ SirenOrchestraPluginEditor::SirenOrchestraPluginEditor(SirenOrchestraPluginProce
 #endif
 
     addAndMakeVisible(rvbStrip);
+#if COMPOSESIREN_CLIC
+    addAndMakeVisible(clicPane);
+#endif
     addAndMakeVisible(masterVolume);
 
     audioProcessor.getVoiceManagerState().addListener(VoiceManagerState::Listener::Key::midiInput, this);
@@ -157,35 +163,61 @@ void SirenOrchestraPluginEditor::resized()
     rvbStrip.setShowGroupLabels(false);
     rvbStrip.setShowKnobLabels(true);
     rvbStrip.setShowTextBox(true);
-    rvbStrip.setBounds(
-        spacer,
-        reverbY,
-        sirenControlsWidth - 2 * spacer,
-        reverbH
-    );
-    rvbStrip.setBackgroundColour(juce::Colour{0x22ffffff});
-    rvbStrip.setCellBackgroundColour(juce::Colours::transparentBlack);
-    rvbStrip.setBackgroundStripColour(bottomColour);
 
     constexpr int keyboardH = 70;
-
-    masterVolume.setTitle("Master Volume");
-    masterVolume.setShowTitle(true);
-    masterVolume.setShowGroupLabels(false);
-    masterVolume.setShowKnobLabels(true);
-    masterVolume.setShowTextBox(true);
+#if COMPOSESIREN_CLIC
+    // Single Clic pane between reverb/keyboard and Master (validated mockup:
+    // clicBorrow 136, master ~119 wide — no Clic block inside Master).
+    constexpr int clicBorrow = 136;
+    clicPane.setBounds(sirenControlsWidth - clicBorrow, reverbY, clicBorrow,
+                       reverbH + keyboardH + spacer);
     masterVolume.setBounds(
         sirenControlsWidth,
         reverbY,
         sirenTrackControlsWidth + sirenTitleWidth - spacer,
         reverbH + keyboardH + spacer
     );
+    rvbStrip.setBounds(
+        spacer,
+        reverbY,
+        sirenControlsWidth - 2 * spacer - clicBorrow,
+        reverbH
+    );
+    constexpr int keyboardY = reverbY + reverbH + spacer;
+    midiKeyboard.setBounds(0, keyboardY, sirenControlsWidth - clicBorrow, keyboardH);
+#else
+    constexpr int clicBorrow = 0;
+    masterVolume.setBounds(
+        sirenControlsWidth,
+        reverbY,
+        sirenTrackControlsWidth + sirenTitleWidth - spacer,
+        reverbH + keyboardH + spacer
+    );
+    rvbStrip.setBounds(
+        spacer,
+        reverbY,
+        sirenControlsWidth - 2 * spacer,
+        reverbH
+    );
+    constexpr int keyboardY = reverbY + reverbH + spacer;
+    midiKeyboard.setBounds(0, keyboardY, sirenControlsWidth, keyboardH);
+#endif
+    rvbStrip.setBackgroundColour(juce::Colour{0x22ffffff});
+    rvbStrip.setCellBackgroundColour(juce::Colours::transparentBlack);
+    rvbStrip.setBackgroundStripColour(bottomColour);
+
+#if COMPOSESIREN_CLIC
+    clicPane.setBackgroundStripColour(bottomColour);
+#endif
+
+    masterVolume.setTitle("Master Volume");
+    masterVolume.setShowTitle(true);
+    masterVolume.setShowGroupLabels(false);
+    masterVolume.setShowKnobLabels(true);
+    masterVolume.setShowTextBox(true);
     masterVolume.setBackgroundColour(juce::Colour{0x22ffffff});
     masterVolume.setCellBackgroundColour(juce::Colours::transparentBlack);
     masterVolume.setBackgroundStripColour(bottomColour);
-
-    constexpr int keyboardY = reverbY + reverbH + spacer;
-    midiKeyboard.setBounds(0, keyboardY, sirenControlsWidth, keyboardH);
 }
 
 #if COMPOSESIREN_PARK_BRIDGE
