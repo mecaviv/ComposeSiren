@@ -8,7 +8,6 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "../lib/definitions/palette.h"
 #include "../lib/definitions/sirenProperties.h"
-#include "../lib/net/mcp/McpControl.h"
 
 #ifndef COMPOSESIREN_PARK_BRIDGE
 #define COMPOSESIREN_PARK_BRIDGE 0
@@ -16,14 +15,23 @@
 #ifndef COMPOSESIREN_SETTINGS
 #define COMPOSESIREN_SETTINGS 0
 #endif
+#ifndef COMPOSESIREN_SONG_TITLE
+#define COMPOSESIREN_SONG_TITLE 0
+#endif
+#if COMPOSESIREN_SONG_TITLE
+#include "../lib/net/mcp/McpControl.h"
+#endif
 #include "../lib/utilities/recorder/RecordDialog.h"
 #if COMPOSESIREN_SETTINGS
 #include "../lib/settings/SettingsDialog.h"
 #endif
 
 class MainButtonsComponent : public juce::Component,
-                             public juce::TextButton::Listener,
-                             private juce::ChangeListener
+                             public juce::TextButton::Listener
+#if COMPOSESIREN_SONG_TITLE
+                           , private juce::Timer
+                           , private juce::ChangeListener
+#endif
 {
 public:
     class Listener {
@@ -42,9 +50,11 @@ public:
         // optionnel : un bouton About... ouvre la fenêtre que showAbout() ouvre.
         virtual bool hasAbout() { return false; }
         virtual void showAbout(juce::Component* /*parent*/) {}
+#if COMPOSESIREN_SONG_TITLE
         // optionnel : le serveur MCP, pour afficher le morceau en cours
         // (set_song_title / clear_song_title) dans la barre de titre.
         virtual McpControl* getMcpControl() { return nullptr; }
+#endif
 #if COMPOSESIREN_RECORD
         // optionnel : l'enregistreur de la sortie audio ; un bouton Record...
         // ouvre son dialogue quand il y en a un.
@@ -109,6 +119,7 @@ public:
         }
 #endif
 
+#if COMPOSESIREN_SONG_TITLE
         // The song tap-viewer is playing (set_song_title), on the left of the
         // top row and in the window's title bar. Hidden again by clear_song_title.
         songTitle.setJustificationType(juce::Justification::centredLeft);
@@ -121,12 +132,15 @@ public:
             mcp->addChangeListener(this);
             applySongDisplay(mcp->getSongDisplay(), false);
         }
+#endif
     }
 
     ~MainButtonsComponent() override
     {
+#if COMPOSESIREN_SONG_TITLE
         if (auto* mcp = listener.getMcpControl())
             mcp->removeChangeListener(this);
+#endif
     }
 
     void paint(juce::Graphics& g) override
@@ -148,10 +162,12 @@ public:
 
         const float btnsHeight = static_cast<float>(bounds.getHeight());
 
+#if COMPOSESIREN_SONG_TITLE
         // The song title, when one is playing.
         if (songTitle.isVisible())
             songTitle.setBounds(bounds.removeFromLeft(
                 static_cast<int>(juce::jmax(160.0f, bounds.getWidth() * 0.42f))));
+#endif
 
         auto add = [&](juce::Button& b, float minW) {
             juce::FlexItem item = juce::FlexItem(b).withMinWidth(minW)
@@ -180,13 +196,22 @@ public:
         currentSirenId = id;
     }
 
+#if COMPOSESIREN_SONG_TITLE
 private:
-    // The song display: title on the left of the top row and in the window's
-    // title bar. `clear_song_title` puts both back.
+    // The song display: title on the left of the top row, and progress in the
+    // window's title bar (`set_song_progress`, and the clock between calls).
+    // `clear_song_title` puts both back.
     void changeListenerCallback(juce::ChangeBroadcaster*) override
     {
         if (auto* mcp = listener.getMcpControl())
             applySongDisplay(mcp->getSongDisplay(), true);
+    }
+
+    void timerCallback() override
+    {
+        if (!song.active)
+            return;
+        updateWindowTitle(formatSongLine(song));
     }
 
     void applySongDisplay(const SongDisplay& next, bool relayout)
@@ -198,13 +223,53 @@ private:
 
         if (song.active != wasActive || relayout)
             resized();
+
+        if (song.active)
+            startTimerHz(4);
+        else
+            stopTimer();
+    }
+
+    // Progress is only in the window title: Title [=======|-------] 1:23
+    static juce::String formatSongLine(const SongDisplay& song)
+    {
+        if (!song.active || song.title.isEmpty())
+            return {};
+
+        juce::String line = song.title;
+        if (song.durationSeconds > 0.0) {
+            constexpr int cells = 14;
+            const double fraction =
+                juce::jlimit(0.0, 1.0, song.currentPosition() / song.durationSeconds);
+            const int filled = juce::roundToInt(fraction * cells);
+
+            line << "  [";
+            for (int i = 0; i < cells; ++i) {
+                if (i < filled)
+                    line << '=';
+                else if (i == filled)
+                    line << '|';
+                else
+                    line << '-';
+            }
+            line << "]";
+
+            const int total = juce::roundToInt(song.durationSeconds);
+            const int at = juce::roundToInt(juce::jmin(song.currentPosition(),
+                                                       song.durationSeconds));
+            line << "  " << (at / 60) << ":"
+                 << juce::String(at % 60).paddedLeft('0', 2) << "/"
+                 << (total / 60) << ":"
+                 << juce::String(total % 60).paddedLeft('0', 2);
+        }
+        return line;
     }
 
     void updateSongTitle()
     {
         const auto line = song.active ? song.title : juce::String();
         songTitle.setText(line, juce::dontSendNotification);
-        updateWindowTitle(line);
+        updateWindowTitle(formatSongLine(song));
     }
 
     void updateWindowTitle(const juce::String& line)
@@ -218,6 +283,7 @@ private:
     }
 
 public:
+#endif // COMPOSESIREN_SONG_TITLE
 
 #if COMPOSESIREN_PARK_BRIDGE
     void refreshPhysicalSirensTooltip()
@@ -314,10 +380,12 @@ private:
     juce::ToggleButton stAllButton;
 #endif
 
+#if COMPOSESIREN_SONG_TITLE
     // the song title in the top bar and window title (set_song_title / clear_song_title)
     SongDisplay song;
     juce::String defaultWindowTitle;
     juce::Label songTitle;
+#endif
 
     std::unique_ptr<juce::FileChooser> fileChooser;
 };
