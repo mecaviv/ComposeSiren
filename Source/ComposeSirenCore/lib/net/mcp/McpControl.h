@@ -21,11 +21,42 @@
 struct cs_mcp_server_t;
 #endif
 
+#ifndef COMPOSESIREN_SONG_TITLE
+#define COMPOSESIREN_SONG_TITLE 0
+#endif
+
 // In-process MCP server. Rust owns the HTTP listener and the discovery file
 // ~/.composesiren_mcp.json. This class runs the commands on the message thread
 // and queues MIDI for the next audio block.
 
+#if COMPOSESIREN_SONG_TITLE
+/// What `set_song_title` / `set_song_progress` show in the UI (title bar),
+/// and `clear_song_title` ends.
+struct SongDisplay
+{
+    juce::String title;
+    double positionSeconds = 0.0;
+    double durationSeconds = 0.0; // 0: unknown, no progress bar
+    juce::uint32 updatedAtMs = 0;
+    bool active = false;
+
+    /// Where the song is now: the last position, moving on with the clock so
+    /// the window title keeps filling between two `set_song_progress` calls.
+    /// Never past the length when it is known.
+    double currentPosition() const
+    {
+        if (!active)
+            return 0.0;
+        double at = positionSeconds + (juce::Time::getMillisecondCounter() - updatedAtMs) * 0.001;
+        return durationSeconds > 0.0 ? juce::jmin(at, durationSeconds) : at;
+    }
+};
+#endif
+
 class McpControl
+#if COMPOSESIREN_SONG_TITLE
+    : public juce::ChangeBroadcaster
+#endif
 {
 public:
     McpControl(juce::AudioProcessor& processor, const juce::String& pluginName, const juce::String& pluginCode);
@@ -45,6 +76,11 @@ public:
 
     // Whether the server is listening (COMPOSESIREN_MCP, and it could bind a port).
     bool isRunning() const { return server != nullptr; }
+
+#if COMPOSESIREN_SONG_TITLE
+    // The song the last `set_song_title` showed (active false: none).
+    SongDisplay getSongDisplay() const;
+#endif
 
     struct ToolCount
     {
@@ -86,7 +122,7 @@ private:
     };
 
     static char* dispatch(const char* requestJson, void* user);
-    std::string handle(const juce::var& request) const;
+    std::string handle(const juce::var& request);
     std::string listParameters() const;
     std::string getParameter(const juce::String& id) const;
     std::string setParameter(const juce::String& id, double value) const;
@@ -94,6 +130,14 @@ private:
     std::string listSettings() const;
     std::string getSetting(const juce::String& id) const;
     std::string setSetting(const juce::String& id, const juce::var& value) const;
+#if COMPOSESIREN_SONG_TITLE
+    std::string setSongTitle(const juce::var& request);
+    std::string setSongProgress(const juce::var& request);
+    std::string clearSongTitle();
+
+    mutable std::mutex songMutex;
+    mutable SongDisplay song;
+#endif
     juce::RangedAudioParameter* findParameter(const juce::String& id) const;
     static juce::var parameterObject(juce::RangedAudioParameter& parameter);
     static char* duplicate(const std::string& text);

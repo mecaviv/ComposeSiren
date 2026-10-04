@@ -15,6 +15,10 @@
 #ifndef COMPOSESIREN_SETTINGS
 #define COMPOSESIREN_SETTINGS 0
 #endif
+#ifndef COMPOSESIREN_SONG_TITLE
+#define COMPOSESIREN_SONG_TITLE 0
+#endif
+#include "../lib/net/mcp/McpControl.h"
 #include "../lib/utilities/recorder/RecordDialog.h"
 #if COMPOSESIREN_SETTINGS
 #include "../lib/settings/SettingsDialog.h"
@@ -22,6 +26,10 @@
 
 class MainButtonsComponent : public juce::Component,
                              public juce::TextButton::Listener
+#if COMPOSESIREN_SONG_TITLE
+                           , private juce::Timer
+                           , private juce::ChangeListener
+#endif
 {
 public:
     class Listener {
@@ -40,6 +48,8 @@ public:
         // optionnel : un bouton About... ouvre la fenêtre que showAbout() ouvre.
         virtual bool hasAbout() { return false; }
         virtual void showAbout(juce::Component* /*parent*/) {}
+        // le serveur MCP (About, and the song title bar when COMPOSESIREN_SONG_TITLE)
+        virtual McpControl& getMcp() = 0;
 #if COMPOSESIREN_RECORD
         // optionnel : l'enregistreur de la sortie audio ; un bouton Record...
         // ouvre son dialogue quand il y en a un.
@@ -103,9 +113,28 @@ public:
             addAndMakeVisible(stAllButton);
         }
 #endif
+
+#if COMPOSESIREN_SONG_TITLE
+        // The song tap-viewer is playing (set_song_title), on the left of the
+        // top row and in the window's title bar. Hidden again by clear_song_title.
+        songTitle.setJustificationType(juce::Justification::centredLeft);
+        songTitle.setColour(juce::Label::textColourId, juce::Colours::whitesmoke);
+        songTitle.setFont(juce::FontOptions(13.0f, juce::Font::bold));
+        songTitle.setInterceptsMouseClicks(false, false);
+        addChildComponent(songTitle);
+
+        auto& mcp = listener.getMcp();
+        mcp.addChangeListener(this);
+        applySongDisplay(mcp.getSongDisplay(), false);
+#endif
     }
 
-    ~MainButtonsComponent() override = default;
+    ~MainButtonsComponent() override
+    {
+#if COMPOSESIREN_SONG_TITLE
+        listener.getMcp().removeChangeListener(this);
+#endif
+    }
 
     void paint(juce::Graphics& g) override
     {
@@ -125,6 +154,13 @@ public:
         fb.justifyContent = juce::FlexBox::JustifyContent::flexEnd;
 
         const float btnsHeight = static_cast<float>(bounds.getHeight());
+
+#if COMPOSESIREN_SONG_TITLE
+        // The song title, when one is playing.
+        if (songTitle.isVisible())
+            songTitle.setBounds(bounds.removeFromLeft(
+                static_cast<int>(juce::jmax(160.0f, bounds.getWidth() * 0.42f))));
+#endif
 
         auto add = [&](juce::Button& b, float minW) {
             juce::FlexItem item = juce::FlexItem(b).withMinWidth(minW)
@@ -152,6 +188,94 @@ public:
     {
         currentSirenId = id;
     }
+
+#if COMPOSESIREN_SONG_TITLE
+private:
+    // The song display: title on the left of the top row, and progress in the
+    // window's title bar (`set_song_progress`, and the clock between calls).
+    // `clear_song_title` puts both back.
+    void changeListenerCallback(juce::ChangeBroadcaster*) override
+    {
+        applySongDisplay(listener.getMcp().getSongDisplay(), true);
+    }
+
+    void timerCallback() override
+    {
+        if (!song.active)
+            return;
+        updateWindowTitle(formatSongLine(song));
+    }
+
+    void applySongDisplay(const SongDisplay& next, bool relayout)
+    {
+        const bool wasActive = song.active;
+        song = next;
+        songTitle.setVisible(song.active);
+        updateSongTitle();
+
+        if (song.active != wasActive || relayout)
+            resized();
+
+        if (song.active)
+            startTimerHz(4);
+        else
+            stopTimer();
+    }
+
+    // Progress is only in the window title: Title [=======|-------] 1:23
+    static juce::String formatSongLine(const SongDisplay& song)
+    {
+        if (!song.active || song.title.isEmpty())
+            return {};
+
+        juce::String line = song.title;
+        if (song.durationSeconds > 0.0) {
+            constexpr int cells = 14;
+            const double fraction =
+                juce::jlimit(0.0, 1.0, song.currentPosition() / song.durationSeconds);
+            const int filled = juce::roundToInt(fraction * cells);
+
+            line << "  [";
+            for (int i = 0; i < cells; ++i) {
+                if (i < filled)
+                    line << '=';
+                else if (i == filled)
+                    line << '|';
+                else
+                    line << '-';
+            }
+            line << "]";
+
+            const int total = juce::roundToInt(song.durationSeconds);
+            const int at = juce::roundToInt(juce::jmin(song.currentPosition(),
+                                                       song.durationSeconds));
+            line << "  " << (at / 60) << ":"
+                 << juce::String(at % 60).paddedLeft('0', 2) << "/"
+                 << (total / 60) << ":"
+                 << juce::String(total % 60).paddedLeft('0', 2);
+        }
+        return line;
+    }
+
+    void updateSongTitle()
+    {
+        const auto line = song.active ? song.title : juce::String();
+        songTitle.setText(line, juce::dontSendNotification);
+        updateWindowTitle(formatSongLine(song));
+    }
+
+    void updateWindowTitle(const juce::String& line)
+    {
+        auto* top = getTopLevelComponent();
+        if (top == nullptr)
+            return;
+        if (defaultWindowTitle.isEmpty())
+            defaultWindowTitle = top->getName();
+        top->setName(song.active && line.isNotEmpty() ? line : defaultWindowTitle);
+    }
+
+public:
+#endif // COMPOSESIREN_SONG_TITLE
 
 #if COMPOSESIREN_PARK_BRIDGE
     void refreshPhysicalSirensTooltip()
@@ -246,6 +370,13 @@ private:
 #if COMPOSESIREN_PARK_BRIDGE
     juce::ToggleButton physicalButton;
     juce::ToggleButton stAllButton;
+#endif
+
+#if COMPOSESIREN_SONG_TITLE
+    // the song title in the top bar and window title (set_song_title / clear_song_title)
+    SongDisplay song;
+    juce::String defaultWindowTitle;
+    juce::Label songTitle;
 #endif
 
     std::unique_ptr<juce::FileChooser> fileChooser;

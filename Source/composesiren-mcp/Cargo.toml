@@ -15,6 +15,9 @@ crate-type = ["staticlib", "rlib"]
 # The recording tools (start_recording, stop_recording, recording_status), for
 # a plugin built with COMPOSESIREN_RECORD.
 record = []
+# The song title tools (set_song_title, set_song_progress, clear_song_title),
+# for a plugin built with COMPOSESIREN_SONG_TITLE.
+song-title = []
 
 [dependencies]
 # What the server and its clients agree on (public, same repository).

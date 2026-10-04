@@ -15,6 +15,8 @@ use composesiren_mcp_api::args::{
 };
 #[cfg(feature = "record")]
 use composesiren_mcp_api::args::{StartRecording, StopRecording};
+#[cfg(feature = "song-title")]
+use composesiren_mcp_api::args::{SetSongProgress, SetSongTitle};
 
 use crate::dispatch::Dispatch;
 use crate::stats::Stats;
@@ -30,10 +32,11 @@ pub struct ComposeSirenServer {
 #[tool_router]
 impl ComposeSirenServer {
     pub fn new(dispatch: Dispatch, stats: Arc<Stats>) -> Self {
-        #[cfg(feature = "record")]
-        let tool_router = Self::tool_router() + Self::record_router();
-        #[cfg(not(feature = "record"))]
         let tool_router = Self::tool_router();
+        #[cfg(feature = "record")]
+        let tool_router = tool_router + Self::record_router();
+        #[cfg(feature = "song-title")]
+        let tool_router = tool_router + Self::song_title_router();
         Self { dispatch, stats, tool_router }
     }
 
@@ -187,6 +190,40 @@ impl ComposeSirenServer {
     }
 }
 
+/// The song title tools, with the `song-title` feature (`COMPOSESIREN_SONG_TITLE`).
+#[cfg(feature = "song-title")]
+#[tool_router(router = song_title_router)]
+impl ComposeSirenServer {
+    #[tool(description = "Show the playing song in the UI title bar, with an optional progress bar when its length is known. Call clear_song_title when it ends.")]
+    fn set_song_title(
+        &self,
+        Parameters(args): Parameters<SetSongTitle>,
+    ) -> Result<CallToolResult, McpError> {
+        self.finish(self.dispatch.call(json!({
+            "op": "set_song_title",
+            "title": args.title,
+            "duration_seconds": args.duration_seconds,
+        })))
+    }
+
+    #[tool(description = "How far the song shown by set_song_title has played, so the progress bar can keep up with the board.")]
+    fn set_song_progress(
+        &self,
+        Parameters(args): Parameters<SetSongProgress>,
+    ) -> Result<CallToolResult, McpError> {
+        self.finish(self.dispatch.call(json!({
+            "op": "set_song_progress",
+            "position_seconds": args.position_seconds,
+            "duration_seconds": args.duration_seconds,
+        })))
+    }
+
+    #[tool(description = "The song is over: the title bar goes back to its usual look.")]
+    fn clear_song_title(&self) -> Result<CallToolResult, McpError> {
+        self.finish(self.dispatch.call(json!({"op": "clear_song_title"})))
+    }
+}
+
 /// The recording tools, with the `record` feature (`COMPOSESIREN_RECORD`).
 #[cfg(feature = "record")]
 #[tool_router(router = record_router)]
@@ -220,7 +257,7 @@ impl ComposeSirenServer {
 }
 
 // The field, not the macro's default `Self::tool_router()`: with the `record`
-// feature, `new` adds the recording tools to it.
+// or `song-title` features, `new` adds those tools to it.
 //
 // `call_tool` is written out, rather than left to the macro, to count each tool.
 #[tool_handler(router = self.tool_router)]
@@ -269,6 +306,17 @@ mod tests {
             ComposeSirenServer::tool_router().list_all().iter().map(|t| t.name.to_string()).collect();
         offered.sort();
         let mut declared: Vec<String> = tool::ALWAYS.iter().map(|t| (*t).to_owned()).collect();
+        declared.sort();
+        assert_eq!(offered, declared);
+    }
+
+    #[cfg(feature = "song-title")]
+    #[test]
+    fn the_song_title_tools_are_the_ones_the_api_declares() {
+        let router = ComposeSirenServer::song_title_router();
+        let mut offered: Vec<String> = router.list_all().iter().map(|t| t.name.to_string()).collect();
+        offered.sort();
+        let mut declared: Vec<String> = tool::SONG_TITLE.iter().map(|t| (*t).to_owned()).collect();
         declared.sort();
         assert_eq!(offered, declared);
     }

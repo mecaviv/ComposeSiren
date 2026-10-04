@@ -120,7 +120,7 @@ public:
 #if COMPOSESIREN_PARK_BRIDGE
     SirenUdpBridge& getUdpBridge() { return udpBridge; }
 #endif
-    McpControl& getMcp() { return mcp; }
+    McpControl& getMcp() override { return mcp; }
 
 private:
     // needed by DSP

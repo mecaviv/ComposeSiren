@@ -154,6 +154,16 @@ composesiren_option(COMPOSESIREN_SETTINGS
         "Power-user settings from the settings metadata, stored per user, Settings... window"
         ON)
 
+# DEAL WITH THE SONG TITLE BAR #################################################
+# Shows the playing song in the top bar and the window title, set over MCP
+# (set_song_title / set_song_progress / clear_song_title, the `song-title` Rust
+# feature of Source/composesiren-mcp). Needs COMPOSESIREN_MCP for the tools;
+# the C++ preprocessor is COMPOSESIREN_SONG_TITLE.
+
+composesiren_option(COMPOSESIREN_SONG_TITLE
+        "Song title bar: show the playing song (MCP set_song_title / clear_song_title)"
+        OFF)
+
 #set(PLUGIN_TARGETS OneSiren)
 set(PLUGIN_TARGETS OneSiren SirenOrchestra)
 #set(PLUGIN_TARGETS CustomMix)
