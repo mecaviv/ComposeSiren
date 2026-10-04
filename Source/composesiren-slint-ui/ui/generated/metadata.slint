@@ -1,4 +1,4 @@
-// GENERATED from the shared metadata (composesiren-parameters.csv, composesiren-ui-sections.csv, composesiren-ui-sirens.csv and composesiren-ui-theme.csv). Do not edit: change the metadata and regenerate.
+// GENERATED from the shared metadata (composesiren-parameters.csv, composesiren-ui-sections.csv, composesiren-ui-sirens.csv, composesiren-ui-theme.csv, composesiren-siren-waves.csv and sirens.csv). Do not edit: change the metadata and regenerate.
 
 export enum ParameterClass { siren, reverb, track, master, clic }
 export enum MidiKind { none, cc, pitch-wheel }
@@ -32,6 +32,32 @@ export struct SirenMeta {
     id: string,
     strip-colour: color,
     category-default: bool,
+}
+
+// A look of the SirenWaves shader: the uniform components that stay put while the sound
+// changes. siren-waves[default-siren-wave[i]] is the default look of sirens[i].
+export struct SirenWaveMeta {
+    label: string,
+    siren: string,
+    // uAccent: override_color, or the siren's colour
+    accent: color,
+    accent-overridden: bool,
+    // uFills.w, px
+    seam-zone: int,
+    // uRipple.w
+    parallax: float,
+    // uLook.z
+    flatness: float,
+    // uLook.w
+    opacity: float,
+    // uLayers.x
+    layers: int,
+    // uLayers.y
+    steps: int,
+    // uExtra.x, px
+    stroke-width: float,
+    // uExtra.y
+    clouds: float,
 }
 
 export global UiMetadata {
@@ -88,6 +114,16 @@ export global UiMetadata {
         { id: "S6", strip-colour: #0e8ece, category-default: false },
         { id: "S7", strip-colour: #07a0cb, category-default: true },
     ];
+    out property <[SirenWaveMeta]> siren-waves: [
+        { label: "s1-default", siren: "S1", accent: #fbeb4f, accent-overridden: false, seam-zone: 16, parallax: 0.5, flatness: 0.3, opacity: 0.9, layers: 1, steps: 16, stroke-width: 2.5, clouds: 0.5 },
+        { label: "s2-default", siren: "S2", accent: #64d940, accent-overridden: false, seam-zone: 16, parallax: 0.5, flatness: 0.3, opacity: 0.9, layers: 1, steps: 16, stroke-width: 2.5, clouds: 0.5 },
+        { label: "s3-default", siren: "S3", accent: #eb4125, accent-overridden: false, seam-zone: 16, parallax: 0.5, flatness: 0.3, opacity: 0.9, layers: 1, steps: 16, stroke-width: 2.5, clouds: 0.5 },
+        { label: "s4-default", siren: "S4", accent: #f4b83f, accent-overridden: false, seam-zone: 16, parallax: 0.5, flatness: 0.3, opacity: 0.9, layers: 1, steps: 16, stroke-width: 2.5, clouds: 0.5 },
+        { label: "s5-default", siren: "S5", accent: #367e21, accent-overridden: false, seam-zone: 16, parallax: 0.5, flatness: 0.3, opacity: 0.9, layers: 1, steps: 16, stroke-width: 2.5, clouds: 0.5 },
+        { label: "s6-default", siren: "S6", accent: #59aef9, accent-overridden: false, seam-zone: 16, parallax: 0.5, flatness: 0.3, opacity: 0.9, layers: 1, steps: 16, stroke-width: 2.5, clouds: 0.5 },
+        { label: "s7-default", siren: "S7", accent: #3b5df6, accent-overridden: false, seam-zone: 16, parallax: 0.5, flatness: 0.3, opacity: 0.9, layers: 1, steps: 16, stroke-width: 2.5, clouds: 0.5 },
+    ];
+    out property <[int]> default-siren-wave: [0, 1, 2, 3, 4, 5, 6];
 }
 
 export global Theme {

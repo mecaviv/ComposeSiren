@@ -1,4 +1,4 @@
-//! GENERATED from the shared metadata (composesiren-parameters.csv, composesiren-ui-sections.csv, composesiren-ui-sirens.csv and composesiren-ui-theme.csv). Do not edit: change the metadata and regenerate.
+//! GENERATED from the shared metadata (composesiren-parameters.csv, composesiren-ui-sections.csv, composesiren-ui-sirens.csv, composesiren-ui-theme.csv, composesiren-siren-waves.csv and sirens.csv). Do not edit: change the metadata and regenerate.
 
 /// `ParameterIdGet::getClass`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -94,6 +94,36 @@ pub struct SirenUi {
     pub strip_colour: u32,
     /// The siren the Siren type menu shows for its category.
     pub category_default: bool,
+}
+
+/// A look of the SirenWaves shader (`SirenWave.frag`): the uniform components that stay
+/// put while the sound changes.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct SirenWave {
+    /// Name; `<siren>-default` is the siren's default look.
+    pub label: &'static str,
+    /// `S1` … `S7`.
+    pub siren: &'static str,
+    /// `uAccent`, 0xAARRGGBB: `override_color`, or the siren's colour.
+    pub accent: u32,
+    /// Whether `override_color` was set.
+    pub accent_overridden: bool,
+    /// `uFills.w, px`.
+    pub seam_zone: i32,
+    /// `uRipple.w`.
+    pub parallax: f32,
+    /// `uLook.z`.
+    pub flatness: f32,
+    /// `uLook.w`.
+    pub opacity: f32,
+    /// `uLayers.x`.
+    pub layers: i32,
+    /// `uLayers.y`.
+    pub steps: i32,
+    /// `uExtra.x, px`.
+    pub stroke_width: f32,
+    /// `uExtra.y`.
+    pub clouds: f32,
 }
 
 /// The parameters, in host order.
@@ -662,6 +692,111 @@ pub const SIRENS: [SirenUi; 7] = [
         category_default: true,
     },
 ];
+
+/// The looks of the SirenWaves shader.
+pub const SIREN_WAVES: [SirenWave; 7] = [
+    SirenWave {
+        label: "s1-default",
+        siren: "S1",
+        accent: 0xff_fb_eb_4f,
+        accent_overridden: false,
+        seam_zone: 16,
+        parallax: 0.5,
+        flatness: 0.3,
+        opacity: 0.9,
+        layers: 1,
+        steps: 16,
+        stroke_width: 2.5,
+        clouds: 0.5,
+    },
+    SirenWave {
+        label: "s2-default",
+        siren: "S2",
+        accent: 0xff_64_d9_40,
+        accent_overridden: false,
+        seam_zone: 16,
+        parallax: 0.5,
+        flatness: 0.3,
+        opacity: 0.9,
+        layers: 1,
+        steps: 16,
+        stroke_width: 2.5,
+        clouds: 0.5,
+    },
+    SirenWave {
+        label: "s3-default",
+        siren: "S3",
+        accent: 0xff_eb_41_25,
+        accent_overridden: false,
+        seam_zone: 16,
+        parallax: 0.5,
+        flatness: 0.3,
+        opacity: 0.9,
+        layers: 1,
+        steps: 16,
+        stroke_width: 2.5,
+        clouds: 0.5,
+    },
+    SirenWave {
+        label: "s4-default",
+        siren: "S4",
+        accent: 0xff_f4_b8_3f,
+        accent_overridden: false,
+        seam_zone: 16,
+        parallax: 0.5,
+        flatness: 0.3,
+        opacity: 0.9,
+        layers: 1,
+        steps: 16,
+        stroke_width: 2.5,
+        clouds: 0.5,
+    },
+    SirenWave {
+        label: "s5-default",
+        siren: "S5",
+        accent: 0xff_36_7e_21,
+        accent_overridden: false,
+        seam_zone: 16,
+        parallax: 0.5,
+        flatness: 0.3,
+        opacity: 0.9,
+        layers: 1,
+        steps: 16,
+        stroke_width: 2.5,
+        clouds: 0.5,
+    },
+    SirenWave {
+        label: "s6-default",
+        siren: "S6",
+        accent: 0xff_59_ae_f9,
+        accent_overridden: false,
+        seam_zone: 16,
+        parallax: 0.5,
+        flatness: 0.3,
+        opacity: 0.9,
+        layers: 1,
+        steps: 16,
+        stroke_width: 2.5,
+        clouds: 0.5,
+    },
+    SirenWave {
+        label: "s7-default",
+        siren: "S7",
+        accent: 0xff_3b_5d_f6,
+        accent_overridden: false,
+        seam_zone: 16,
+        parallax: 0.5,
+        flatness: 0.3,
+        opacity: 0.9,
+        layers: 1,
+        steps: 16,
+        stroke_width: 2.5,
+        clouds: 0.5,
+    },
+];
+
+/// In siren order (`S1` first): the index in [`SIREN_WAVES`] of the siren's default look.
+pub const DEFAULT_SIREN_WAVE: [usize; 7] = [0, 1, 2, 3, 4, 5, 6];
 
 /// Colours (0xAARRGGBB) and lengths (logical pixels).
 pub mod theme {
