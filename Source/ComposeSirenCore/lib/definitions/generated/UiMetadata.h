@@ -1,7 +1,8 @@
-// GENERATED from the shared metadata (composesiren-parameters.csv, composesiren-ui-sections.csv, composesiren-ui-sirens.csv and composesiren-ui-theme.csv). Do not edit: change the metadata and regenerate.
+// GENERATED from the shared metadata (composesiren-parameters.csv, composesiren-ui-sections.csv, composesiren-ui-sirens.csv, composesiren-ui-theme.csv, composesiren-siren-waves.csv and sirens.csv). Do not edit: change the metadata and regenerate.
 #pragma once
 
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <string_view>
 
@@ -39,6 +40,23 @@ struct SirenUi {
     std::string_view id;
     std::uint32_t stripColourArgb; // 0xAARRGGBB
     bool categoryDefault;          // the siren the "Siren type" menu shows for its category
+};
+
+// A look of the SirenWaves shader (SirenWave.frag): the uniform components that stay put
+// while the sound changes. sirenWaves[defaultSirenWave[i]] is the default look of sirens[i].
+struct SirenWave {
+    std::string_view label;
+    std::string_view siren;
+    std::uint32_t accentArgb;     // uAccent: override_color, or the siren's colour
+    bool accentOverridden;
+    int seamZone; // uFills.w, px
+    float parallax; // uRipple.w
+    float flatness; // uLook.z
+    float opacity; // uLook.w
+    int layers; // uLayers.x
+    int steps; // uLayers.y
+    float strokeWidth; // uExtra.x, px
+    float clouds; // uExtra.y
 };
 
 inline constexpr std::array<Parameter, 32> parameters {{
@@ -96,6 +114,19 @@ inline constexpr std::array<SirenUi, 7> sirens {{
     { "S6", 0xff0e8eceu, false },
     { "S7", 0xff07a0cbu, true },
 }};
+
+inline constexpr std::array<SirenWave, 7> sirenWaves {{
+    { "s1-default", "S1", 0xfffbeb4fu, false, 16, 0.5f, 0.3f, 0.9f, 1, 16, 2.5f, 0.5f },
+    { "s2-default", "S2", 0xff64d940u, false, 16, 0.5f, 0.3f, 0.9f, 1, 16, 2.5f, 0.5f },
+    { "s3-default", "S3", 0xffeb4125u, false, 16, 0.5f, 0.3f, 0.9f, 1, 16, 2.5f, 0.5f },
+    { "s4-default", "S4", 0xfff4b83fu, false, 16, 0.5f, 0.3f, 0.9f, 1, 16, 2.5f, 0.5f },
+    { "s5-default", "S5", 0xff367e21u, false, 16, 0.5f, 0.3f, 0.9f, 1, 16, 2.5f, 0.5f },
+    { "s6-default", "S6", 0xff59aef9u, false, 16, 0.5f, 0.3f, 0.9f, 1, 16, 2.5f, 0.5f },
+    { "s7-default", "S7", 0xff3b5df6u, false, 16, 0.5f, 0.3f, 0.9f, 1, 16, 2.5f, 0.5f },
+}};
+
+// In siren order (S1 first): the index in sirenWaves of the siren's default look.
+inline constexpr std::array<std::size_t, 7> defaultSirenWave { 0, 1, 2, 3, 4, 5, 6 };
 
 namespace theme {
 inline constexpr std::uint32_t colourOrangeMecanique = 0xffff9900u; // Accent: knob arcs, the held keyboard key, selections.
