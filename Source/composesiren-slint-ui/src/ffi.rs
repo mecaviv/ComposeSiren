@@ -9,7 +9,7 @@ use std::rc::Rc;
 use std::sync::{Arc, OnceLock};
 
 use crate::editor::HostSink;
-use crate::embed::{Bgra8Premultiplied, EmbeddedEditor, Pointer};
+use crate::embed::{Bgra8Premultiplied, DirtyRect, EmbeddedEditor, Pointer};
 use crate::params::{PARAMS, ParamId};
 use crate::store::{ParamStore, param_id};
 
@@ -27,6 +27,20 @@ pub struct CsSlintUiCallbacks {
     pub category_changed: Option<extern "C" fn(context: *mut c_void, category: u32)>,
     /// A key of the on-screen keyboard went down or up.
     pub note: Option<extern "C" fn(context: *mut c_void, note: u8, on: bool)>,
+}
+
+/// The rectangle a tick redrew, in physical pixels (see [`cs_slint_ui_tick_region`]).
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CsRect {
+    /// Left.
+    pub x: u32,
+    /// Top.
+    pub y: u32,
+    /// Width.
+    pub width: u32,
+    /// Height.
+    pub height: u32,
 }
 
 /// Pointer event kinds for [`cs_slint_ui_pointer`].
@@ -125,8 +139,10 @@ pub unsafe extern "C" fn cs_slint_ui_set_param(ui: *const CsSlintUi, param: u32,
     }
 }
 
-/// Run timers and animations; redraw into `pixels` (BGRA premultiplied, `juce::Image::ARGB`; `stride` pixels
-/// per row, at least width x height) when something changed. True when redrawn.
+/// Run queued work, timers and animations; redraw into `pixels` (BGRA premultiplied, `juce::Image::ARGB`;
+/// `stride` pixels per row, at least width x height) when something changed. True when redrawn.
+///
+/// Only what changed is redrawn: hand the same pixels, unmodified, to every tick (the editor's `juce::Image`).
 ///
 /// # Safety
 /// `ui` is a live editor; `pixels` holds `stride * height` pixels.
@@ -136,11 +152,44 @@ pub unsafe extern "C" fn cs_slint_ui_tick(
     pixels: *mut u8,
     stride: u32,
 ) -> bool {
+    unsafe { cs_slint_ui_tick_region(ui, pixels, stride, std::ptr::null_mut()) }
+}
+
+/// Like [`cs_slint_ui_tick`], and writes the redrawn rectangle to `dirty` (if not null) when it returns true,
+/// for the host to repaint only that part.
+///
+/// # Safety
+/// `ui` is a live editor; `pixels` holds `stride * height` pixels; `dirty` is null or writable.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn cs_slint_ui_tick_region(
+    ui: *const CsSlintUi,
+    pixels: *mut u8,
+    stride: u32,
+    dirty: *mut CsRect,
+) -> bool {
     let ui = unsafe { &*ui };
     let len = stride as usize * ui.editor.size().1 as usize;
     let pixels =
         unsafe { std::slice::from_raw_parts_mut(pixels.cast::<Bgra8Premultiplied>(), len) };
-    ui.editor.tick(pixels, stride as usize)
+    match ui.editor.tick_region(pixels, stride as usize) {
+        Some(DirtyRect {
+            x,
+            y,
+            width,
+            height,
+        }) => {
+            if let Some(out) = unsafe { dirty.as_mut() } {
+                *out = CsRect {
+                    x,
+                    y,
+                    width,
+                    height,
+                };
+            }
+            true
+        }
+        None => false,
+    }
 }
 
 /// Forward a pointer event at logical coordinates.

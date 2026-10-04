@@ -49,13 +49,56 @@ fn row(def: &ParamDef, value: f32) -> ParamRow {
     }
 }
 
-fn set_row(rows: &VecModel<ParamRow>, index: usize, value: f32) {
-    if let Some(mut r) = rows.row_data(index)
-        && ((r.value - value).abs() > f32::EPSILON || r.text.is_empty())
-    {
-        r.value = value;
-        r.text = PARAMS[index].format(value).into();
-        rows.set_row_data(index, r);
+/// The parameter rows, one model per group of the strip (see `GroupRow` in `ui/onesiren.slint`).
+#[derive(Clone)]
+struct Rows(Rc<Vec<Rc<VecModel<ParamRow>>>>);
+
+impl Rows {
+    fn new(store: &ParamStore) -> Self {
+        Self(Rc::new(
+            GROUPS
+                .iter()
+                .map(|&(_, first, count)| {
+                    Rc::new(VecModel::from(
+                        PARAMS[first..first + count]
+                            .iter()
+                            .map(|d| row(d, store.get(d.id)))
+                            .collect::<Vec<_>>(),
+                    ))
+                })
+                .collect(),
+        ))
+    }
+
+    fn groups(&self) -> Vec<GroupRow> {
+        GROUPS
+            .iter()
+            .zip(self.0.iter())
+            .map(|(&(title, first, _), rows)| GroupRow {
+                title: title.into(),
+                first: first as i32,
+                params: ModelRc::from(rows.clone()),
+            })
+            .collect()
+    }
+
+    /// Show `value` for parameter `index` (of the parameter table).
+    fn set(&self, index: usize, value: f32) {
+        let Some((g, &(_, first, _))) = GROUPS
+            .iter()
+            .enumerate()
+            .find(|(_, (_, first, count))| (*first..first + count).contains(&index))
+        else {
+            return;
+        };
+        let rows = &self.0[g];
+        if let Some(mut r) = rows.row_data(index - first)
+            && ((r.value - value).abs() > f32::EPSILON || r.text.is_empty())
+        {
+            r.value = value;
+            r.text = PARAMS[index].format(value).into();
+            rows.set_row_data(index - first, r);
+        }
     }
 }
 
@@ -81,22 +124,8 @@ impl Editor {
         sink: &Rc<dyn HostSink>,
     ) -> Result<Self, slint::PlatformError> {
         let component = OneSiren::new()?;
-        let rows = Rc::new(VecModel::from(
-            PARAMS
-                .iter()
-                .map(|d| row(d, store.get(d.id)))
-                .collect::<Vec<_>>(),
-        ));
-        component.set_params(ModelRc::from(rows.clone()));
-        let groups: Vec<GroupRow> = GROUPS
-            .iter()
-            .map(|&(title, first, count)| GroupRow {
-                title: title.into(),
-                first: first as i32,
-                count: count as i32,
-            })
-            .collect();
-        component.set_groups(ModelRc::new(VecModel::from(groups)));
+        let rows = Rows::new(store);
+        component.set_groups(ModelRc::new(VecModel::from(rows.groups())));
         component.set_categories(ModelRc::new(VecModel::from(
             CATEGORIES
                 .iter()
@@ -129,7 +158,7 @@ fn wire_params(
     component: &OneSiren,
     store: &Arc<ParamStore>,
     sink: &Rc<dyn HostSink>,
-    rows: &Rc<VecModel<ParamRow>>,
+    rows: &Rows,
 ) {
     component.on_param_changed({
         let (store, sink, rows, weak) = (
@@ -144,7 +173,7 @@ fn wire_params(
             };
             let before = store.get(id);
             let stored = store.set_from_ui(id, value);
-            set_row(&rows, index as usize, stored);
+            rows.set(index as usize, stored);
             if (stored - before).abs() > f32::EPSILON {
                 sink.param_changed(id, stored);
                 if let Some(c) = weak.upgrade()
@@ -166,12 +195,7 @@ fn wire_params(
 }
 
 /// Header and keyboard: siren type, reset, notes.
-fn wire_strip(
-    component: &OneSiren,
-    store: &Arc<ParamStore>,
-    sink: &Rc<dyn HostSink>,
-    rows: &Rc<VecModel<ParamRow>>,
-) {
+fn wire_strip(component: &OneSiren, store: &Arc<ParamStore>, sink: &Rc<dyn HostSink>, rows: &Rows) {
     component.on_category_picked({
         let (sink, weak) = (sink.clone(), component.as_weak());
         move |c| {
@@ -190,7 +214,7 @@ fn wire_strip(
                 let v = store.set_from_ui(d.id, d.default);
                 sink.param_changed(d.id, v);
                 sink.gesture(d.id, false);
-                set_row(&rows, i, v);
+                rows.set(i, v);
             }
         }
     });
@@ -214,7 +238,7 @@ fn wire_strip(
 
 /// Host -> editor: automation, presets, MIDI input change values on other threads; the editor looks at
 /// the change mask at frame rate and refreshes only the rows that moved.
-fn poll_host_changes(store: &Arc<ParamStore>, rows: &Rc<VecModel<ParamRow>>) -> Timer {
+fn poll_host_changes(store: &Arc<ParamStore>, rows: &Rows) -> Timer {
     let poll = Timer::default();
     poll.start(TimerMode::Repeated, Duration::from_millis(16), {
         let (store, rows) = (store.clone(), rows.clone());
@@ -223,7 +247,7 @@ fn poll_host_changes(store: &Arc<ParamStore>, rows: &Rc<VecModel<ParamRow>>) -> 
             while mask != 0 {
                 let i = mask.trailing_zeros() as usize;
                 mask &= mask - 1;
-                set_row(&rows, i, store.get(PARAMS[i].id));
+                rows.set(i, store.get(PARAMS[i].id));
             }
         }
     });

@@ -2,19 +2,26 @@
 //! `juce::Image` in the plugin), and the host forwards its mouse events. No second native window, no OpenGL
 //! context, no event loop of Slint's own: the host's message thread drives everything through [`EmbeddedEditor::tick`].
 //!
+//! Partial rendering: the host keeps its pixels between ticks (a `juce::Image` does), so Slint redraws only
+//! what changed (`RepaintBufferType::ReusedBuffer`) and [`EmbeddedEditor::tick_region`] says which rectangle,
+//! for the host to repaint only that.
+//!
+//! `slint::invoke_from_event_loop` (used by Slint's live preview to reload `.slint` files, and by any other
+//! thread that wants to reach the UI) queues closures that the next tick runs.
+//!
 //! Slint's platform is process-global and single-threaded. Every editor of the process (several plugin
 //! instances in one host) is created and driven on the same thread (JUCE's message thread). Each plugin binary
 //! links its own copy of Slint, so other plugins using Slint do not share this platform.
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::rc::Rc;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use slint::platform::software_renderer::{
     MinimalSoftwareWindow, PremultipliedRgbaColor, RepaintBufferType, TargetPixel,
 };
-use slint::platform::{Platform, PointerEventButton, WindowAdapter, WindowEvent};
+use slint::platform::{EventLoopProxy, Platform, PointerEventButton, WindowAdapter, WindowEvent};
 use slint::{ComponentHandle, LogicalPosition, PhysicalSize};
 
 use crate::editor::{Editor, HostSink};
@@ -54,6 +61,36 @@ thread_local! {
     static NEXT_WINDOW: RefCell<Option<Rc<MinimalSoftwareWindow>>> = const { RefCell::new(None) };
 }
 
+type Job = Box<dyn FnOnce() + Send>;
+
+// Closures from `slint::invoke_from_event_loop`, run by the next tick on the editor thread.
+static JOBS: Mutex<Vec<Job>> = Mutex::new(Vec::new());
+
+struct JobQueue;
+
+impl EventLoopProxy for JobQueue {
+    fn quit_event_loop(&self) -> Result<(), slint::EventLoopError> {
+        Ok(()) // the host owns the event loop
+    }
+
+    fn invoke_from_event_loop(&self, event: Job) -> Result<(), slint::EventLoopError> {
+        JOBS.lock()
+            .map_err(|_| slint::EventLoopError::EventLoopTerminated)?
+            .push(event);
+        Ok(())
+    }
+}
+
+fn run_jobs() {
+    let jobs = JOBS
+        .lock()
+        .map(|mut q| std::mem::take(&mut *q))
+        .unwrap_or_default();
+    for job in jobs {
+        job();
+    }
+}
+
 struct EmbedPlatform {
     start: Instant,
 }
@@ -68,6 +105,10 @@ impl Platform for EmbedPlatform {
 
     fn duration_since_start(&self) -> Duration {
         self.start.elapsed()
+    }
+
+    fn new_event_loop_proxy(&self) -> Option<Box<dyn EventLoopProxy>> {
+        Some(Box::new(JobQueue))
     }
 }
 
@@ -94,6 +135,19 @@ pub enum Pointer {
 /// The editor's size in logical pixels (`OneSiren`'s `width` and `height` in `ui/onesiren.slint`).
 pub const LOGICAL_SIZE: (f32, f32) = (760.0, 262.0);
 
+/// The part of the host's pixels a tick redrew, in physical pixels.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct DirtyRect {
+    /// Left.
+    pub x: u32,
+    /// Top.
+    pub y: u32,
+    /// Width.
+    pub width: u32,
+    /// Height.
+    pub height: u32,
+}
+
 /// One editor rendered into host pixels.
 pub struct EmbeddedEditor {
     window: Rc<MinimalSoftwareWindow>,
@@ -102,7 +156,8 @@ pub struct EmbeddedEditor {
 }
 
 impl EmbeddedEditor {
-    /// The editor at `scale` physical pixels per logical pixel (the host's display scale).
+    /// The editor at `scale` physical pixels per logical pixel (the host's display scale), drawing into
+    /// pixels the host keeps between ticks (only what changed is redrawn).
     ///
     /// # Errors
     /// When the component cannot be created (another platform was installed first).
@@ -111,8 +166,22 @@ impl EmbeddedEditor {
         sink: &Rc<dyn HostSink>,
         scale: f32,
     ) -> Result<Self, slint::PlatformError> {
+        Self::with_repaint_buffer(store, sink, scale, RepaintBufferType::ReusedBuffer)
+    }
+
+    /// Like [`EmbeddedEditor::new`], choosing how Slint treats the host's pixels: `ReusedBuffer` when the host
+    /// hands the same, unmodified pixels to every tick (partial redraws), `NewBuffer` to redraw everything.
+    ///
+    /// # Errors
+    /// When the component cannot be created (another platform was installed first).
+    pub fn with_repaint_buffer(
+        store: &Arc<ParamStore>,
+        sink: &Rc<dyn HostSink>,
+        scale: f32,
+        repaint: RepaintBufferType,
+    ) -> Result<Self, slint::PlatformError> {
         install_platform();
-        let window = MinimalSoftwareWindow::new(RepaintBufferType::NewBuffer);
+        let window = MinimalSoftwareWindow::new(repaint);
         NEXT_WINDOW.with(|w| *w.borrow_mut() = Some(window.clone()));
         let editor = Editor::new(store, sink)?;
         window.dispatch_event(WindowEvent::ScaleFactorChanged {
@@ -143,13 +212,38 @@ impl EmbeddedEditor {
         (self.size.width, self.size.height)
     }
 
-    /// Run timers and animations, and redraw into `pixels` (`stride` pixels per row) if anything changed.
-    /// Returns true when the pixels were redrawn (the host then repaints). Call it from a host timer (60 Hz).
+    /// Run queued closures, timers and animations, and redraw into `pixels` (`stride` pixels per row) if
+    /// anything changed. Returns true when the pixels were redrawn (the host then repaints). Call it from a
+    /// host timer (60 Hz).
     pub fn tick(&self, pixels: &mut [Bgra8Premultiplied], stride: usize) -> bool {
+        self.tick_region(pixels, stride).is_some()
+    }
+
+    /// Like [`EmbeddedEditor::tick`], returning the rectangle that was redrawn (the host repaints only that).
+    pub fn tick_region(
+        &self,
+        pixels: &mut [Bgra8Premultiplied],
+        stride: usize,
+    ) -> Option<DirtyRect> {
+        run_jobs();
         slint::platform::update_timers_and_animations();
+        let dirty = Cell::new(None);
         self.window.draw_if_needed(|renderer| {
-            renderer.render(pixels, stride);
-        })
+            let region = renderer.render(pixels, stride);
+            let (origin, size) = (region.bounding_box_origin(), region.bounding_box_size());
+            dirty.set(Some(DirtyRect {
+                x: origin.x.max(0) as u32,
+                y: origin.y.max(0) as u32,
+                width: size.width,
+                height: size.height,
+            }));
+        });
+        dirty.get()
+    }
+
+    /// Mark the whole editor for redrawing (after the host lost its pixels, or to measure a full frame).
+    pub fn request_full_redraw(&self) {
+        self.window.request_redraw();
     }
 
     /// Forward a pointer event at logical coordinates (JUCE's component coordinates).

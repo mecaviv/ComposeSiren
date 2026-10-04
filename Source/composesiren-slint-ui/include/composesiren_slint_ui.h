@@ -41,6 +41,18 @@ typedef struct {
     void (*note)(void *context, uint8_t note, bool on);
 } CsSlintUiCallbacks;
 
+// The rectangle a tick redrew, in physical pixels (see [`cs_slint_ui_tick_region`]).
+typedef struct {
+    // Left.
+    uint32_t x;
+    // Top.
+    uint32_t y;
+    // Width.
+    uint32_t width;
+    // Height.
+    uint32_t height;
+} CsRect;
+
 #ifdef __cplusplus
 extern "C" {
 #endif // __cplusplus
@@ -74,14 +86,26 @@ void cs_slint_ui_set_param(const CsSlintUi *ui,
                            uint32_t param,
                            float value);
 
-// Run timers and animations; redraw into `pixels` (BGRA premultiplied, `juce::Image::ARGB`; `stride` pixels
-// per row, at least width x height) when something changed. True when redrawn.
+// Run queued work, timers and animations; redraw into `pixels` (BGRA premultiplied, `juce::Image::ARGB`;
+// `stride` pixels per row, at least width x height) when something changed. True when redrawn.
+//
+// Only what changed is redrawn: hand the same pixels, unmodified, to every tick (the editor's `juce::Image`).
 //
 // # Safety
 // `ui` is a live editor; `pixels` holds `stride * height` pixels.
 bool cs_slint_ui_tick(const CsSlintUi *ui,
                       uint8_t *pixels,
                       uint32_t stride);
+
+// Like [`cs_slint_ui_tick`], and writes the redrawn rectangle to `dirty` (if not null) when it returns true,
+// for the host to repaint only that part.
+//
+// # Safety
+// `ui` is a live editor; `pixels` holds `stride * height` pixels; `dirty` is null or writable.
+bool cs_slint_ui_tick_region(const CsSlintUi *ui,
+                             uint8_t *pixels,
+                             uint32_t stride,
+                             CsRect *dirty);
 
 // Forward a pointer event at logical coordinates.
 //

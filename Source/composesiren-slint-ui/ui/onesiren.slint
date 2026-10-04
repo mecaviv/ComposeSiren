@@ -15,10 +15,12 @@ export struct ParamRow {
     kind: int,           // 0 knob, 1 centred knob, 2 spin
 }
 
+// One group of the strip with its own rows: a repeater over `params` follows changes row by row, so a
+// knob that moves re-evaluates that cell only (indexing one flat model would make every cell depend on all).
 export struct GroupRow {
     title: string,
-    first: int,          // index into `params`
-    count: int,
+    first: int,          // index of the group's first parameter in the parameter table
+    params: [ParamRow],
 }
 
 component Keyboard inherits Rectangle {
@@ -75,7 +77,6 @@ export component OneSiren inherits Window {
     background: #1d2027;
     default-font-size: 13px;
 
-    in property <[ParamRow]> params;
     in property <[GroupRow]> groups;
     in property <color> strip-colour: #3a78d6;
     in property <[string]> categories: ["Alto", "Bass", "Tenor", "Soprano", "Piccolo"];
@@ -130,10 +131,9 @@ export component OneSiren inherits Window {
                 for g in root.groups : Group {
                     title: g.title;
                     colour: root.strip-colour;
-                    horizontal-stretch: g.count;
-                    for k in g.count : VerticalLayout {
+                    horizontal-stretch: g.params.length;
+                    for p[k] in g.params : VerticalLayout {
                         property <int> i: g.first + k;
-                        property <ParamRow> p: root.params[self.i];
                         spacing: 0px;
                         min-width: 44px;
                         Text {
