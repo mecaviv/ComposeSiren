@@ -21,7 +21,7 @@ Settings::Settings()
     file = std::make_unique<juce::PropertiesFile>(options);
 #endif
 
-    for (std::size_t i = 0; i < meta::settingCount; ++i) {
+    for (std::size_t i = 0; i < settingCount; ++i) {
         const auto id = idAt(i);
         juce::var v = describe(id).type == meta::SettingType::String
                           ? juce::var(juce::String())
@@ -49,6 +49,18 @@ Settings::~Settings()
 
 const meta::Setting& Settings::describe(Id id)
 {
+#if COMPOSESIREN_RESETALLCONTROLLERS && COMPOSESIREN_SETTINGS
+    if (id == controllerResetEnabled) {
+        static constexpr meta::Setting reset {
+            "reset_all_controllers.enabled", "Controller reset", "Enable",
+            meta::SettingType::Bool, 1.0, 0.0, 1.0, "", "",
+            "COMPOSESIREN_RESETALLCONTROLLERS", "global",
+            "Enable the experimental controller reset and MIDI CC 120/123 handling. "
+            "When off, reset_controllers returns an error and MIDI handling follows the main branch."
+        };
+        return reset;
+    }
+#endif
     return meta::settings[static_cast<std::size_t>(id)];
 }
 
@@ -62,6 +74,9 @@ bool Settings::isAvailable(Id id)
     if (option == "COMPOSESIREN_RECORD") return COMPOSESIREN_RECORD != 0;
     if (option == "COMPOSESIREN_PARK_BRIDGE") return COMPOSESIREN_PARK_BRIDGE != 0;
     if (option == "COMPOSESIREN_CLIC") return COMPOSESIREN_CLIC != 0;
+#if COMPOSESIREN_RESETALLCONTROLLERS && COMPOSESIREN_SETTINGS
+    if (option == "COMPOSESIREN_RESETALLCONTROLLERS") return true;
+#endif
     return false; // an option this build doesn't know about
 }
 
@@ -110,7 +125,7 @@ void Settings::setString(Id id, const juce::String& value)
 
 void Settings::resetToDefaults()
 {
-    for (std::size_t i = 0; i < meta::settingCount; ++i) {
+    for (std::size_t i = 0; i < settingCount; ++i) {
         const auto id = idAt(i);
         if (describe(id).type == meta::SettingType::String)
             setString(id, juce::String());
@@ -127,7 +142,7 @@ juce::Value Settings::getValueObject(Id id)
 void Settings::valueTreePropertyChanged(juce::ValueTree&, const juce::Identifier& property)
 {
     if (normalising) return;
-    for (std::size_t i = 0; i < meta::settingCount; ++i) {
+    for (std::size_t i = 0; i < settingCount; ++i) {
         const auto id = idAt(i);
         if (key(id) != property) continue;
 

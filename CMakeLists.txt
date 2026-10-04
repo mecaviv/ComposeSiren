@@ -133,11 +133,12 @@ composesiren_option(COMPOSESIREN_MCP
         ON)
 
 # DEAL WITH THE CONTROLLER RESET ###############################################
-# Adds thread-safe DSP reset requests, immediate silence before MIDI CC 121
-# resets the controllers, and MIDI CC 120 (All Sound Off) / 123 (All Notes Off).
+# Adds thread-safe DSP reset requests, a zero-volume callback before MIDI CC
+# 121 resets the controllers, and MIDI CC 120 (All Sound Off) / 123 (All Notes Off).
 # With COMPOSESIREN_MCP, also adds reset_controllers (the reset-all-controllers
 # Rust feature in Source/composesiren-mcp). Off: retain the main branch's DSP
 # behaviour and MCP tools. See Source/ComposeSirenCore/Mcp.cmake.
+# With COMPOSESIREN_SETTINGS, an Enable checkbox controls it at runtime.
 
 option(COMPOSESIREN_RESETALLCONTROLLERS
         "Thread-safe controller reset, MIDI CC 120/123, and the MCP reset_controllers tool"
@@ -202,6 +203,10 @@ if (APPLE)
 endif()
 
 composesiren_add_build_info() # after the options: it records them
+
+if(BUILD_TESTING)
+  enable_testing()
+endif()
 
 add_subdirectory(Assets)
 add_subdirectory(Source)

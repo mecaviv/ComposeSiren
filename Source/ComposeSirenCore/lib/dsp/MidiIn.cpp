@@ -116,7 +116,7 @@ void MidiIn::handleControlChange(int cc, int value) {
     switch (cc) {
 #if COMPOSESIREN_RESETALLCONTROLLERS
         case 120: // All Sound Off (standard MIDI)
-            if (value > 0) {
+            if (controllerResetEnabled && value > 0) {
                 allSoundOff();
             }
             break;
@@ -126,7 +126,7 @@ void MidiIn::handleControlChange(int cc, int value) {
             break;
 #if COMPOSESIREN_RESETALLCONTROLLERS
         case 123: // All Notes Off (standard MIDI)
-            if (value > 0) {
+            if (controllerResetEnabled && value > 0) {
                 allNotesOff();
             }
             break;
@@ -444,7 +444,8 @@ void MidiIn::resetSirene() {
 #if COMPOSESIREN_RESETALLCONTROLLERS
     // silence first : the reset used to leave a sounding note at its last
     // volume, since nothing told the siren that the note was gone
-    allSoundOff();
+    if (controllerResetEnabled)
+        allSoundOff();
 
 #endif
     noteOnFinal = 0.0;
@@ -473,7 +474,8 @@ void MidiIn::resetSirene() {
     noteOnFinal = 0.0;
     volumeFinal = 0.0;
 #if COMPOSESIREN_RESETALLCONTROLLERS
-    controlFinal = 0;
+    if (controllerResetEnabled)
+        controlFinal = 0;
 #endif
     control[6] = 64;
     control[12] = 127.;

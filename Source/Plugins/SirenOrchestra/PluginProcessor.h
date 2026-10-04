@@ -192,6 +192,9 @@ private:
 #endif
 #if COMPOSESIREN_SETTINGS
     void settingChanged(cs::Settings::Id id) override;
+#if COMPOSESIREN_RESETALLCONTROLLERS
+    void applyControllerResetSetting();
+#endif
     juce::SharedResourcePointer<cs::Settings> settings;
 #endif
 

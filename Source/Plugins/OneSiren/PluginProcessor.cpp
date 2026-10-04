@@ -43,11 +43,18 @@ OneSirenPluginProcessor::OneSirenPluginProcessor() :
 #endif
     vms.addListener(this);
     vms.notifyListeners();
+#if COMPOSESIREN_RESETALLCONTROLLERS && COMPOSESIREN_SETTINGS
+    settings->addListener(this);
+    applyControllerResetSetting();
+#endif
     startTimer(33);
 }
 
 OneSirenPluginProcessor::~OneSirenPluginProcessor()
 {
+#if COMPOSESIREN_RESETALLCONTROLLERS && COMPOSESIREN_SETTINGS
+    settings->removeListener(this);
+#endif
     vms.removeListener(this);
     stopTimer();
 }
@@ -59,6 +66,21 @@ void OneSirenPluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlo
     lastBlockSize = samplesPerBlock;
     siren.setSampleRate(sampleRate);
 }
+
+#if COMPOSESIREN_RESETALLCONTROLLERS && COMPOSESIREN_SETTINGS
+void OneSirenPluginProcessor::applyControllerResetSetting()
+{
+    const bool enabled = settings->getBool(cs::Settings::controllerResetEnabled);
+    siren.setControllerResetEnabled(enabled);
+    mcp.setControllerResetEnabled(enabled);
+}
+
+void OneSirenPluginProcessor::settingChanged(cs::Settings::Id id)
+{
+    if (id == cs::Settings::controllerResetEnabled)
+        applyControllerResetSetting();
+}
+#endif
 
 void OneSirenPluginProcessor::releaseResources()
 {

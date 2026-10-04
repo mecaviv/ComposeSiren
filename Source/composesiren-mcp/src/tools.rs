@@ -355,6 +355,25 @@ mod tests {
 
     #[cfg(feature = "reset-all-controllers")]
     #[test]
+    fn disabled_reset_is_reported_as_an_error() {
+        unsafe extern "C" fn disabled_dispatch(
+            _: *const std::ffi::c_char,
+            _: *mut std::ffi::c_void,
+        ) -> *mut std::ffi::c_char {
+            // SAFETY: the literal is NUL-terminated; Dispatch frees the malloc'd copy.
+            unsafe { libc::strdup(c"{\"ok\":false,\"error\":\"Controller reset is disabled in Settings.\"}".as_ptr()) }
+        }
+        // SAFETY: the callback lives for the entire test and touches no state.
+        let dispatch = unsafe { crate::dispatch::Dispatch::new(disabled_dispatch, std::ptr::null_mut()) };
+        let server = ComposeSirenServer::new(dispatch, std::sync::Arc::new(crate::stats::Stats::default()));
+        let error = server.reset_controllers(rmcp::handler::server::wrapper::Parameters(
+            composesiren_mcp_api::args::ResetControllers::default(),
+        )).unwrap_err();
+        assert_eq!(error.message, "Controller reset is disabled in Settings.");
+    }
+
+    #[cfg(feature = "reset-all-controllers")]
+    #[test]
     fn the_controller_reset_tools_are_the_ones_the_api_declares() {
         let router = ComposeSirenServer::controller_reset_router();
         let offered: Vec<String> = router.list_all().iter().map(|t| t.name.to_string()).collect();

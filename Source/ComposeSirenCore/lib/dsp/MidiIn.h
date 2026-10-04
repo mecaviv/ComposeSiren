@@ -33,11 +33,17 @@ public:
     void stopSirene();
     void resetSirene();
 #if COMPOSESIREN_RESETALLCONTROLLERS
+    // Audio thread only: the wrapper copies its atomic setting once per block.
+    void setControllerResetEnabled(bool enabled) { controllerResetEnabled = enabled; }
+    bool isControllerResetEnabled() const { return controllerResetEnabled; }
     void allSoundOff();
     void allNotesOff();
 #endif
 
 private:
+#if COMPOSESIREN_RESETALLCONTROLLERS
+    bool controllerResetEnabled = true;
+#endif
 	// per-siren midi message management, refactored from MidiIn class :
 
 	// ---------- will be called from above

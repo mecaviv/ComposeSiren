@@ -91,6 +91,8 @@ public:
     // when it has no such siren.
     using ResetHandler = std::function<bool(int siren)>;
     void setResetHandler(ResetHandler handler) { resetHandler = std::move(handler); }
+    // Message thread only, like the settings listener and resetControllers.
+    void setControllerResetEnabled(bool enabled) { controllerResetEnabled = enabled; }
 #endif
 
     struct ToolCount
@@ -162,6 +164,7 @@ private:
     int port = 0;
 #if COMPOSESIREN_RESETALLCONTROLLERS
     ResetHandler resetHandler;
+    bool controllerResetEnabled = true;
 #endif
 #if COMPOSESIREN_RECORD
     Recorder* recorder = nullptr;

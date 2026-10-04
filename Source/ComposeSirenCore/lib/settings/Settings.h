@@ -4,6 +4,7 @@
 // default and description, comes from lib/definitions/generated/
 // SettingsMetadata.h, committed, generated from mecaviv-dev-root's
 // resources/metadata/composesiren-settings.csv by `franz doctor fix meta`.
+// The compile-gated controller-reset row extends it in Settings::describe().
 //
 // With COMPOSESIREN_SETTINGS the values are stored per user (a properties
 // file next to the other Mecanique Vivante settings) and the Settings...
@@ -20,6 +21,15 @@ class Settings : private juce::ValueTree::Listener
 {
 public:
     using Id = mecaviv::metadata::SettingId;
+
+#if COMPOSESIREN_RESETALLCONTROLLERS && COMPOSESIREN_SETTINGS
+    // Optional extension: leave the generated base table and disabled builds
+    // unchanged. Stored by name, like the generated settings.
+    static constexpr Id controllerResetEnabled = static_cast<Id>(mecaviv::metadata::settingCount);
+    static constexpr std::size_t settingCount = mecaviv::metadata::settingCount + 1;
+#else
+    static constexpr std::size_t settingCount = mecaviv::metadata::settingCount;
+#endif
 
     class Listener
     {

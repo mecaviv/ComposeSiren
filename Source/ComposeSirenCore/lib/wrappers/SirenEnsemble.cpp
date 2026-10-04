@@ -121,6 +121,10 @@ void SirenEnsemble::stop(std::optional<sirenId> id) {
 }
 
 #if COMPOSESIREN_RESETALLCONTROLLERS
+void SirenEnsemble::setControllerResetEnabled(bool enabled) {
+    for (auto& t : tracks | std::views::values) { t->setControllerResetEnabled(enabled); }
+}
+
 void SirenEnsemble::requestReset(std::optional<sirenId> id) {
     if (id.has_value()) {
         tracks.at(id.value())->requestReset();

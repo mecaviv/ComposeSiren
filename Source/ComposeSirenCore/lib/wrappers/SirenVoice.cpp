@@ -62,8 +62,9 @@ void SirenVoiceUnit::handleMidi(int status, int value1, int value2) {
         midiIn->handleControlChange(value1, value2);
 #if COMPOSESIREN_RESETALLCONTROLLERS
         // all sound off, reset all controllers, all notes off
-        // (CC 121 resets on any value like the firmware; 120/123 act on value > 0)
-        if (value1 == 121 || ((value1 == 120 || value1 == 123) && value2 > 0)) {
+        // CC 121 resets on any value; CC 120/123 act on value > 0.
+        if (midiIn->isControllerResetEnabled()
+            && (value1 == 121 || ((value1 == 120 || value1 == 123) && value2 > 0))) {
             ino = false;
         }
 #endif
@@ -77,6 +78,10 @@ void SirenVoiceUnit::stopSiren() {
 }
 
 #if COMPOSESIREN_RESETALLCONTROLLERS
+void SirenVoiceUnit::setControllerResetEnabled(bool enabled) {
+    midiIn->setControllerResetEnabled(enabled);
+}
+
 void SirenVoiceUnit::resetSiren() {
     midiIn->resetSirene();
     ino = false;
@@ -229,7 +234,8 @@ void SirenVoice::stop()
 #if COMPOSESIREN_RESETALLCONTROLLERS
 void SirenVoice::requestReset()
 {
-    resetRequested.store(true, std::memory_order_release);
+    if (controllerResetEnabled.load(std::memory_order_acquire))
+        resetRequested.store(true, std::memory_order_release);
 }
 
 #endif
@@ -246,7 +252,10 @@ void SirenVoice::handleMidi(int status, int value1, int value2)
 void SirenVoice::beginProcessBlock()
 {
 #if COMPOSESIREN_RESETALLCONTROLLERS
-    if (resetRequested.exchange(false, std::memory_order_acq_rel)) {
+    const auto resetEnabled = controllerResetEnabled.load(std::memory_order_acquire);
+    rawSiren->setControllerResetEnabled(resetEnabled);
+    // Consume pending requests even when disabled; don't replay them later.
+    if (resetRequested.exchange(false, std::memory_order_acq_rel) && resetEnabled) {
         rawSiren->resetSiren();
     }
 #endif
@@ -281,5 +290,4 @@ void SirenVoice::notifyListeners()
         });
     }
 }
-
 

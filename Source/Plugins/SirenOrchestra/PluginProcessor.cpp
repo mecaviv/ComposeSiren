@@ -96,6 +96,9 @@ SirenOrchestraPluginProcessor::SirenOrchestraPluginProcessor() :
 #endif
 #if COMPOSESIREN_SETTINGS
     settings->addListener(this);
+#if COMPOSESIREN_RESETALLCONTROLLERS
+    applyControllerResetSetting();
+#endif
 #if COMPOSESIREN_CLIC
     applyClicOutputSetting();
 #endif
@@ -470,8 +473,21 @@ void SirenOrchestraPluginProcessor::renderClic(juce::AudioBuffer<float>& audio)
 #endif
 
 #if COMPOSESIREN_SETTINGS
+#if COMPOSESIREN_RESETALLCONTROLLERS
+void SirenOrchestraPluginProcessor::applyControllerResetSetting()
+{
+    const bool enabled = settings->getBool(cs::Settings::controllerResetEnabled);
+    ensemble.setControllerResetEnabled(enabled);
+    mcp.setControllerResetEnabled(enabled);
+}
+#endif
+
 void SirenOrchestraPluginProcessor::settingChanged(cs::Settings::Id id)
 {
+#if COMPOSESIREN_RESETALLCONTROLLERS
+    if (id == cs::Settings::controllerResetEnabled)
+        applyControllerResetSetting();
+#endif
 #if COMPOSESIREN_CLIC
     if (id == cs::Settings::Id::clicOutputDevice)
         applyClicOutputSetting();

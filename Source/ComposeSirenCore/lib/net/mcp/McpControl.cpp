@@ -310,7 +310,7 @@ namespace {
 
 std::optional<cs::Settings::Id> settingIdFromString(const juce::String& name)
 {
-    for (std::size_t i = 0; i < mecaviv::metadata::settingCount; ++i) {
+    for (std::size_t i = 0; i < cs::Settings::settingCount; ++i) {
         const auto id = cs::Settings::idAt(i);
         const auto& d = cs::Settings::describe(id);
         if (name == juce::String(d.id.data(), d.id.size()))
@@ -346,7 +346,7 @@ std::string McpControl::listSettings() const
 {
     juce::SharedResourcePointer<cs::Settings> settings;
     juce::Array<juce::var> rows;
-    for (std::size_t i = 0; i < mecaviv::metadata::settingCount; ++i)
+    for (std::size_t i = 0; i < cs::Settings::settingCount; ++i)
         rows.add(settingObject(*settings, cs::Settings::idAt(i)));
     auto* object = new juce::DynamicObject();
     object->setProperty("ok", true);
@@ -484,6 +484,8 @@ std::string McpControl::clearSongTitle()
 #if COMPOSESIREN_RESETALLCONTROLLERS
 std::string McpControl::resetControllers(int siren) const
 {
+    if (!controllerResetEnabled)
+        return jsonOf(failure("Controller reset is disabled in Settings.")).toStdString();
     if (!resetHandler)
         return jsonOf(failure("this plugin cannot reset its controllers")).toStdString();
     if (siren < 0 || siren > 16)

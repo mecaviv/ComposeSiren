@@ -74,6 +74,7 @@ public:
 #if COMPOSESIREN_RESETALLCONTROLLERS
     // thread-safe, see SirenVoice::requestReset (nullopt = every siren)
     void requestReset(std::optional<sirenId> id = std::nullopt);
+    void setControllerResetEnabled(bool enabled);
 #endif
 
     void setPanning(sirenId id, float p);

@@ -128,17 +128,58 @@ $ cmake --build cmake-build-debug --target OneSiren_Standalone
 
 ### Controller reset
 
-Controller reset is opt-in: `-DCOMPOSESIREN_RESETALLCONTROLLERS=ON` enables
-thread-safe DSP reset requests, zero-volume requests before MIDI CC 121 resets the
-controllers, and MIDI CC 120 (All Sound Off) / CC 123 (All Notes Off).
-With `COMPOSESIREN_MCP=ON`, it also adds `reset_controllers` (`siren`: 1–7,
-or omitted for all). Siren parameters return to defaults; reverb and master
-settings are kept. SirenOrchestra forwards the reset to the park bridge when
-it is enabled.
-
-The default is `OFF`: these additions are excluded from C++ and Rust, and
-the MIDI handling and MCP tool set remain the same as the main branch.
+Controller reset is experimental and opt-in. Configure with
+`-DCOMPOSESIREN_RESETALLCONTROLLERS=ON` to compile thread-safe DSP reset
+requests and additional MIDI CC 120/123 handling. The default is `OFF`:
+the additions, their runtime setting, and the MCP reset tool are excluded.
 The Rust server feature is `reset-all-controllers`.
+
+With `COMPOSESIREN_SETTINGS=ON`, **Settings... → Controller reset → Enable**
+controls the compiled feature at runtime. It defaults to on and is stored
+as `reset_all_controllers.enabled`, shared by plugin instances in the same
+process. Turning it off keeps the existing CC 121 reset and knob synchronization,
+but disables the extra zero-volume request and CC 120/123 handling. With settings
+compiled out, the compiled feature remains enabled.
+
+With `COMPOSESIREN_MCP=ON`, the feature adds `reset_controllers`: pass
+`siren` (1–7) or omit it for all sirens. Selected siren parameters return
+to their declared plugin defaults, including pitch-bend range; reverb and
+master settings are kept. When enabled, SirenOrchestra forwards the reset
+to the optional park bridge. If the runtime setting is off, the tool remains
+listed and returns "Controller reset is disabled in Settings." before changing
+parameters or sending a bridge command.
+
+Reset requests are applied at an audio block boundary. The runtime flag is
+sampled per block; the audio thread does not read the settings ValueTree.
+Pending requests consumed in a disabled block are discarded.
+
+#### MIDI behavior and current limitations
+
+CC 121 accepts any value and keeps the existing controller-reset map and
+knob synchronization. With this feature enabled, it additionally cancels
+attack/release ramps, requests zero MIDI-level volume and clears accumulated
+modulation depth. The MIDI controller-reset map and MCP's plugin-default
+reset are distinct operations.
+
+CC 120 requests zero MIDI-level volume and cancels ramps; CC 123 releases
+the current monophonic note through the existing release path. Both currently
+act **only when the value is greater than zero**. The standard value zero
+is ignored: this is a known interoperability limitation. The
+[MIDI controller table](https://midi.org/midi-1-0-control-change-messages)
+specifies zero for CC 120, 121 and 123. This siren-specific CC 121 behavior
+also differs from the controller-only reset described in
+[RP-015](https://midi.org/response-to-reset-all-controllers).
+
+A zero-volume callback does not guarantee a sample-immediate cut to silence:
+the DSP still models flap interpolation and leakage, and reverb is not cleared.
+CC 123 does not add polyphonic note tracking or sustain-pedal handling.
+Channel routing is unchanged, including SirenOrchestra's existing CC 121
+on channel 16 convention for resetting all sirens.
+
+Characterization tests can be enabled with
+`-DCOMPOSESIREN_RESETALLCONTROLLERS=ON -DBUILD_TESTING=ON`. Build
+`ComposeSirenControllerResetTests`, then run `ctest --test-dir <build>`.
+The tests record the current behavior, including the value-zero limitation.
 
 ### Recorder
 
