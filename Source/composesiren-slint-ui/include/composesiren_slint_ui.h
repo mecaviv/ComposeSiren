@@ -95,11 +95,13 @@ void cs_slint_ui_pointer(const CsSlintUi *ui, CsPointer kind, float x, float y);
 // `ui` is a live editor.
 void cs_slint_ui_wheel(const CsSlintUi *ui, float x, float y, float dx, float dy);
 
-// Show the siren type chosen elsewhere (state restore).
+// Show the siren type chosen elsewhere (state restore, `VoiceManagerState::Listener`). Not reported back
+// through `category_changed`, so the plugin's listener does not loop.
 //
 // # Safety
 // `ui` is a live editor.
-void cs_slint_ui_set_category(const CsSlintUi *ui, uint32_t category);
+void cs_slint_ui_set_category(const CsSlintUi *ui,
+                              uint32_t category);
 
 // Number of parameters in the table (indices `0..count`).
 uint32_t cs_slint_ui_param_count(void);

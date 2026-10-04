@@ -1,5 +1,5 @@
 //! Render the embedded editor headless (the path the plugin uses), before and after a simulated drag and a
-//! host automation change, and write PNGs: `cargo run --example render_png --no-default-features -- <dir> [scale]`.
+//! host automation change, and write PNGs: `cargo run --example render_png -- <dir> [scale]`.
 
 use std::cell::RefCell;
 use std::fs::File;

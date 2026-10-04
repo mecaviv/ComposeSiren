@@ -218,6 +218,17 @@ composesiren_option(COMPOSESIREN_SIREN_WAVES
         "Animated waves in SirenOrchestra's title cells (OpenGL, software fallback)"
         OFF)
 
+# DEAL WITH THE SLINT EDITOR (EXPERIMENT) ######################################
+# OneSiren's editor drawn by the Slint UI written in Rust (Rust crate
+# Source/composesiren-slint-ui), rendered into the JUCE editor's own window.
+# JUCE keeps the audio, the parameters and the plugin formats. Off: the JUCE
+# components editor, unchanged. See docs/slint-port-investigation.md and
+# Source/composesiren-slint-ui/SlintUi.cmake.
+
+composesiren_option(COMPOSESIREN_SLINT_UI
+        "Experimental OneSiren editor drawn by the Slint UI (Rust) inside the JUCE editor"
+        OFF)
+
 #set(PLUGIN_TARGETS OneSiren)
 set(PLUGIN_TARGETS OneSiren SirenOrchestra)
 #set(PLUGIN_TARGETS CustomMix)

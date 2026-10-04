@@ -16,9 +16,12 @@ license = "GPL-3.0-only"
 crate-type = ["staticlib", "rlib"]
 
 [features]
-default = ["standalone"]
-# A top-level window through winit, for `cargo run`. The plugin build turns it off: inside a host the UI
-# renders with the software renderer into the editor's pixels (src/embed.rs), so no winit/GL in the plugin.
+# Nothing by default: the plugin (CMake, COMPOSESIREN_SLINT_UI) builds the staticlib with the default
+# features, and inside a host the UI renders with the software renderer into the JUCE editor's pixels
+# (src/embed.rs), so no winit, no GL, no second window in the plugin.
+default = []
+# A top-level window through winit for the standalone preview:
+# `cargo run --features standalone --bin onesiren-slint`.
 standalone = ["slint/backend-winit"]
 
 [dependencies]

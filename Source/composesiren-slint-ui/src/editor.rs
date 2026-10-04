@@ -64,6 +64,13 @@ fn colour(siren: usize) -> slint::Color {
     slint::Color::from_rgb_u8(r, g, b)
 }
 
+/// Show a siren type chosen elsewhere (the plugin's state, the other editor) without reporting it back.
+pub fn show_category(component: &OneSiren, category: usize) {
+    let category = category.min(CATEGORIES.len() - 1);
+    component.set_category(category as i32);
+    component.set_strip_colour(colour(CATEGORIES[category].1));
+}
+
 impl Editor {
     /// Build the component for `store`, sending UI changes to `sink`.
     ///
@@ -96,9 +103,7 @@ impl Editor {
                 .map(|(n, _)| SharedString::from(*n))
                 .collect::<Vec<_>>(),
         )));
-        let category = 3; // Soprano, the screenshot in the README
-        component.set_category(category);
-        component.set_strip_colour(colour(CATEGORIES[category as usize].1));
+        show_category(&component, 3); // Soprano until the host says otherwise
 
         wire_params(&component, store, sink, &rows);
         wire_strip(&component, store, sink, &rows);
