@@ -123,9 +123,9 @@ function(add_plugin_variant TARGET_NAME PLUGIN_CODE BUNDLE_ID)
       juce::juce_recommended_lto_flags
   )
 
-  # The Slint editor experiment: OneSiren only, see composesiren-slint-ui/SlintUi.cmake
+  # The Slint editor experiment: OneSiren only. The crate target is created in
+  # ComposeSirenCore/CMakeLists.txt, see composesiren-slint-ui/SlintUi.cmake
   if(COMPOSESIREN_SLINT_UI AND TARGET_NAME STREQUAL "OneSiren")
-    include("${CMAKE_CURRENT_LIST_DIR}/composesiren-slint-ui/SlintUi.cmake")
     target_link_libraries(${TARGET_NAME} PRIVATE composesiren_slint_ui)
     target_compile_definitions(${TARGET_NAME} PRIVATE COMPOSESIREN_SLINT_UI=1)
   else()

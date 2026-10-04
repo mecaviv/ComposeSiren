@@ -195,6 +195,10 @@ composesiren_option(COMPOSESIREN_SLINT_UI
 set(PLUGIN_TARGETS OneSiren SirenOrchestra)
 #set(PLUGIN_TARGETS CustomMix)
 
+# Clones without --recursive: fetch Dependencies/JUCE first (cmake/GitSubmodules.cmake)
+include("${CMAKE_CURRENT_LIST_DIR}/cmake/GitSubmodules.cmake")
+composesiren_ensure_git_submodules()
+
 add_subdirectory(Dependencies/JUCE)
 
 set(FORMATS "VST3" "Standalone")
