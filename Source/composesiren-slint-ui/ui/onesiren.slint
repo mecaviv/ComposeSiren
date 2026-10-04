@@ -3,6 +3,7 @@
 // formatting come from the Rust parameter model (src/params.rs); every change goes back through callbacks.
 
 import { Knob, Spin, Group, Pill } from "widgets.slint";
+import { Theme } from "generated/metadata.slint";
 
 export struct ParamRow {
     caption: string,     // label, and "ccN" on a second line
@@ -124,7 +125,7 @@ export component OneSiren inherits Window {
         Rectangle {
             height: 148px;
             border-radius: 9px;
-            background: #314159;
+            background: Theme.colour-background-strip-grey;
             HorizontalLayout {
                 padding: 3px;
                 spacing: 3px;
@@ -162,7 +163,7 @@ export component OneSiren inherits Window {
         // keyboard ---------------------------------------------------------------
         Keyboard {
             height: 68px;
-            accent: #ff9900;
+            accent: Theme.colour-orange-mecanique;
             note(n, on) => { root.note(n, on); }
         }
     }

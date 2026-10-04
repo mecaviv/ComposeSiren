@@ -1,6 +1,7 @@
 //! Proof of concept: ComposeSiren's `OneSiren` editor in Slint, Rust first.
 //!
 //! - `params`: the siren parameters (ids, bounds, CC numbers), mirrored from `parameterDefinitions.h`.
+//! - `metadata`: the interface tables shared with the JUCE editor (`UiMetadata.h`), generated: do not edit.
 //! - `store`: lock-free values shared by the host side and the editor.
 //! - `midi`: the MIDI message each value mirrors.
 //! - `editor`: the Slint component bound to the store; UI changes go to a [`editor::HostSink`].
@@ -11,6 +12,8 @@
 pub mod editor;
 pub mod embed;
 pub mod ffi;
+#[path = "generated/metadata.rs"]
+pub mod metadata;
 pub mod midi;
 pub mod params;
 pub mod store;

@@ -354,3 +354,59 @@ fn hsl_to_rgb(h: f32, s: f32, l: f32) -> (u8, u8, u8) {
         to8(hue(p, q, h - 1.0 / 3.0)),
     )
 }
+
+#[cfg(test)]
+mod generated_metadata {
+    use super::{GROUPS, Midi, PARAMS, ParamDef, Widget, siren_colour};
+    use crate::metadata::{self, PARAMETERS, SECTIONS, SIRENS};
+
+    fn generated(def: &ParamDef) -> &'static metadata::Parameter {
+        PARAMETERS
+            .iter()
+            .find(|p| p.code_name == def.code_name)
+            .expect("every strip parameter is in the generated table")
+    }
+
+    #[test]
+    fn the_strip_table_matches_the_generated_one() {
+        for def in &PARAMS {
+            let p = generated(def);
+            assert_eq!(
+                (p.strip_label, p.min, p.max, p.step, p.default),
+                (def.label, def.min, def.max, def.step, def.default),
+                "{}",
+                def.code_name
+            );
+            let midi = match def.midi {
+                Midi::Cc(n) => metadata::Midi::Cc(n),
+                Midi::PitchWheel => metadata::Midi::PitchWheel,
+                Midi::None => metadata::Midi::None,
+            };
+            let widget = match def.widget {
+                Widget::Knob => metadata::Widget::Knob,
+                Widget::CentredKnob => metadata::Widget::CentredKnob,
+                Widget::Spin => metadata::Widget::Spin,
+            };
+            assert_eq!((p.midi, p.widget), (midi, widget), "{}", def.code_name);
+        }
+    }
+
+    #[test]
+    fn the_groups_are_the_generated_sections() {
+        for (g, (title, first, count)) in GROUPS.iter().enumerate() {
+            assert_eq!(SECTIONS[g].title, *title);
+            for k in 0..*count {
+                assert_eq!(generated(&PARAMS[first + k]).section, Some((g, k)));
+            }
+        }
+    }
+
+    #[test]
+    fn the_colour_ramp_gives_the_generated_strip_colours() {
+        for (i, s) in SIRENS.iter().enumerate() {
+            let (r, g, b) = siren_colour(i);
+            let rgb = (u32::from(r) << 16) | (u32::from(g) << 8) | u32::from(b);
+            assert_eq!(s.strip_colour & 0x00ff_ffff, rgb, "{}", s.id);
+        }
+    }
+}
