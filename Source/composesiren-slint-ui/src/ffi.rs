@@ -172,16 +172,14 @@ pub unsafe extern "C" fn cs_slint_ui_wheel(ui: *const CsSlintUi, x: f32, y: f32,
     unsafe { &*ui }.editor.wheel(x, y, dx, dy);
 }
 
-/// Show the siren type chosen elsewhere (state restore).
+/// Show the siren type chosen elsewhere (state restore, `VoiceManagerState::Listener`). Not reported back
+/// through `category_changed`, so the plugin's listener does not loop.
 ///
 /// # Safety
 /// `ui` is a live editor.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn cs_slint_ui_set_category(ui: *const CsSlintUi, category: u32) {
-    let c = unsafe { &*ui }.editor.component();
-    let category = (category as usize).min(crate::params::CATEGORIES.len() - 1);
-    c.set_category(category as i32);
-    c.invoke_category_picked(category as i32);
+    crate::editor::show_category(unsafe { &*ui }.editor.component(), category as usize);
 }
 
 /// Number of parameters in the table (indices `0..count`).

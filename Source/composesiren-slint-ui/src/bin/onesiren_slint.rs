@@ -1,6 +1,6 @@
 //! The `OneSiren` editor in its own window, with a simulated host that prints what the plugin would receive.
 //!
-//! `cargo run` shows the editor; `cargo run -- --automate` also moves Vibrato Depth from another thread, the
+//! `cargo run --features standalone --bin onesiren-slint` shows the editor; add `-- --automate` to also move Vibrato Depth from another thread, the
 //! way host automation does, to show host -> editor updates through the lock-free store.
 
 use std::rc::Rc;
