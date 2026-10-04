@@ -5,7 +5,6 @@ description = "Proof of concept: ComposeSiren's OneSiren editor in Slint, with t
 edition = "2024"
 rust-version = "1.92"  # Slint 1.18 requires it (the other crates need 1.88)
 publish = false
-license = "GPL-3.0-only"
 
 # A standalone package inside ComposeSiren, not a member of any workspace (like the other crates).
 [workspace]
@@ -25,7 +24,7 @@ default = []
 standalone = ["slint/backend-winit"]
 
 [dependencies]
-# GPL-3.0-only is one of Slint's three licences; ComposeSiren is GPL-3.0 too (see the investigation doc).
+# Slint under its GPL-3.0-only option, like ComposeSiren (GPLv3): see docs/slint-port-investigation.md.
 slint = { version = "1.18.1", default-features = false, features = ["std", "compat-1-2", "renderer-software"] }
 
 [dev-dependencies]
