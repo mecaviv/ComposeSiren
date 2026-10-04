@@ -1,4 +1,4 @@
-// GENERATED from the interface metadata (composesiren-parameters.csv, composesiren-ui-sections.csv, composesiren-ui-sirens.csv and composesiren-ui-theme.csv). Do not edit: change the metadata and regenerate.
+// GENERATED from the shared metadata (composesiren-parameters.csv, composesiren-ui-sections.csv, composesiren-ui-sirens.csv and composesiren-ui-theme.csv). Do not edit: change the metadata and regenerate.
 #pragma once
 
 #include <array>
