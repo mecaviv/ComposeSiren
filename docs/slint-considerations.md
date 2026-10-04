@@ -136,6 +136,46 @@ What the numbers taught, and what is now in the PoC:
   `ComponentPeer`/`Desktop` scale listeners).
 - **Line-by-line rendering** (`render_by_line`) only helps memory-constrained targets. Not useful here.
 
+### What the Slint showcase audio plugins do
+
+A survey of the Slint showcase ([slint-showcase-rendering.md](slint-showcase-rendering.md), 2026-10-05)
+found no open plugin code that uses the software renderer in a host window:
+
+- The two showcase DAW plugins, [WesAudio](https://slint.dev/success/wesaudio-daw.html) and
+  [Viiri Audio Aava](https://slint.dev/success/viiri-audio.html), are closed source.
+- Aava's author publishes [plugin-things](https://github.com/ilmai/plugin-things) (MIT):
+  `plugin-canvas` and `plugin-canvas-slint`. That Aava uses it is an inference from shared authorship.
+  - It creates a native child window (`WS_CHILD` HWND, NSView, X11).
+  - A custom Slint `Platform` and `WindowAdapter` drive the **Skia GPU renderer**: Direct3D on Windows,
+    Metal on macOS 13+ (OpenGL before), OpenGL on Linux.
+  - `request_redraw()` only sets a flag; `render()` runs on the next frame tick only when it is set.
+  - Ticks are vsync-paced: DXGI `WaitForVBlank` on Windows, `CADisplayLink` on macOS 14+, a 16 ms host
+    timer on Linux.
+- [slint-baseview](https://codeberg.org/RustAudio/slint-baseview) and
+  [nice-plug-slint](https://github.com/aidan729/nice-plug-slint) use FemtoVG on OpenGL and render
+  **every** 15 ms tick unconditionally, with vsync off. Not a performance model.
+- Slint's C++ [`platform_native`](https://github.com/slint-ui/slint/blob/master/examples/cpp/platform_native/windowadapter_win.h)
+  example does the same with `slint::platform::SkiaRenderer` in a `WS_CHILDWINDOW`: `request_redraw()` is
+  `InvalidateRect`, and `WM_PAINT` renders.
+- Slint discussions: [#4691](https://github.com/slint-ui/slint/discussions/4691) (GPU backends repaint the
+  full window) and [#5677](https://github.com/slint-ui/slint/discussions/5677) (FemtoVG to Skia cut CPU
+  from about 30 % to 2 %, for a binary of about 20 MB instead of 3 MB).
+
+The survey's software-renderer checklist, against the PoC:
+
+| Recommendation | PoC |
+|---|---|
+| `RepaintBufferType::ReusedBuffer` and one persistent buffer | done (`embed.rs`; one `juce::Image` per editor) |
+| Repaint only the region `render()` returns, in logical coordinates | done (bounding box; several rectangles to do, above) |
+| Render straight into the JUCE image memory through `TargetPixel` | done (`Bgra8Premultiplied` written through `Image::BitmapData`, no conversion pass) |
+| `juce::SoftwareImageType`, not the native (Direct2D) image | done |
+| Buffer in physical pixels, scale passed to Slint (`ScaleFactorChanged`), so JUCE never resamples | done at creation; re-creating on scale change is to do |
+| Tick from `juce::VBlankAttachment`, render only when Slint asked | render-on-request done (`draw_if_needed`); `VBlankAttachment` to do (60 Hz `Timer` now) |
+| Apply host values once per tick, not per audio callback | done (lock-free store read at tick) |
+
+What stays expensive on this path is continuous animation over large areas (meters, the SirenWaves
+cells, spectra) and big editors at 2x: that is when to move to a GPU renderer.
+
 ### Alternatives that keep JUCE
 
 | Option | How | Gains | Costs and risks |
@@ -143,15 +183,20 @@ What the numbers taught, and what is now in the PoC:
 | **A. Software renderer into `juce::Image`** (now) | As above | Works in every host and format; no native child window; no GPU context; headless tests | CPU per changed pixel; the upload to the OS on repaint |
 | **B. Slint FemtoVG (OpenGL) on a JUCE `OpenGLContext`** | Attach a `juce::OpenGLContext` to the editor; a custom Slint `WindowAdapter` whose renderer is `slint::platform::femtovg_renderer::FemtoVGRenderer::new(impl OpenGLInterface)`, where `ensure_current`, `swap_buffers` and `get_proc_address` forward to JUCE's context (`juce::OpenGLHelpers::getExtensionFunction`); call `renderer.render()` from `renderOpenGL()` | GPU raster; no CPU-to-OS upload; scales well at 2x and for SirenOrchestra | JUCE renders GL on **its own thread**, but Slint is single-threaded: the whole Slint UI must then live on the GL thread (the lock-free Rust store makes that workable, and input events must be queued to it). OpenGL is deprecated on macOS. Contexts per editor instance, and GL state shared with JUCE's own GL drawing. Needs the `renderer-femtovg` feature. |
 | **C. Skia renderer** (`renderer-skia`: Metal on macOS, D3D on Windows, Vulkan/GL on Linux) | Same custom-adapter pattern; Skia's Metal/D3D surfaces need the native view or layer | Best quality and speed; Metal on macOS (no deprecated GL) | Large dependency (Skia binaries, build time); surfaces bound to a native view, so effectively option D on macOS and Windows |
-| **D. Native child window parented under JUCE's peer** | Slint (winit backend, or `slint-baseview`) creates an `NSView`/`HWND`/X11 window as a child of `getWindowHandle()`, rendering with FemtoVG or Skia | GPU rendering, Slint's own input, text input and IME, and its own event loop integration | Child windows inside host windows are where plugin UIs break: focus and keyboard routing, resize, DPI changes, z-order, per host and per OS. Slint's winit backend wants to own the event loop, so it must be pumped from JUCE (no `run()`). `slint-baseview` is a git dependency. |
+| **D. Native child window parented under JUCE's peer, Skia GPU** (the pattern of the showcase plugin code) | **D1, fastest to try:** `plugin-canvas` + `plugin-canvas-slint`, with `getPeer()->getNativeHandle()` (or a `juce::HWNDComponent` / `NSViewComponent` / `XEmbedComponent`) as the parent window handle; on Linux call its `on_frame()` from a 16 ms `juce::Timer`; forward JUCE scale changes to `set_scale()`. **D2, own the adapter:** a `WindowAdapter` of about 300 lines modelled on `plugin-canvas-slint/src/window_adapter.rs` or Slint's C++ `platform_native` example: child view, `SkiaRenderer` (`default_direct3d` / `default_metal`), JUCE mouse and key events translated to `WindowEvent`s, driven by `juce::VBlankAttachment` (queued closures, `update_timers_and_animations()`, then `render()` only when `request_redraw` set the flag). Slint's C++ `slint::platform::SkiaRenderer` lets D2 live in C++. | GPU raster straight into a native surface: no CPU raster, no copy, no second blit by JUCE; vsync-paced, redraw on request; Metal on macOS. Shipping evidence: Aava (inferred). | Child windows inside host windows are where plugin UIs break: focus and keyboard routing, resize, DPI changes, z-order, per host and per OS. D1 depends on Slint's internal `i-slint-*` crates pinned to `~1.17.1` (breaks on Slint upgrades) and uses one global Slint platform per process. Skia makes the binary much bigger. Avoid `slint-baseview` as a model (renders every 15 ms, GL, vsync off). |
 | **E. Event loop integration (applies to every option)** | A custom Slint `Platform` driven by the JUCE message thread: `update_timers_and_animations()` from a JUCE timer, `duration_until_next_timer_update()` to schedule the next tick, and an `EventLoopProxy` for `invoke_from_event_loop` | No second event loop; Slint timers and animations run on JUCE's thread | Already done for A in the PoC; B needs the same on the GL thread |
 
 Recommendation:
-- Stay on **A**, with the partial-redraw improvements, for OneSiren.
-- Prototype SirenOrchestra's 7 strips at 2x on A (the `frame_time` example extended to that layout) before
-  porting it.
-- If that is too slow, try **B** first (no child windows, same embedding model) and keep **D** as the last
-  resort.
+- Stay on **A** for OneSiren: with partial redraws it is 0.2 to 1.6 ms per change (measured above). Finish
+  its checklist items: `VBlankAttachment`, several dirty rectangles, image re-creation on scale changes.
+- Prototype SirenOrchestra's 7 strips at 2x on A (the `frame_time` example extended to that layout), with
+  and without a continuously animating cell, before porting it.
+- If that is too slow, move to a GPU renderer:
+  - **D** (Skia in a child window) is the route the showcase plugin code proves. Benchmark **D1**
+    (`plugin-canvas-slint`) against A on the same UI at 1x and 2x, then write **D2** (own adapter,
+    `VBlankAttachment`) for production, to avoid the pinned internal crates.
+  - **B** stays the option without child windows, if host child-window problems show up. Mind its GL
+    thread and macOS's deprecated OpenGL.
 
 ## 3. Shared interface metadata
 
