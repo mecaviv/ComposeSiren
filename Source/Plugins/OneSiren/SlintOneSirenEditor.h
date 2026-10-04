@@ -27,7 +27,7 @@ public:
         juce::AudioProcessorEditor(&p),
         audioProcessor(p)
     {
-        const float scale = displayScale();
+        scale = displayScale();
         ui.reset(cs_slint_ui_new(callbacks(), scale));
         jassert(ui != nullptr);
         pixels = juce::Image(juce::Image::ARGB,
@@ -126,10 +126,20 @@ private:
 
     void timerCallback() override
     {
-        // Slint draws only when something changed (an edit, a host value, an animation).
-        juce::Image::BitmapData data(pixels, juce::Image::BitmapData::readWrite);
-        if (cs_slint_ui_tick(ui.get(), data.data, static_cast<uint32_t>(data.lineStride / data.pixelStride))) {
-            repaint();
+        // Slint draws only when something changed (an edit, a host value, an animation), and only that
+        // part of the image (the image keeps the rest): repaint that rectangle, in logical pixels.
+        CsRect dirty {};
+        bool redrawn = false;
+        {
+            juce::Image::BitmapData data(pixels, juce::Image::BitmapData::readWrite);
+            redrawn = cs_slint_ui_tick_region(ui.get(), data.data,
+                                              static_cast<uint32_t>(data.lineStride / data.pixelStride), &dirty);
+        }
+        if (redrawn) {
+            repaint(juce::Rectangle<float>(static_cast<float>(dirty.x), static_cast<float>(dirty.y),
+                                           static_cast<float>(dirty.width), static_cast<float>(dirty.height))
+                        .transformedBy(juce::AffineTransform::scale(1.0f / scale))
+                        .getSmallestIntegerContainer());
         }
     }
 
@@ -147,6 +157,7 @@ private:
     OneSirenPluginProcessor& audioProcessor;
     std::unique_ptr<CsSlintUi, UiDeleter> ui;
     juce::Image pixels;
+    float scale = 1.0f;
     std::array<std::unique_ptr<juce::ParameterAttachment>, parameterCount> attachments;
 };
 
