@@ -1,6 +1,6 @@
 /*
  * composesiren-slint-ui: C ABI of the Slint editor proof of concept. The JUCE
- * side is sketched in Source/composesiren-slint-ui/juce/SlintEditor.h.
+ * side is sketched in Source/Plugins/OneSiren/SlintOneSirenEditor.h.
  */
 
 #ifndef COMPOSESIREN_SLINT_UI_H

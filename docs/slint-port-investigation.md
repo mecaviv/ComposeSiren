@@ -8,8 +8,11 @@ editor. Nothing changes in the default build: the Slint editor sits behind a new
 
 ## TL;DR
 
-- **It works.** OneSiren's editor (strip, header, keyboard) is reimplemented in `.slint` plus Rust, about
-  1,700 lines including the tests and the JUCE bridge.
+- **It works, inside the real plugin.** OneSiren's editor (strip, header, keyboard) is reimplemented in
+  `.slint` plus Rust, about 1,900 lines including the tests and the JUCE bridge. With
+  `-DCOMPOSESIREN_SLINT_UI=ON`, the JUCE OneSiren Standalone and VST3 build on Linux. The Standalone ran
+  with the Slint editor: knob drags, the mouse wheel and the siren type all went through the APVTS and
+  `VoiceManagerState`.
   - Slint's software renderer draws it straight into a `juce::Image` owned by an ordinary
     `juce::AudioProcessorEditor`, which forwards its mouse events to Slint.
   - There is no second native window, no OpenGL context, and no event loop of Slint's own.
@@ -19,7 +22,7 @@ editor. Nothing changes in the default build: the Slint editor sits behind a new
 - **The bridge is a C ABI.** It is built as a Rust staticlib with the repo's existing
   `composesiren_add_rust_staticlib` (Corrosion on Linux/Windows, cargo + lipo on macOS), with a
   cbindgen-generated committed header, exactly like `composesiren-record` or `composesiren-mcp`. The C++
-  side is one header-only editor class (`SlintOneSirenEditor.h`, about 170 lines).
+  side is one header-only editor class (`SlintOneSirenEditor.h`, about 150 lines).
 - **Full-port effort:** about 6 to 9 weeks for one developer for OneSiren + SirenOrchestra at visual parity,
   host testing included (see the [estimate](#effort-estimate-for-a-full-ui-port)).
 - **Recommendation:** go on with this architecture (option A below), port OneSiren completely first, ship it
@@ -54,7 +57,7 @@ little UI logic: values, ranges and CC numbers come from the parameter definitio
 ```
  host ── JUCE plugin (VST3/AU/Standalone) ─────────────────────────────────────────────
          AudioProcessor + APVTS + SirenVoice (C++, unchanged)
-         SlintOneSirenEditor : juce::AudioProcessorEditor        (C++, ~170 lines)
+         SlintOneSirenEditor : juce::AudioProcessorEditor        (C++, ~150 lines)
            ├─ ParameterAttachment x14 ──► cs_slint_ui_set_param ──► ParamStore (atomics)
            ├─ Timer 60 Hz ──► cs_slint_ui_tick(pixels) ──► Slint software renderer
            ├─ paint(): drawImage(pixels)                     ▲
@@ -120,8 +123,8 @@ Source/composesiren-slint-ui/
   src/bin/onesiren_slint.rs  standalone preview window with a simulated host (feature `standalone`)
   examples/render_png.rs  headless render through the plugin path, before/after a drag
   tests/                  model, MIDI, store; embedded render + drag with gestures
-  juce/SlintOneSirenEditor.h  the JUCE editor using the C ABI
   SlintUi.cmake           composesiren_add_rust_staticlib for the crate
+Source/Plugins/OneSiren/SlintOneSirenEditor.h   the JUCE editor using the C ABI (next to PluginEditor.h)
 ```
 
 Wiring outside the crate is small and opt-in:
@@ -180,11 +183,31 @@ The default configuration (option OFF) builds exactly what it built before.
 | `cargo build` / `cargo test` (6 tests) / `cargo clippy` pedantic, both feature sets | pass (Linux, rustc 1.99) |
 | Standalone preview window (winit, X11) | runs; knob drags print gestures, values and the CC; siren type recolours; `--automate` moves Depth live |
 | Headless render through the embedded path, 1x and 2x | pass; drag on Portamento → 64, host Volume 40 / Timbre 100 shown |
-| Plugin build with `-DCOMPOSESIREN_SLINT_UI=ON` (Linux) | see [build notes](#plugin-build-notes) |
-| macOS / Windows plugin builds, host testing | not done |
+| Plugin build with `-DCOMPOSESIREN_SLINT_UI=ON` (Linux, GCC 14, Ninja, Release) | OneSiren_Standalone + OneSiren_VST3 build and link (see [build notes](#plugin-build-notes)) |
+| JUCE OneSiren Standalone with the Slint editor (X11) | runs. Volume drag → 76, wheel on Portamento → 5, siren type → Bass through `VoiceManagerState` (strip recoloured); the header shows the mirrored CC |
+| Default build, option OFF | OneSiren_Standalone builds; no Slint symbols in the binary |
+| macOS / Windows plugin builds, DAW host testing | not done |
 
-Release `libcomposesiren_slint_ui.a` is about 50 MB before linking. Most of that is dropped by the linker;
-the linked size increase still needs to be measured, and is expected in the low MBs (fonts, text shaping).
+Size: the Release `libcomposesiren_slint_ui.a` is about 50 MB, but the linker drops most of it. The
+unstripped Linux OneSiren Standalone is 38.4 MB with the option ON and 23.0 MB with it OFF, so about
++15 MB unstripped; the stripped difference still needs to be measured on macOS.
+
+#### Plugin build notes
+
+The box (Debian 13, GCC 14) needed two flags that have **nothing to do with Slint**. Upstream fails the same
+way on that toolchain: the code is normally built with Apple clang, whose headers include more
+transitively.
+- `Sirene.cpp` uses `memset` without `<cstring>`, and `SirenVoice.h` / `SirenEnsemble.h` use `std::atomic`
+  without `<atomic>`. Worked around with `-DCMAKE_CXX_FLAGS="-include atomic -include cstring"`.
+- `std::atomic` of a non-lock-free struct (for example in `PerSirenMidiBridges`) needs libatomic. Worked
+  around with `-DCMAKE_CXX_STANDARD_LIBRARIES=-latomic`.
+
+The proper fix is two `#include`s and a `target_link_libraries(... atomic)` on Linux. I left it out of this
+change to keep its diff UI-only. Also needed on Debian: the JUCE dev packages (ALSA, FreeType, fontconfig,
+X11 headers) plus `cmake ninja-build g++`.
+
+On macOS no extra flags should be needed. Corrosion is not used there: the helper runs cargo per
+architecture plus lipo, and `SlintUi.cmake` adds the CoreText/CoreGraphics/CoreFoundation frameworks.
 
 ### What the PoC does not do yet
 
@@ -255,7 +278,13 @@ This is not legal advice. It is a summary of the licence texts to check with the
 
 ## Screenshots
 
-Standalone preview (`--automate`): after a drag on Volume (76) and picking Piccolo; Vibrato Depth moved
+The JUCE OneSiren Standalone built with `-DCOMPOSESIREN_SLINT_UI=ON` (JUCE window, Slint editor). The
+screenshot is after a Volume drag, five wheel steps on Portamento, and a click on the siren type (Alto →
+Bass, through `VoiceManagerState`).
+
+![OneSiren JUCE standalone with the Slint editor](slint-images/onesiren-juce-standalone.png)
+
+The Rust standalone preview (`--automate`): after a drag on Volume (76) and picking Piccolo; Vibrato Depth moved
 by the simulated host; the header shows the CC the drag mirrors.
 
 ![OneSiren in Slint, standalone preview](slint-images/onesiren-standalone.png)
