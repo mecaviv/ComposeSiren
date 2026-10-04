@@ -1,0 +1,52 @@
+[package]
+name = "composesiren-slint-ui"
+version = "0.1.0"
+description = "Proof of concept: ComposeSiren's OneSiren editor in Slint, with the parameter model in Rust"
+edition = "2024"
+rust-version = "1.92"  # Slint 1.18 requires it (the other crates need 1.88)
+publish = false
+license = "GPL-3.0-only"
+
+# A standalone package inside ComposeSiren, not a member of any workspace (like the other crates).
+[workspace]
+
+[lib]
+# staticlib: linked into the JUCE plugin through the C ABI (src/ffi.rs, include/composesiren_slint_ui.h).
+# rlib: used by the standalone binary, the example and the tests.
+crate-type = ["staticlib", "rlib"]
+
+[features]
+default = ["standalone"]
+# A top-level window through winit, for `cargo run`. The plugin build turns it off: inside a host the UI
+# renders with the software renderer into the editor's pixels (src/embed.rs), so no winit/GL in the plugin.
+standalone = ["slint/backend-winit"]
+
+[dependencies]
+# GPL-3.0-only is one of Slint's three licences; ComposeSiren is GPL-3.0 too (see the investigation doc).
+slint = { version = "1.18.1", default-features = false, features = ["std", "compat-1-2", "renderer-software"] }
+
+[dev-dependencies]
+png = "0.17"
+
+[build-dependencies]
+slint-build = "1.18.1"
+cbindgen = { version = "0.29.4", default-features = false }
+
+[[bin]]
+name = "onesiren-slint"
+path = "src/bin/onesiren_slint.rs"
+required-features = ["standalone"]
+
+[[example]]
+name = "render_png"
+
+[lints.rust]
+missing_docs = "warn"
+
+[lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+module_name_repetitions = "allow"
+cast_possible_truncation = "allow"
+cast_precision_loss = "allow"
+cast_sign_loss = "allow"
+cast_possible_wrap = "allow"
