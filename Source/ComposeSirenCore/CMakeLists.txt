@@ -94,6 +94,12 @@ else()
   target_compile_definitions(ComposeSirenCore PUBLIC COMPOSESIREN_SETTINGS=0)
 endif()
 
+if(COMPOSESIREN_SONG_TITLE)
+  target_compile_definitions(ComposeSirenCore PUBLIC COMPOSESIREN_SONG_TITLE=1)
+else()
+  target_compile_definitions(ComposeSirenCore PUBLIC COMPOSESIREN_SONG_TITLE=0)
+endif()
+
 target_link_libraries(ComposeSirenCore
   PRIVATE
     # copied from projucer project

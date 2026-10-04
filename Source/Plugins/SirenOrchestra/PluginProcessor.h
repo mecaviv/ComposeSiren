@@ -121,7 +121,9 @@ public:
     SirenUdpBridge& getUdpBridge() { return udpBridge; }
 #endif
     McpControl& getMcp() { return mcp; }
+#if COMPOSESIREN_SONG_TITLE
     McpControl* getMcpControl() override { return &mcp; }
+#endif
 
 private:
     // needed by DSP

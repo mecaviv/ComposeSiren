@@ -191,12 +191,14 @@ std::string McpControl::handle(const juce::var& request)
         return sendMidi(static_cast<int>(request.getProperty("status", 0)),
                         static_cast<int>(request.getProperty("data1", 0)),
                         static_cast<int>(request.getProperty("data2", 0)));
+#if COMPOSESIREN_SONG_TITLE
     if (op == "set_song_title")
         return setSongTitle(request);
     if (op == "set_song_progress")
         return setSongProgress(request);
     if (op == "clear_song_title")
         return clearSongTitle();
+#endif
 
 #if COMPOSESIREN_SETTINGS || COMPOSESIREN_CLIC
     if (op == "list_settings")
@@ -398,6 +400,7 @@ std::string McpControl::sendMidi(int status, int data1, int data2) const
     return jsonOf(object).toStdString();
 }
 
+#if COMPOSESIREN_SONG_TITLE
 namespace {
 
 juce::var songObject(const SongDisplay& song)
@@ -471,6 +474,7 @@ std::string McpControl::clearSongTitle()
     sendChangeMessage();
     return jsonOf(okObject()).toStdString();
 }
+#endif // COMPOSESIREN_SONG_TITLE
 
 #if COMPOSESIREN_RECORD
 std::string McpControl::recording(const juce::String& op, const juce::var& request) const
