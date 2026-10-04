@@ -1,0 +1,169 @@
+// OneSiren's editor (Source/Plugins/OneSiren/PluginEditor.cpp) in Slint: the header (siren type, MIDI routing,
+// Reset), the strip of the siren's 14 parameters in five groups, and a keyboard. Values, captions and
+// formatting come from the Rust parameter model (src/params.rs); every change goes back through callbacks.
+
+import { Knob, Spin, Group, Pill } from "widgets.slint";
+
+export struct ParamRow {
+    caption: string,     // label, and "ccN" on a second line
+    value: float,
+    text: string,        // formatted value
+    minimum: float,
+    maximum: float,
+    step: float,
+    default-value: float,
+    kind: int,           // 0 knob, 1 centred knob, 2 spin
+}
+
+export struct GroupRow {
+    title: string,
+    first: int,          // index into `params`
+    count: int,
+}
+
+component Keyboard inherits Rectangle {
+    in property <color> accent;
+    in property <int> lowest: 24;           // C1
+    in property <int> white-keys: 43;       // C1..C7
+    callback note(int, bool);
+    property <[int]> degree: [0, 2, 4, 5, 7, 9, 11];
+    property <length> key-width: root.width / root.white-keys;
+    property <int> held: -1;
+    background: #101215;
+    for i in root.white-keys : Rectangle {
+        property <int> n: root.lowest + 12 * floor(i / 7) + root.degree[mod(i, 7)];
+        x: i * root.key-width;
+        width: root.key-width - 1px;
+        background: root.held == self.n ? root.accent : white;
+        border-radius: 2px;
+        if mod(i, 7) == 0 : Text {
+            y: parent.height - 14px; x: 3px;
+            text: "C" + floor(i / 7 + 1);
+            color: #333; font-size: 10px;
+        }
+        TouchArea {
+            pointer-event(e) => {
+                if e.kind == PointerEventKind.down { root.held = parent.n; root.note(parent.n, true); }
+                if e.kind == PointerEventKind.up { root.held = -1; root.note(parent.n, false); }
+            }
+        }
+    }
+    for i in root.white-keys - 1 : Rectangle {
+        property <int> d: mod(i, 7);
+        property <int> n: root.lowest + 12 * floor(i / 7) + root.degree[self.d] + 1;
+        visible: self.d != 2 && self.d != 6;
+        x: (i + 1) * root.key-width - root.key-width * 0.3;
+        y: 0;
+        width: root.key-width * 0.6;
+        height: root.height * 0.6;
+        background: root.held == self.n ? root.accent : #555b63;
+        border-radius: 2px;
+        TouchArea {
+            enabled: parent.visible;
+            pointer-event(e) => {
+                if e.kind == PointerEventKind.down { root.held = parent.n; root.note(parent.n, true); }
+                if e.kind == PointerEventKind.up { root.held = -1; root.note(parent.n, false); }
+            }
+        }
+    }
+}
+
+export component OneSiren inherits Window {
+    title: "OneSiren — Slint proof of concept";
+    width: 760px;
+    height: 262px;
+    background: #1d2027;
+    default-font-size: 13px;
+
+    in property <[ParamRow]> params;
+    in property <[GroupRow]> groups;
+    in property <color> strip-colour: #3a78d6;
+    in property <[string]> categories: ["Alto", "Bass", "Tenor", "Soprano", "Piccolo"];
+    in-out property <int> category: 3;
+    in-out property <int> midi-in: 0;       // 0 = Any, 1..16
+    in property <string> midi-out-text;
+
+    callback param-changed(int, float);
+    callback param-gesture(int, bool);
+    callback category-picked(int);
+    callback reset-all();
+    callback note(int, bool);
+
+    VerticalLayout {
+        padding: 4px;
+        spacing: 4px;
+        // header ---------------------------------------------------------------
+        HorizontalLayout {
+            height: 26px;
+            spacing: 8px;
+            Pill {
+                text: "▾ " + root.categories[root.category];
+                clicked => {
+                    root.category = mod(root.category + 1, root.categories.length);
+                    root.category-picked(root.category);
+                }
+            }
+            Text { text: "Siren type"; color: white; vertical-alignment: center; }
+            Rectangle { width: 8px; height: 8px; y: 9px; border-radius: 4px; background: #5ee05e; }
+            Pill {
+                text: "▾ " + (root.midi-in == 0 ? "Any" : root.midi-in);
+                clicked => { root.midi-in = mod(root.midi-in + 1, 17); }
+            }
+            Text { text: "MIDI In"; color: white; vertical-alignment: center; }
+            Text {
+                text: root.midi-out-text;
+                color: #9aa4b2; font-size: 12px;
+                vertical-alignment: center; horizontal-alignment: right;
+                horizontal-stretch: 1;
+                overflow: elide;
+            }
+            Pill { text: "Reset"; tint: #8b1d1d; clicked => { root.reset-all(); } }
+        }
+        // the strip --------------------------------------------------------------
+        Rectangle {
+            height: 148px;
+            border-radius: 9px;
+            background: #314159;
+            HorizontalLayout {
+                padding: 3px;
+                spacing: 3px;
+                for g in root.groups : Group {
+                    title: g.title;
+                    colour: root.strip-colour;
+                    horizontal-stretch: g.count;
+                    for k in g.count : VerticalLayout {
+                        property <int> i: g.first + k;
+                        property <ParamRow> p: root.params[self.i];
+                        spacing: 0px;
+                        min-width: 44px;
+                        Text {
+                            text: p.caption;
+                            height: 30px;
+                            color: white; font-size: 12px;
+                            horizontal-alignment: center; vertical-alignment: top;
+                        }
+                        if p.kind != 2 : Knob {
+                            height: 88px;
+                            value: p.value; minimum: p.minimum; maximum: p.maximum; step: p.step;
+                            default-value: p.default-value; centred: p.kind == 1; text: p.text;
+                            changed(v) => { root.param-changed(i, v); }
+                            gesture(b) => { root.param-gesture(i, b); }
+                        }
+                        if p.kind == 2 : Spin {
+                            height: 88px;
+                            value: p.value; step: p.step; text: p.text;
+                            changed(v) => { root.param-changed(i, v); }
+                            gesture(b) => { root.param-gesture(i, b); }
+                        }
+                    }
+                }
+            }
+        }
+        // keyboard ---------------------------------------------------------------
+        Keyboard {
+            height: 68px;
+            accent: #ff9900;
+            note(n, on) => { root.note(n, on); }
+        }
+    }
+}
