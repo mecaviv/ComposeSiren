@@ -7,6 +7,9 @@ include("${CMAKE_SOURCE_DIR}/cmake/RustStaticLib.cmake")
 # The recording tools with COMPOSESIREN_RECORD, the song title tools with
 # COMPOSESIREN_SONG_TITLE.
 set(_cs_mcp_features "")
+if(COMPOSESIREN_RESETALLCONTROLLERS)
+  list(APPEND _cs_mcp_features reset-all-controllers)
+endif()
 if(COMPOSESIREN_RECORD)
   list(APPEND _cs_mcp_features record)
 endif()

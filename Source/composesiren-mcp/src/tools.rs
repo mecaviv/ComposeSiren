@@ -10,9 +10,11 @@ use serde_json::{Value, json};
 use std::sync::Arc;
 
 use composesiren_mcp_api::args::{
-    GetSetting, ParameterId, ResetControllers, SendMidi, SendNote, SetAudioDevice, SetMidiInput, SetMidiOutput,
+    GetSetting, ParameterId, SendMidi, SendNote, SetAudioDevice, SetMidiInput, SetMidiOutput,
     SetParameter, SetSetting,
 };
+#[cfg(feature = "reset-all-controllers")]
+use composesiren_mcp_api::args::ResetControllers;
 #[cfg(feature = "record")]
 use composesiren_mcp_api::args::{StartRecording, StopRecording};
 #[cfg(feature = "song-title")]
@@ -33,6 +35,8 @@ pub struct ComposeSirenServer {
 impl ComposeSirenServer {
     pub fn new(dispatch: Dispatch, stats: Arc<Stats>) -> Self {
         let tool_router = Self::tool_router();
+        #[cfg(feature = "reset-all-controllers")]
+        let tool_router = tool_router + Self::controller_reset_router();
         #[cfg(feature = "record")]
         let tool_router = tool_router + Self::record_router();
         #[cfg(feature = "song-title")]
@@ -101,22 +105,6 @@ impl ComposeSirenServer {
             return self.finish(stopped);
         }
         self.finish(started)
-    }
-
-    #[tool(description = "Reset the controllers of one siren, or of every siren when `siren` is omitted, like MIDI CC 121. \
-        Volume, pitch bend, pitch bend range, vibrato, tremolo, portamento, attack and release, transpose and the other \
-        siren parameters go back to their defaults, and sounding notes are cut. Reverb and master settings are kept.")]
-    fn reset_controllers(
-        &self,
-        Parameters(args): Parameters<ResetControllers>,
-    ) -> Result<CallToolResult, McpError> {
-        if args.siren.is_some_and(|siren| !(1..=7).contains(&siren)) {
-            return Err(McpError::invalid_params("siren must be 1 to 7", None));
-        }
-        self.finish(self.dispatch.call(json!({
-            "op": "reset_controllers",
-            "siren": args.siren.unwrap_or(0),
-        })))
     }
 
     #[tool(description = "List audio input and output devices. Only the standalone owns them.")]
@@ -206,6 +194,27 @@ impl ComposeSirenServer {
     }
 }
 
+/// The controller reset tool, with `COMPOSESIREN_RESETALLCONTROLLERS`.
+#[cfg(feature = "reset-all-controllers")]
+#[tool_router(router = controller_reset_router)]
+impl ComposeSirenServer {
+    #[tool(description = "Reset the controllers of one siren, or of every siren when `siren` is omitted, like MIDI CC 121. \
+        Volume, pitch bend, pitch bend range, vibrato, tremolo, portamento, attack and release, transpose and the other \
+        siren parameters go back to their defaults, and sounding notes are cut. Reverb and master settings are kept.")]
+    fn reset_controllers(
+        &self,
+        Parameters(args): Parameters<ResetControllers>,
+    ) -> Result<CallToolResult, McpError> {
+        if args.siren.is_some_and(|siren| !(1..=7).contains(&siren)) {
+            return Err(McpError::invalid_params("siren must be 1 to 7", None));
+        }
+        self.finish(self.dispatch.call(json!({
+            "op": "reset_controllers",
+            "siren": args.siren.unwrap_or(0),
+        })))
+    }
+}
+
 /// The song title tools, with the `song-title` feature (`COMPOSESIREN_SONG_TITLE`).
 #[cfg(feature = "song-title")]
 #[tool_router(router = song_title_router)]
@@ -273,7 +282,7 @@ impl ComposeSirenServer {
 }
 
 // The field, not the macro's default `Self::tool_router()`: with the `record`
-// or `song-title` features, `new` adds those tools to it.
+// or `song-title` / `reset-all-controllers` features, `new` adds those tools to it.
 //
 // `call_tool` is written out, rather than left to the macro, to count each tool.
 #[tool_handler(router = self.tool_router)]
@@ -323,6 +332,33 @@ mod tests {
         offered.sort();
         let mut declared: Vec<String> = tool::ALWAYS.iter().map(|t| (*t).to_owned()).collect();
         declared.sort();
+        assert_eq!(offered, declared);
+    }
+
+    #[test]
+    fn reset_tool_is_offered_only_when_enabled() {
+        unsafe extern "C" fn unused_dispatch(
+            _: *const std::ffi::c_char,
+            _: *mut std::ffi::c_void,
+        ) -> *mut std::ffi::c_char {
+            std::ptr::null_mut()
+        }
+        // SAFETY: the callback lives for the entire test and touches no state.
+        let dispatch = unsafe { crate::dispatch::Dispatch::new(unused_dispatch, std::ptr::null_mut()) };
+        let server = ComposeSirenServer::new(dispatch, std::sync::Arc::new(crate::stats::Stats::default()));
+        let offered = server.tool_router.list_all();
+        assert_eq!(
+            offered.iter().filter(|t| t.name == tool::RESET_CONTROLLERS).count(),
+            usize::from(cfg!(feature = "reset-all-controllers")),
+        );
+    }
+
+    #[cfg(feature = "reset-all-controllers")]
+    #[test]
+    fn the_controller_reset_tools_are_the_ones_the_api_declares() {
+        let router = ComposeSirenServer::controller_reset_router();
+        let offered: Vec<String> = router.list_all().iter().map(|t| t.name.to_string()).collect();
+        let declared: Vec<String> = tool::CONTROLLER_RESET.iter().map(|t| (*t).to_owned()).collect();
         assert_eq!(offered, declared);
     }
 

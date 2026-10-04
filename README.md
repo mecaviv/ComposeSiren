@@ -126,6 +126,20 @@ $ cmake -B cmake-build-debug -DCMAKE_BUILD_TYPE=Debug
 $ cmake --build cmake-build-debug --target OneSiren_Standalone
 ```
 
+### Controller reset
+
+Controller reset is opt-in: `-DCOMPOSESIREN_RESETALLCONTROLLERS=ON` enables
+thread-safe DSP reset requests, zero-volume requests before MIDI CC 121 resets the
+controllers, and MIDI CC 120 (All Sound Off) / CC 123 (All Notes Off).
+With `COMPOSESIREN_MCP=ON`, it also adds `reset_controllers` (`siren`: 1–7,
+or omitted for all). Siren parameters return to defaults; reverb and master
+settings are kept. SirenOrchestra forwards the reset to the park bridge when
+it is enabled.
+
+The default is `OFF`: these additions are excluded from C++ and Rust, and
+the MIDI handling and MCP tool set remain the same as the main branch.
+The Rust server feature is `reset-all-controllers`.
+
 ### Recorder
 
 SirenOrchestra can record its audio output, after the reverb, to FLAC (24-bit)

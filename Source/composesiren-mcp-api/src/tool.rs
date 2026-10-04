@@ -26,7 +26,8 @@ pub const LIST_SETTINGS: &str = "list_settings";
 pub const GET_SETTING: &str = "get_setting";
 /// `set_setting`.
 pub const SET_SETTING: &str = "set_setting";
-/// `reset_controllers`.
+/// `reset_controllers` (a build with `COMPOSESIREN_RESETALLCONTROLLERS`).
+/// `tap-viewer midi --reset` asks for it and goes on without it.
 pub const RESET_CONTROLLERS: &str = "reset_controllers";
 /// `set_song_title` (a build with `COMPOSESIREN_SONG_TITLE`): show the playing
 /// song in the UI (title bar) with an optional progress bar. `tap-viewer midi
@@ -60,7 +61,6 @@ pub const ALWAYS: &[&str] = &[
     LIST_SETTINGS,
     GET_SETTING,
     SET_SETTING,
-    RESET_CONTROLLERS,
 ];
 
 /// Only a build with the song title bar has these.
@@ -68,3 +68,7 @@ pub const SONG_TITLE: &[&str] = &[SET_SONG_TITLE, SET_SONG_PROGRESS, CLEAR_SONG_
 
 /// Only a build with the recorder has these.
 pub const RECORDING: &[&str] = &[START_RECORDING, STOP_RECORDING, RECORDING_STATUS];
+
+/// Only a build with controller reset has these.
+#[cfg(feature = "reset-all-controllers")]
+pub const CONTROLLER_RESET: &[&str] = &[RESET_CONTROLLERS];

@@ -34,11 +34,13 @@ OneSirenPluginProcessor::OneSirenPluginProcessor() :
     mcp(*this, "OneSiren", "MvOS")
 {
     ssm.subscribe(&siren);
+#if COMPOSESIREN_RESETALLCONTROLLERS
     // one siren : any siren number means the current one
     mcp.setResetHandler([this](int) {
         siren.requestReset();
         return true;
     });
+#endif // COMPOSESIREN_RESETALLCONTROLLERS
     vms.addListener(this);
     vms.notifyListeners();
     startTimer(33);

@@ -132,6 +132,16 @@ composesiren_option(COMPOSESIREN_MCP
         "In-process MCP server for parameters, MIDI, and standalone audio/MIDI devices"
         ON)
 
+# CONTROLLER RESET ############################################################
+# Keep the default build identical to master, including the About options:
+# advertise this opt-in feature only when it is enabled.
+option(COMPOSESIREN_RESETALLCONTROLLERS
+        "Thread-safe controller reset, MIDI CC 120/123, and the MCP reset_controllers tool"
+        OFF)
+if(COMPOSESIREN_RESETALLCONTROLLERS)
+  set_property(GLOBAL APPEND PROPERTY COMPOSESIREN_OPTIONS COMPOSESIREN_RESETALLCONTROLLERS)
+endif()
+
 # DEAL WITH THE RECORDER #######################################################
 # Records the audio output to FLAC or WAV (Rust crate Source/composesiren-record,
 # pure Rust encoders): a Record dialog in the editor, and, with COMPOSESIREN_MCP,

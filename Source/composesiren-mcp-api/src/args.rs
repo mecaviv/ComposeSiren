@@ -129,6 +129,7 @@ pub struct SetSongProgress {
 }
 
 /// `reset_controllers`.
+#[cfg(feature = "reset-all-controllers")]
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ResetControllers {

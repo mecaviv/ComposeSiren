@@ -54,6 +54,10 @@ target_sources(ComposeSirenCore
 
 # ------------------------------------------------------------------------------
 
+target_compile_definitions(ComposeSirenCore PUBLIC
+  COMPOSESIREN_RESETALLCONTROLLERS=$<BOOL:${COMPOSESIREN_RESETALLCONTROLLERS}>
+)
+
 if(COMPOSESIREN_MCP)
   include("${CMAKE_CURRENT_LIST_DIR}/Mcp.cmake")
   target_link_libraries(ComposeSirenCore PUBLIC composesiren_mcp)

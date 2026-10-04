@@ -114,19 +114,23 @@ void MidiIn::handleControlChange(int cc, int value) {
     // - pitch bend range (cc 16)
     // - effect order switch (cc 42) but this one is not implemented in firmware
     switch (cc) {
+#if COMPOSESIREN_RESETALLCONTROLLERS
         case 120: // All Sound Off (standard MIDI)
             if (value > 0) {
                 allSoundOff();
             }
             break;
+#endif // COMPOSESIREN_RESETALLCONTROLLERS
         case 121: // Reset All Controllers: any value, as the firmware does
             resetSirene();
             break;
+#if COMPOSESIREN_RESETALLCONTROLLERS
         case 123: // All Notes Off (standard MIDI)
             if (value > 0) {
                 allNotesOff();
             }
             break;
+#endif // COMPOSESIREN_RESETALLCONTROLLERS
         case 1 : { // vibrato depth
             control[1] = value ;
             if (control[11] == 0) {
@@ -407,6 +411,7 @@ void MidiIn::stopSirene() {
     ancienVolFinal = -1;
 }
 
+#if COMPOSESIREN_RESETALLCONTROLLERS
 void MidiIn::allNotesOff() {
     // the note goes through the release envelope, like a regular note off
     if (velocite > 0.0) {
@@ -434,11 +439,14 @@ void MidiIn::allSoundOff() {
     onVolumeChanged(0);
 }
 
+#endif // COMPOSESIREN_RESETALLCONTROLLERS
 void MidiIn::resetSirene() {
+#if COMPOSESIREN_RESETALLCONTROLLERS
     // silence first : the reset used to leave a sounding note at its last
     // volume, since nothing told the siren that the note was gone
     allSoundOff();
 
+#endif // COMPOSESIREN_RESETALLCONTROLLERS
     noteOnFinal = 0.0;
     ///////////////////////////////////////////////////****** Ferme les volets
     ancienVolFinal = -1;
@@ -464,7 +472,9 @@ void MidiIn::resetSirene() {
     tourMoteur = 0.0;
     noteOnFinal = 0.0;
     volumeFinal = 0.0;
+#if COMPOSESIREN_RESETALLCONTROLLERS
     controlFinal = 0;
+#endif // COMPOSESIREN_RESETALLCONTROLLERS
     control[6] = 64;
     control[12] = 127.;
     control[13] = 127.;

@@ -12,6 +12,8 @@ publish = false
 crate-type = ["staticlib", "rlib"]
 
 [features]
+# The reset_controllers tool, for COMPOSESIREN_RESETALLCONTROLLERS.
+reset-all-controllers = ["composesiren-mcp-api/reset-all-controllers"]
 # The recording tools (start_recording, stop_recording, recording_status), for
 # a plugin built with COMPOSESIREN_RECORD.
 record = []

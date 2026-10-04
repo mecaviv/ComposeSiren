@@ -5,7 +5,9 @@
 #include <lib/definitions/sirenProperties.h>
 #include <apvtsUtilities.h>
 #include <pathUtilities.h>
+#if COMPOSESIREN_RESETALLCONTROLLERS
 #include <algorithm>
+#endif // COMPOSESIREN_RESETALLCONTROLLERS
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 #include "AboutDialog.h"
@@ -60,6 +62,7 @@ SirenOrchestraPluginProcessor::SirenOrchestraPluginProcessor() :
     mcp(*this, "SirenOrchestra", "MvSO")
 {
     ssm.subscribe(&ensemble);
+#if COMPOSESIREN_RESETALLCONTROLLERS
     mcp.setResetHandler([this](int siren) {
         std::optional<sirenId> id;
         if (siren > 0) {
@@ -77,6 +80,7 @@ SirenOrchestraPluginProcessor::SirenOrchestraPluginProcessor() :
 #endif
         return true;
     });
+#endif // COMPOSESIREN_RESETALLCONTROLLERS
 #if COMPOSESIREN_RECORD
     mcp.setRecorder(&recorder);
 #endif

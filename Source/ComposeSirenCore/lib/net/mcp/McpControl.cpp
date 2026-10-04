@@ -210,9 +210,11 @@ std::string McpControl::handle(const juce::var& request)
                           request.getProperty("value", {}));
 #endif
 
+#if COMPOSESIREN_RESETALLCONTROLLERS
     if (op == "reset_controllers")
         return resetControllers(static_cast<int>(request.getProperty("siren", 0)));
 
+#endif // COMPOSESIREN_RESETALLCONTROLLERS
 #if COMPOSESIREN_RECORD
     if (op == "start_recording" || op == "stop_recording" || op == "recording_status")
         return recording(op, request);
@@ -479,6 +481,7 @@ std::string McpControl::clearSongTitle()
 }
 #endif // COMPOSESIREN_SONG_TITLE
 
+#if COMPOSESIREN_RESETALLCONTROLLERS
 std::string McpControl::resetControllers(int siren) const
 {
     if (!resetHandler)
@@ -519,6 +522,7 @@ std::string McpControl::resetControllers(int siren) const
     return jsonOf(object).toStdString();
 }
 
+#endif // COMPOSESIREN_RESETALLCONTROLLERS
 #if COMPOSESIREN_RECORD
 std::string McpControl::recording(const juce::String& op, const juce::var& request) const
 {
