@@ -87,10 +87,7 @@ public:
     juce::MidiKeyboardState& getMidiKeyboardState();
     VoiceManagerState& getVoiceManagerState();
     SirenStateMonitor& getSirenStateMonitor();
-    McpControl& getMcp() { return mcp; }
-#if COMPOSESIREN_SONG_TITLE
-    McpControl* getMcpControl() override { return &mcp; }
-#endif
+    McpControl& getMcp() override { return mcp; }
 
 private:
     // void initialiseUiState();

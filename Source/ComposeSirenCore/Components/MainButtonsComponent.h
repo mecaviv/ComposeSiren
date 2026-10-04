@@ -18,9 +18,7 @@
 #ifndef COMPOSESIREN_SONG_TITLE
 #define COMPOSESIREN_SONG_TITLE 0
 #endif
-#if COMPOSESIREN_SONG_TITLE
 #include "../lib/net/mcp/McpControl.h"
-#endif
 #include "../lib/utilities/recorder/RecordDialog.h"
 #if COMPOSESIREN_SETTINGS
 #include "../lib/settings/SettingsDialog.h"
@@ -50,11 +48,8 @@ public:
         // optionnel : un bouton About... ouvre la fenêtre que showAbout() ouvre.
         virtual bool hasAbout() { return false; }
         virtual void showAbout(juce::Component* /*parent*/) {}
-#if COMPOSESIREN_SONG_TITLE
-        // optionnel : le serveur MCP, pour afficher le morceau en cours
-        // (set_song_title / clear_song_title) dans la barre de titre.
-        virtual McpControl* getMcpControl() { return nullptr; }
-#endif
+        // le serveur MCP (About, and the song title bar when COMPOSESIREN_SONG_TITLE)
+        virtual McpControl& getMcp() = 0;
 #if COMPOSESIREN_RECORD
         // optionnel : l'enregistreur de la sortie audio ; un bouton Record...
         // ouvre son dialogue quand il y en a un.
@@ -128,18 +123,16 @@ public:
         songTitle.setInterceptsMouseClicks(false, false);
         addChildComponent(songTitle);
 
-        if (auto* mcp = listener.getMcpControl()) {
-            mcp->addChangeListener(this);
-            applySongDisplay(mcp->getSongDisplay(), false);
-        }
+        auto& mcp = listener.getMcp();
+        mcp.addChangeListener(this);
+        applySongDisplay(mcp.getSongDisplay(), false);
 #endif
     }
 
     ~MainButtonsComponent() override
     {
 #if COMPOSESIREN_SONG_TITLE
-        if (auto* mcp = listener.getMcpControl())
-            mcp->removeChangeListener(this);
+        listener.getMcp().removeChangeListener(this);
 #endif
     }
 
@@ -203,8 +196,7 @@ private:
     // `clear_song_title` puts both back.
     void changeListenerCallback(juce::ChangeBroadcaster*) override
     {
-        if (auto* mcp = listener.getMcpControl())
-            applySongDisplay(mcp->getSongDisplay(), true);
+        applySongDisplay(listener.getMcp().getSongDisplay(), true);
     }
 
     void timerCallback() override
