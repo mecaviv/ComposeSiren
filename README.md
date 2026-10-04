@@ -153,12 +153,34 @@ Reset requests are applied at an audio block boundary. The runtime flag is
 sampled per block; the audio thread does not read the settings ValueTree.
 Pending requests consumed in a disabled block are discarded.
 
+#### End-user behaviour change
+
+The enabled column assumes `COMPOSESIREN_RESETALLCONTROLLERS=ON` and the
+runtime switch is on (its default). MCP entries also require `COMPOSESIREN_MCP=ON`.
+
+| Surface | Compile option OFF (default) | Compile option ON, runtime enabled |
+|---|---|---|
+| MIDI CC 121 | Existing controller reset and knob synchronization; no explicit zero-volume callback. | Same reset and knob synchronization, plus a zero-volume callback before reset and accumulated modulation-depth clearing. Any value is accepted in both modes. |
+| MIDI CC 120 | Ignored. | A value greater than zero requests zero MIDI-level volume and cancels attack/release ramps. Value zero is ignored. |
+| MIDI CC 123 | Ignored. | A value greater than zero releases the current monophonic note through the existing release path. Value zero is ignored. |
+| MCP `reset_controllers` | Tool absent. | Restores selected siren plugin defaults and queues a DSP reset for an audio block boundary. Reverb/master parameters are kept; SirenOrchestra forwards the reset when the park bridge is enabled. |
+| SirenOrchestra Reset buttons / CC 121 on channel 16 | Existing CC 121 routing and knob synchronization. | Routing and knob synchronization stay the same; the DSP applies the enabled CC 121 behavior above. |
+| OneSiren Reset button | Existing stop routine; keeps controller values. | Unchanged. This button does not invoke the new MCP/controller-reset operation. |
+
+With the runtime switch off, MIDI follows the compile-OFF column; MCP
+`reset_controllers` stays listed but returns an error without changing
+parameters or forwarding a bridge command. Button routing remains unchanged.
+With settings compiled out, the compiled feature stays enabled.
+
+Zero MIDI-level volume does not guarantee immediate acoustic silence: the
+DSP still models flap interpolation/leakage, and reverb is not cleared.
+
 #### MIDI behavior and current limitations
 
 CC 121 accepts any value and keeps the existing controller-reset map and
-knob synchronization. With this feature enabled, it additionally cancels
-attack/release ramps, requests zero MIDI-level volume and clears accumulated
-modulation depth. The MIDI controller-reset map and MCP's plugin-default
+knob synchronization. With this feature enabled, it also requests zero
+MIDI-level volume before the reset and clears accumulated modulation depth.
+The MIDI controller-reset map and MCP's plugin-default
 reset are distinct operations.
 
 CC 120 requests zero MIDI-level volume and cancels ramps; CC 123 releases
