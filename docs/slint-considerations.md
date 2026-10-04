@@ -153,5 +153,32 @@ Recommendation:
 - If that is too slow, try **B** first (no child windows, same embedding model) and keep **D** as the last
   resort.
 
-The SirenWaves shader, and how one shader source could serve JUCE, Slint and the web mock-ups, is discussed
-separately: [SirenWaves shader as shared metadata](SIRENWAVES_LINK_PLACEHOLDER).
+## 3. Shared interface metadata
+
+Both editors need the same facts: parameter code names, labels, strip captions, ranges, steps,
+defaults, CC numbers, widgets, sections, strip colours, the palette and the strip layout. They are
+now generated, not copied by hand:
+
+- `Source/ComposeSirenCore/lib/definitions/generated/UiMetadata.h` (namespace
+  `mecaviv::metadata::ui`) for the JUCE editors;
+- `Source/composesiren-slint-ui/ui/generated/metadata.slint` (the `UiMetadata` and `Theme` globals)
+  and `src/generated/metadata.rs` (the `metadata` module) for the Slint editor.
+
+The three files are committed, carry a "GENERATED, do not edit" notice and are produced from
+metadata tables maintained outside this repository; the build doesn't need anything else. The
+Slint editor already takes its strip grey and orange from `Theme`, and tests in `src/params.rs`
+check its hand-written parameter table, groups and colour ramp against `metadata.rs`. Next steps:
+- make `PARAMS` and `GROUPS` views over `metadata::PARAMETERS`;
+- on the JUCE side, build `parameterDefinitions`, the strip captions, `palette.h` and
+  `controlStripLayout` from `UiMetadata.h`.
+
+## 4. The SirenWaves shader
+
+How the SirenWaves shader of PR 32 (`Assets/shaders/SirenWave.frag`, `juce::OpenGLGraphicsContextCustomShader`)
+could serve the JUCE build and a Slint editor from one source is assessed separately, outside this
+repository. In short:
+- Slint has no custom shaders yet. While JUCE hosts the editor, the wave cells can stay JUCE components
+  over transparent Slint cells.
+- The shader's CPU twin (`SirenWaveMath.h`, `SirenWaveRaster.h`) can render the cells into a Slint
+  `Image` when there is no OpenGL context.
+- A FemtoVG-rendered Slint could draw the same GLSL in an OpenGL underlay.
