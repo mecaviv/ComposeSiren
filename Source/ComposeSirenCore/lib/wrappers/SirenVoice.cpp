@@ -66,7 +66,7 @@ void SirenVoiceUnit::handleMidi(int status, int value1, int value2) {
         if (value1 == 121 || ((value1 == 120 || value1 == 123) && value2 > 0)) {
             ino = false;
         }
-#endif // COMPOSESIREN_RESETALLCONTROLLERS
+#endif
     } else if (status >> 4 & 0xE) { // pitch bend
         midiIn->handlePitchWheel(value1, value2);
     }
@@ -82,7 +82,7 @@ void SirenVoiceUnit::resetSiren() {
     ino = false;
 }
 
-#endif // COMPOSESIREN_RESETALLCONTROLLERS
+#endif
 void SirenVoiceUnit::beginProcessBlock()
 {
     isNoteOn.store(ino, std::memory_order_relaxed);
@@ -232,7 +232,7 @@ void SirenVoice::requestReset()
     resetRequested.store(true, std::memory_order_release);
 }
 
-#endif // COMPOSESIREN_RESETALLCONTROLLERS
+#endif
 void SirenVoice::update()
 {
     if (getRawSirenHandle()) { rawSiren->update(); }
@@ -249,7 +249,7 @@ void SirenVoice::beginProcessBlock()
     if (resetRequested.exchange(false, std::memory_order_acq_rel)) {
         rawSiren->resetSiren();
     }
-#endif // COMPOSESIREN_RESETALLCONTROLLERS
+#endif
     rawSiren->beginProcessBlock();
 }
 

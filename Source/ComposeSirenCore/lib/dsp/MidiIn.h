@@ -35,7 +35,7 @@ public:
 #if COMPOSESIREN_RESETALLCONTROLLERS
     void allSoundOff();
     void allNotesOff();
-#endif // COMPOSESIREN_RESETALLCONTROLLERS
+#endif
 
 private:
 	// per-siren midi message management, refactored from MidiIn class :

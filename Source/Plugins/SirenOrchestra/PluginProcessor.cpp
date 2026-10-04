@@ -7,7 +7,7 @@
 #include <pathUtilities.h>
 #if COMPOSESIREN_RESETALLCONTROLLERS
 #include <algorithm>
-#endif // COMPOSESIREN_RESETALLCONTROLLERS
+#endif
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 #include "AboutDialog.h"
@@ -80,7 +80,7 @@ SirenOrchestraPluginProcessor::SirenOrchestraPluginProcessor() :
 #endif
         return true;
     });
-#endif // COMPOSESIREN_RESETALLCONTROLLERS
+#endif
 #if COMPOSESIREN_RECORD
     mcp.setRecorder(&recorder);
 #endif

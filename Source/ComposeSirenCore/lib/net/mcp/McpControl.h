@@ -5,7 +5,7 @@
 #include <cstdint>
 #if COMPOSESIREN_RESETALLCONTROLLERS
 #include <functional>
-#endif // COMPOSESIREN_RESETALLCONTROLLERS
+#endif
 #include <memory>
 #include <mutex>
 #include <string>
@@ -91,7 +91,7 @@ public:
     // when it has no such siren.
     using ResetHandler = std::function<bool(int siren)>;
     void setResetHandler(ResetHandler handler) { resetHandler = std::move(handler); }
-#endif // COMPOSESIREN_RESETALLCONTROLLERS
+#endif
 
     struct ToolCount
     {
@@ -151,7 +151,7 @@ private:
 #endif
 #if COMPOSESIREN_RESETALLCONTROLLERS
     std::string resetControllers(int siren) const;
-#endif // COMPOSESIREN_RESETALLCONTROLLERS
+#endif
     juce::RangedAudioParameter* findParameter(const juce::String& id) const;
     static juce::var parameterObject(juce::RangedAudioParameter& parameter);
     static char* duplicate(const std::string& text);
@@ -162,7 +162,7 @@ private:
     int port = 0;
 #if COMPOSESIREN_RESETALLCONTROLLERS
     ResetHandler resetHandler;
-#endif // COMPOSESIREN_RESETALLCONTROLLERS
+#endif
 #if COMPOSESIREN_RECORD
     Recorder* recorder = nullptr;
     std::string recording(const juce::String& op, const juce::var& request) const;

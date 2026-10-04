@@ -129,7 +129,7 @@ void SirenEnsemble::requestReset(std::optional<sirenId> id) {
     }
 }
 
-#endif // COMPOSESIREN_RESETALLCONTROLLERS
+#endif
 void SirenEnsemble::setPanning(sirenId id, float p) {
     tracks.at(id)->setPanning(p);
 }

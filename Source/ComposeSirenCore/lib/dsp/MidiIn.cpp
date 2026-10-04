@@ -120,7 +120,7 @@ void MidiIn::handleControlChange(int cc, int value) {
                 allSoundOff();
             }
             break;
-#endif // COMPOSESIREN_RESETALLCONTROLLERS
+#endif
         case 121: // Reset All Controllers: any value, as the firmware does
             resetSirene();
             break;
@@ -130,7 +130,7 @@ void MidiIn::handleControlChange(int cc, int value) {
                 allNotesOff();
             }
             break;
-#endif // COMPOSESIREN_RESETALLCONTROLLERS
+#endif
         case 1 : { // vibrato depth
             control[1] = value ;
             if (control[11] == 0) {
@@ -439,14 +439,14 @@ void MidiIn::allSoundOff() {
     onVolumeChanged(0);
 }
 
-#endif // COMPOSESIREN_RESETALLCONTROLLERS
+#endif
 void MidiIn::resetSirene() {
 #if COMPOSESIREN_RESETALLCONTROLLERS
     // silence first : the reset used to leave a sounding note at its last
     // volume, since nothing told the siren that the note was gone
     allSoundOff();
 
-#endif // COMPOSESIREN_RESETALLCONTROLLERS
+#endif
     noteOnFinal = 0.0;
     ///////////////////////////////////////////////////****** Ferme les volets
     ancienVolFinal = -1;
@@ -474,7 +474,7 @@ void MidiIn::resetSirene() {
     volumeFinal = 0.0;
 #if COMPOSESIREN_RESETALLCONTROLLERS
     controlFinal = 0;
-#endif // COMPOSESIREN_RESETALLCONTROLLERS
+#endif
     control[6] = 64;
     control[12] = 127.;
     control[13] = 127.;

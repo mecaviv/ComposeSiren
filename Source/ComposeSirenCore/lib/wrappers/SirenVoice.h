@@ -49,7 +49,7 @@ public:
     void stopSiren();
 #if COMPOSESIREN_RESETALLCONTROLLERS
     void resetSiren();
-#endif // COMPOSESIREN_RESETALLCONTROLLERS
+#endif
 
     void beginProcessBlock();
     // this will compute the next sample to play and return it
@@ -79,7 +79,7 @@ class SirenVoice
 #if COMPOSESIREN_RESETALLCONTROLLERS
     // set from any thread, consumed by the audio thread in beginProcessBlock
     std::atomic<bool> resetRequested { false };
-#endif // COMPOSESIREN_RESETALLCONTROLLERS
+#endif
 
 protected:
     std::optional<sirenId> id { std::nullopt };
@@ -133,7 +133,7 @@ public:
     // Thread-safe : resets every controller, releases notes and silences the
     // siren (like MIDI CC 121). Applied at the start of the next audio block.
     void requestReset();
-#endif // COMPOSESIREN_RESETALLCONTROLLERS
+#endif
     void update();
 
     // those are not using getRawSirenHandle

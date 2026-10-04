@@ -132,12 +132,17 @@ composesiren_option(COMPOSESIREN_MCP
         "In-process MCP server for parameters, MIDI, and standalone audio/MIDI devices"
         ON)
 
-# CONTROLLER RESET ############################################################
-# Keep the default build identical to master, including the About options:
-# advertise this opt-in feature only when it is enabled.
+# DEAL WITH THE CONTROLLER RESET ###############################################
+# Adds thread-safe DSP reset requests, immediate silence before MIDI CC 121
+# resets the controllers, and MIDI CC 120 (All Sound Off) / 123 (All Notes Off).
+# With COMPOSESIREN_MCP, also adds reset_controllers (the reset-all-controllers
+# Rust feature in Source/composesiren-mcp). Off: retain the main branch's DSP
+# behaviour and MCP tools. See Source/ComposeSirenCore/Mcp.cmake.
+
 option(COMPOSESIREN_RESETALLCONTROLLERS
         "Thread-safe controller reset, MIDI CC 120/123, and the MCP reset_controllers tool"
         OFF)
+# Register only when enabled so the default About options also match master.
 if(COMPOSESIREN_RESETALLCONTROLLERS)
   set_property(GLOBAL APPEND PROPERTY COMPOSESIREN_OPTIONS COMPOSESIREN_RESETALLCONTROLLERS)
 endif()

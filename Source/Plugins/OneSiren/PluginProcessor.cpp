@@ -40,7 +40,7 @@ OneSirenPluginProcessor::OneSirenPluginProcessor() :
         siren.requestReset();
         return true;
     });
-#endif // COMPOSESIREN_RESETALLCONTROLLERS
+#endif
     vms.addListener(this);
     vms.notifyListeners();
     startTimer(33);

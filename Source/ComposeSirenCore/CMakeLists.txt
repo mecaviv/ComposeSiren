@@ -54,10 +54,6 @@ target_sources(ComposeSirenCore
 
 # ------------------------------------------------------------------------------
 
-target_compile_definitions(ComposeSirenCore PUBLIC
-  COMPOSESIREN_RESETALLCONTROLLERS=$<BOOL:${COMPOSESIREN_RESETALLCONTROLLERS}>
-)
-
 if(COMPOSESIREN_MCP)
   include("${CMAKE_CURRENT_LIST_DIR}/Mcp.cmake")
   target_link_libraries(ComposeSirenCore PUBLIC composesiren_mcp)
@@ -103,6 +99,12 @@ if(COMPOSESIREN_SONG_TITLE)
 else()
   target_compile_definitions(ComposeSirenCore PUBLIC COMPOSESIREN_SONG_TITLE=0)
 endif()
+
+# Controller reset: keep the DSP and plugin declarations in sync. The MCP
+# tool is enabled by the matching Rust feature in Mcp.cmake.
+target_compile_definitions(ComposeSirenCore PUBLIC
+  COMPOSESIREN_RESETALLCONTROLLERS=$<BOOL:${COMPOSESIREN_RESETALLCONTROLLERS}>
+)
 
 target_link_libraries(ComposeSirenCore
   PRIVATE
