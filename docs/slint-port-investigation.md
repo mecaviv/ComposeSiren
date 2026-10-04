@@ -186,6 +186,7 @@ The default configuration (option OFF) builds exactly what it built before.
 | Plugin build with `-DCOMPOSESIREN_SLINT_UI=ON` (Linux, GCC 14, Ninja, Release) | OneSiren_Standalone + OneSiren_VST3 build and link (see [build notes](#plugin-build-notes)) |
 | JUCE OneSiren Standalone with the Slint editor (X11) | runs. Volume drag → 76, wheel on Portamento → 5, siren type → Bass through `VoiceManagerState` (strip recoloured); the header shows the mirrored CC |
 | Default build, option OFF | OneSiren_Standalone builds; no Slint symbols in the binary |
+| macOS (rustc 1.98.1): `cargo test`, headless render at 2x, `--features standalone` build | pass (crate only; the window was not opened) |
 | macOS / Windows plugin builds, DAW host testing | not done |
 
 Size: the Release `libcomposesiren_slint_ui.a` is about 50 MB, but the linker drops most of it. The
