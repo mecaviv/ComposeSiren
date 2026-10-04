@@ -1,6 +1,7 @@
 # composesiren-slint-ui: the Slint editor experiment (Rust staticlib), linked
 # into OneSiren when COMPOSESIREN_SLINT_UI is ON. The C header is under the
-# crate's include/ directory; the JUCE editor is juce/SlintOneSirenEditor.h.
+# crate's include/ directory; the JUCE editor is
+# Source/Plugins/OneSiren/SlintOneSirenEditor.h.
 # Default features only: the staticlib renders with Slint's software renderer
 # into the JUCE editor, no winit (that is the `standalone` preview feature).
 

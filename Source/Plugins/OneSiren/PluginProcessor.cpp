@@ -7,7 +7,7 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 #if COMPOSESIREN_SLINT_UI
-#include <SlintOneSirenEditor.h>
+#include "SlintOneSirenEditor.h"
 #endif
 
 OneSirenPluginProcessor::OneSirenPluginProcessor() :
