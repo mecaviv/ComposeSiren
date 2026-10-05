@@ -210,6 +210,11 @@ std::string McpControl::handle(const juce::var& request)
                           request.getProperty("value", {}));
 #endif
 
+#if COMPOSESIREN_RESETALLCONTROLLERS
+    if (op == "reset_controllers")
+        return resetControllers(static_cast<int>(request.getProperty("siren", 0)));
+
+#endif
 #if COMPOSESIREN_RECORD
     if (op == "start_recording" || op == "stop_recording" || op == "recording_status")
         return recording(op, request);
@@ -305,7 +310,7 @@ namespace {
 
 std::optional<cs::Settings::Id> settingIdFromString(const juce::String& name)
 {
-    for (std::size_t i = 0; i < mecaviv::metadata::settingCount; ++i) {
+    for (std::size_t i = 0; i < cs::Settings::settingCount; ++i) {
         const auto id = cs::Settings::idAt(i);
         const auto& d = cs::Settings::describe(id);
         if (name == juce::String(d.id.data(), d.id.size()))
@@ -341,7 +346,7 @@ std::string McpControl::listSettings() const
 {
     juce::SharedResourcePointer<cs::Settings> settings;
     juce::Array<juce::var> rows;
-    for (std::size_t i = 0; i < mecaviv::metadata::settingCount; ++i)
+    for (std::size_t i = 0; i < cs::Settings::settingCount; ++i)
         rows.add(settingObject(*settings, cs::Settings::idAt(i)));
     auto* object = new juce::DynamicObject();
     object->setProperty("ok", true);
@@ -476,6 +481,50 @@ std::string McpControl::clearSongTitle()
 }
 #endif // COMPOSESIREN_SONG_TITLE
 
+#if COMPOSESIREN_RESETALLCONTROLLERS
+std::string McpControl::resetControllers(int siren) const
+{
+    if (!controllerResetEnabled)
+        return jsonOf(failure("Controller reset is disabled in Settings.")).toStdString();
+    if (!resetHandler)
+        return jsonOf(failure("this plugin cannot reset its controllers")).toStdString();
+    if (siren < 0 || siren > 16)
+        return jsonOf(failure("siren must be a siren number, or omitted for every siren")).toStdString();
+
+    // The DSP forgets its controllers, releases its notes and goes silent. It
+    // does that on the audio thread, at the start of the next block.
+    if (!resetHandler(siren))
+        return jsonOf(failure("no such siren")).toStdString();
+
+    // Then the parameters go back to their defaults, so that the UI, the host
+    // and the DSP agree (each change is bridged to its MIDI CC). Siren
+    // parameters are the ones of the groups S (one siren) and S1, S2, ...;
+    // reverb (R) and master (M) are left alone.
+    const auto wanted = siren > 0 ? "S" + juce::String(siren) : juce::String();
+    int count = 0;
+    for (auto* parameter : processor.getParameters()) {
+        auto* ranged = dynamic_cast<juce::RangedAudioParameter*>(parameter);
+        if (ranged == nullptr)
+            continue;
+        const auto id = ranged->getParameterID();
+        const auto group = id.upToFirstOccurrenceOf(" | ", false, false);
+        if (!group.startsWithChar('S') || (group.length() > 1 && !group.substring(1).containsOnly("0123456789")))
+            continue;
+        if (siren > 0 && group != "S" && group != wanted)
+            continue;
+        ranged->beginChangeGesture();
+        ranged->setValueNotifyingHost(ranged->getDefaultValue());
+        ranged->endChangeGesture();
+        ++count;
+    }
+
+    auto object = okObject();
+    object.getDynamicObject()->setProperty("siren", siren > 0 ? juce::var(siren) : juce::var("all"));
+    object.getDynamicObject()->setProperty("parameters", count);
+    return jsonOf(object).toStdString();
+}
+
+#endif
 #if COMPOSESIREN_RECORD
 std::string McpControl::recording(const juce::String& op, const juce::var& request) const
 {

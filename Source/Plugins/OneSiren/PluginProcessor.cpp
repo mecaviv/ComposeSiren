@@ -34,13 +34,27 @@ OneSirenPluginProcessor::OneSirenPluginProcessor() :
     mcp(*this, "OneSiren", "MvOS")
 {
     ssm.subscribe(&siren);
+#if COMPOSESIREN_RESETALLCONTROLLERS
+    // one siren : any siren number means the current one
+    mcp.setResetHandler([this](int) {
+        siren.requestReset();
+        return true;
+    });
+#endif
     vms.addListener(this);
     vms.notifyListeners();
+#if COMPOSESIREN_RESETALLCONTROLLERS && COMPOSESIREN_SETTINGS
+    settings->addListener(this);
+    applyControllerResetSetting();
+#endif
     startTimer(33);
 }
 
 OneSirenPluginProcessor::~OneSirenPluginProcessor()
 {
+#if COMPOSESIREN_RESETALLCONTROLLERS && COMPOSESIREN_SETTINGS
+    settings->removeListener(this);
+#endif
     vms.removeListener(this);
     stopTimer();
 }
@@ -52,6 +66,22 @@ void OneSirenPluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlo
     lastBlockSize = samplesPerBlock;
     siren.setSampleRate(sampleRate);
 }
+
+#if COMPOSESIREN_RESETALLCONTROLLERS && COMPOSESIREN_SETTINGS
+void OneSirenPluginProcessor::applyControllerResetSetting()
+{
+    const auto policy = settings->getDspChannelModePolicy();
+    channelModePolicy.store(policy.packed(), std::memory_order_release);
+    siren.setResetRequestsEnabled(policy.enabled);
+    mcp.setControllerResetEnabled(policy.enabled);
+}
+
+void OneSirenPluginProcessor::settingChanged(cs::Settings::Id id)
+{
+    if (cs::Settings::isControllerResetSetting(id))
+        applyControllerResetSetting();
+}
+#endif
 
 void OneSirenPluginProcessor::releaseResources()
 {
@@ -152,6 +182,11 @@ void OneSirenPluginProcessor::setSirenId(sirenId id)
 void OneSirenPluginProcessor::processBlock(juce::AudioBuffer<float>& audio,
                                            juce::MidiBuffer& midiIn)
 {
+#if COMPOSESIREN_RESETALLCONTROLLERS && COMPOSESIREN_SETTINGS
+    const auto policy = cs::DspChannelModePolicy::unpack(channelModePolicy.load(std::memory_order_acquire));
+    router.setChannelModePolicy(policy);
+    siren.setChannelModePolicy(policy);
+#endif
     juce::MidiBuffer midiOut;
 
     // MIDI ROUTING / SCHEDULING / UI SYNCING //////////////////////////////////

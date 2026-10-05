@@ -21,7 +21,7 @@ Settings::Settings()
     file = std::make_unique<juce::PropertiesFile>(options);
 #endif
 
-    for (std::size_t i = 0; i < meta::settingCount; ++i) {
+    for (std::size_t i = 0; i < settingCount; ++i) {
         const auto id = idAt(i);
         juce::var v = describe(id).type == meta::SettingType::String
                           ? juce::var(juce::String())
@@ -49,8 +49,62 @@ Settings::~Settings()
 
 const meta::Setting& Settings::describe(Id id)
 {
+#if COMPOSESIREN_RESETALLCONTROLLERS && COMPOSESIREN_SETTINGS
+    if (isControllerResetSetting(id)) {
+        static constexpr std::string_view receiveChoices = "Ignore|Zero only|Positive only|Any value";
+        static constexpr std::string_view outputChoices = "Preserve|Send 0|Send 127";
+        static constexpr std::string_view dspDescription =
+            "Which incoming values trigger this DSP operation. MIDI specifies value 0; "
+            "positive-only supports momentary buttons without acting on their release.";
+        static constexpr std::string_view bridgeDescription =
+            "Which incoming values are forwarded to the bridge, independently of the DSP. "
+            "Filtering happens before the output value is converted.";
+        static constexpr std::string_view outputDescription =
+            "Value sent for accepted messages, on the bridge copy only. "
+            "Conversion does not add support for a command at the receiver.";
+        static constexpr std::array<meta::Setting, 10> reset {{ {
+            "reset_all_controllers.enabled", "Controller reset", "Enable",
+            meta::SettingType::Bool, 1.0, 0.0, 1.0, "", "",
+            "COMPOSESIREN_RESETALLCONTROLLERS", "global",
+            "Enable the experimental controller reset and MIDI CC 120/123 handling. "
+            "When off, reset_controllers returns an error and MIDI handling follows the main branch."
+        },
+            { "reset_all_controllers.dsp.cc120.values", "Controller reset: DSP", "CC 120 All Sound Off", meta::SettingType::Choice, 2, 0, 3, receiveChoices, "", "COMPOSESIREN_RESETALLCONTROLLERS", "global", dspDescription },
+            { "reset_all_controllers.dsp.cc121.values", "Controller reset: DSP", "CC 121 Reset All Controllers", meta::SettingType::Choice, 3, 0, 3, receiveChoices, "", "COMPOSESIREN_RESETALLCONTROLLERS", "global", dspDescription },
+            { "reset_all_controllers.dsp.cc123.values", "Controller reset: DSP", "CC 123 All Notes Off", meta::SettingType::Choice, 2, 0, 3, receiveChoices, "", "COMPOSESIREN_RESETALLCONTROLLERS", "global", dspDescription },
+            { "reset_all_controllers.bridge.cc120.values", "Controller reset: bridge", "CC 120 accepted values", meta::SettingType::Choice, 3, 0, 3, receiveChoices, "", "COMPOSESIREN_PARK_BRIDGE", "global", bridgeDescription },
+            { "reset_all_controllers.bridge.cc121.values", "Controller reset: bridge", "CC 121 accepted values", meta::SettingType::Choice, 3, 0, 3, receiveChoices, "", "COMPOSESIREN_PARK_BRIDGE", "global", bridgeDescription },
+            { "reset_all_controllers.bridge.cc123.values", "Controller reset: bridge", "CC 123 accepted values", meta::SettingType::Choice, 3, 0, 3, receiveChoices, "", "COMPOSESIREN_PARK_BRIDGE", "global", bridgeDescription },
+            { "reset_all_controllers.bridge.cc120.output", "Controller reset: bridge", "CC 120 output value", meta::SettingType::Choice, 0, 0, 2, outputChoices, "", "COMPOSESIREN_PARK_BRIDGE", "global", outputDescription },
+            { "reset_all_controllers.bridge.cc121.output", "Controller reset: bridge", "CC 121 output value", meta::SettingType::Choice, 0, 0, 2, outputChoices, "", "COMPOSESIREN_PARK_BRIDGE", "global", outputDescription },
+            { "reset_all_controllers.bridge.cc123.output", "Controller reset: bridge", "CC 123 output value", meta::SettingType::Choice, 0, 0, 2, outputChoices, "", "COMPOSESIREN_PARK_BRIDGE", "global", outputDescription }
+        }};
+        return reset[static_cast<std::size_t>(id) - meta::settingCount];
+    }
+#endif
     return meta::settings[static_cast<std::size_t>(id)];
 }
+
+#if COMPOSESIREN_RESETALLCONTROLLERS && COMPOSESIREN_SETTINGS
+DspChannelModePolicy Settings::getDspChannelModePolicy() const
+{
+    return { getBool(controllerResetEnabled), {
+        static_cast<MidiValueRule>(getInt(dspAllSoundsOffValues)),
+        static_cast<MidiValueRule>(getInt(dspResetControllersValues)),
+        static_cast<MidiValueRule>(getInt(dspAllNotesOffValues)) } };
+}
+
+BridgeChannelModePolicy Settings::getBridgeChannelModePolicy() const
+{
+    return { getBool(controllerResetEnabled), {
+        static_cast<MidiValueRule>(getInt(bridgeAllSoundsOffValues)),
+        static_cast<MidiValueRule>(getInt(bridgeResetControllersValues)),
+        static_cast<MidiValueRule>(getInt(bridgeAllNotesOffValues)) }, {
+        static_cast<MidiOutputValue>(getInt(bridgeAllSoundsOffOutput)),
+        static_cast<MidiOutputValue>(getInt(bridgeResetControllersOutput)),
+        static_cast<MidiOutputValue>(getInt(bridgeAllNotesOffOutput)) } };
+}
+#endif
 
 bool Settings::isAvailable(Id id)
 {
@@ -62,6 +116,9 @@ bool Settings::isAvailable(Id id)
     if (option == "COMPOSESIREN_RECORD") return COMPOSESIREN_RECORD != 0;
     if (option == "COMPOSESIREN_PARK_BRIDGE") return COMPOSESIREN_PARK_BRIDGE != 0;
     if (option == "COMPOSESIREN_CLIC") return COMPOSESIREN_CLIC != 0;
+#if COMPOSESIREN_RESETALLCONTROLLERS && COMPOSESIREN_SETTINGS
+    if (option == "COMPOSESIREN_RESETALLCONTROLLERS") return true;
+#endif
     return false; // an option this build doesn't know about
 }
 
@@ -110,7 +167,7 @@ void Settings::setString(Id id, const juce::String& value)
 
 void Settings::resetToDefaults()
 {
-    for (std::size_t i = 0; i < meta::settingCount; ++i) {
+    for (std::size_t i = 0; i < settingCount; ++i) {
         const auto id = idAt(i);
         if (describe(id).type == meta::SettingType::String)
             setString(id, juce::String());
@@ -127,7 +184,7 @@ juce::Value Settings::getValueObject(Id id)
 void Settings::valueTreePropertyChanged(juce::ValueTree&, const juce::Identifier& property)
 {
     if (normalising) return;
-    for (std::size_t i = 0; i < meta::settingCount; ++i) {
+    for (std::size_t i = 0; i < settingCount; ++i) {
         const auto id = idAt(i);
         if (key(id) != property) continue;
 

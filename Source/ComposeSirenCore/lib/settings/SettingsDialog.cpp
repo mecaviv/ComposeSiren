@@ -113,13 +113,13 @@ SettingsDialog::SettingsDialog()
 {
     // sections in the order their group first appears in the metadata
     juce::StringArray groups;
-    for (std::size_t i = 0; i < meta::settingCount; ++i)
+    for (std::size_t i = 0; i < Settings::settingCount; ++i)
         if (Settings::isAvailable(Settings::idAt(i)))
             groups.addIfNotAlreadyThere(str(Settings::describe(Settings::idAt(i)).group));
 
     for (const auto& group : groups) {
         juce::Array<juce::PropertyComponent*> rows;
-        for (std::size_t i = 0; i < meta::settingCount; ++i) {
+        for (std::size_t i = 0; i < Settings::settingCount; ++i) {
             const auto id = Settings::idAt(i);
             if (Settings::isAvailable(id) && str(Settings::describe(id).group) == group)
                 rows.add(makeRow(*settings, id));

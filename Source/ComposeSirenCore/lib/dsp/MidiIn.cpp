@@ -114,9 +114,26 @@ void MidiIn::handleControlChange(int cc, int value) {
     // - pitch bend range (cc 16)
     // - effect order switch (cc 42) but this one is not implemented in firmware
     switch (cc) {
-        case 121: // Reset All Controllers: any value, as the firmware does
+#if COMPOSESIREN_RESETALLCONTROLLERS
+        case 120: // All Sound Off (standard MIDI)
+            if (acceptsChannelMode(cc, value)) {
+                onMidiAllSoundsOff();
+            }
+            break;
+#endif
+        case 121: // Reset All Controllers
+#if COMPOSESIREN_RESETALLCONTROLLERS
+            if (!acceptsChannelMode(cc, value)) break;
+#endif
             resetSirene();
             break;
+#if COMPOSESIREN_RESETALLCONTROLLERS
+        case 123: // All Notes Off (standard MIDI)
+            if (acceptsChannelMode(cc, value)) {
+                onMidiAllNotesOff();
+            }
+            break;
+#endif
         case 1 : { // vibrato depth
             control[1] = value ;
             if (control[11] == 0) {
@@ -397,7 +414,55 @@ void MidiIn::stopSirene() {
     ancienVolFinal = -1;
 }
 
+#if COMPOSESIREN_RESETALLCONTROLLERS
+void MidiIn::onMidiAllNotesOff() {
+    // MIDI 1.0 Detailed Specification 4.2.1, appendix A-5: voices should
+    // "go to the release stage of the envelope"; hold/sustain takes priority.
+    // https://midi.org/midi-1-0-detailed-specification
+    // The official controller table specifies CC 123 value 0:
+    // https://midi.org/midi-1-0-control-change-messages
+    // Here only the current monophonic note is released. Sustain and full
+    // Omni/Basic Channel mode handling are not implemented; the configurable
+    // value rule retains positive-value button compatibility by default.
+    if (velocite > 0.0) {
+        realTimeStopNote(static_cast<int>(noteOn));
+    }
+}
+
+void MidiIn::onMidiAllSoundsOff() {
+    // MIDI 1.0 Detailed Specification 4.2.1, printed p. 25: sounding notes'
+    // "volume envelopes are set to zero as soon as possible".
+    // https://midi.org/midi-1-0-detailed-specification
+    // The official controller table specifies CC 120 value 0:
+    // https://midi.org/midi-1-0-control-change-messages
+    // Cancel attack/release and request zero MIDI volume, keeping controllers.
+    // Sirene's flap interpolation/leakage and downstream reverb remain; this
+    // callback alone does not guarantee immediate silence at the audio output.
+    if (isRampe) {
+        isRampe = false;
+        countCreateAttack--;
+    }
+    if (isRelease) {
+        isRelease = false;
+        countCreateRelease--;
+    }
+    velocite = 0.0;
+    volumeFinal = 0.0;
+    tremolo = 0.0;
+    veloFinal = 0;
+    vitesseClapet = 0;
+    ancienVelo = 0;
+    onVolumeChanged(0);
+}
+
+#endif
 void MidiIn::resetSirene() {
+#if COMPOSESIREN_RESETALLCONTROLLERS
+    // Request zero MIDI volume before restoring the controller map.
+    if (isControllerResetEnabled())
+        onMidiAllSoundsOff();
+
+#endif
     noteOnFinal = 0.0;
     ///////////////////////////////////////////////////****** Ferme les volets
     ancienVolFinal = -1;
@@ -423,6 +488,10 @@ void MidiIn::resetSirene() {
     tourMoteur = 0.0;
     noteOnFinal = 0.0;
     volumeFinal = 0.0;
+#if COMPOSESIREN_RESETALLCONTROLLERS
+    if (isControllerResetEnabled())
+        controlFinal = 0;
+#endif
     control[6] = 64;
     control[12] = 127.;
     control[13] = 127.;

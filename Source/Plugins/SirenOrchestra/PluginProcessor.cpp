@@ -5,6 +5,9 @@
 #include <lib/definitions/sirenProperties.h>
 #include <apvtsUtilities.h>
 #include <pathUtilities.h>
+#if COMPOSESIREN_RESETALLCONTROLLERS
+#include <algorithm>
+#endif
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 #include "AboutDialog.h"
@@ -59,6 +62,25 @@ SirenOrchestraPluginProcessor::SirenOrchestraPluginProcessor() :
     mcp(*this, "SirenOrchestra", "MvSO")
 {
     ssm.subscribe(&ensemble);
+#if COMPOSESIREN_RESETALLCONTROLLERS
+    mcp.setResetHandler([this](int siren) {
+        std::optional<sirenId> id;
+        if (siren > 0) {
+            const auto candidate = static_cast<sirenId>(siren - 1);
+            if (std::find(allSirenIds.begin(), allSirenIds.end(), candidate) == allSirenIds.end())
+                return false;
+            id = candidate;
+        }
+        ensemble.requestReset(id);
+#if COMPOSESIREN_PARK_BRIDGE
+        if (id.has_value())
+            udpBridge.pushReset(static_cast<int>(id.value()) + 1);
+        else
+            udpBridge.pushResetAll();
+#endif
+        return true;
+    });
+#endif
 #if COMPOSESIREN_RECORD
     mcp.setRecorder(&recorder);
 #endif
@@ -74,6 +96,9 @@ SirenOrchestraPluginProcessor::SirenOrchestraPluginProcessor() :
 #endif
 #if COMPOSESIREN_SETTINGS
     settings->addListener(this);
+#if COMPOSESIREN_RESETALLCONTROLLERS
+    applyControllerResetSetting();
+#endif
 #if COMPOSESIREN_CLIC
     applyClicOutputSetting();
 #endif
@@ -242,6 +267,15 @@ void SirenOrchestraPluginProcessor::timerCallback()
 void SirenOrchestraPluginProcessor::processBlock(juce::AudioBuffer<float>& audio,
                                                  juce::MidiBuffer& midiIn)
 {
+#if COMPOSESIREN_RESETALLCONTROLLERS && COMPOSESIREN_SETTINGS
+    const auto policyBits = channelModePolicy.load(std::memory_order_acquire);
+    const auto policy = cs::DspChannelModePolicy::unpack(policyBits);
+    router.setChannelModePolicy(policy);
+    ensemble.setChannelModePolicy(policy);
+#if COMPOSESIREN_PARK_BRIDGE
+    const auto bridgePolicy = cs::BridgeChannelModePolicy::unpack(policyBits >> 7);
+#endif
+#endif
     juce::MidiBuffer midiOut;
 
     // MIDI ROUTING / SCHEDULING / UI SYNCING //////////////////////////////////
@@ -285,10 +319,19 @@ void SirenOrchestraPluginProcessor::processBlock(juce::AudioBuffer<float>& audio
     // (lock-free : les envois réseau se font sur le thread du bridge)
     for (const auto metadata : midiIn) {
         const auto& m = metadata.getMessage();
-        if (m.getRawDataSize() == 3)
+        if (m.getRawDataSize() == 3) {
+#if COMPOSESIREN_RESETALLCONTROLLERS && COMPOSESIREN_SETTINGS
+            if (m.isController()) {
+                const auto value = bridgePolicy.forwardedValue(m.getControllerNumber(), m.getControllerValue());
+                if (value.has_value())
+                    udpBridge.pushMidi(m.getRawData()[0], m.getRawData()[1], static_cast<std::uint8_t>(*value));
+                continue;
+            }
+#endif
             udpBridge.pushMidi(m.getRawData()[0],
                                m.getRawData()[1],
                                m.getRawData()[2]);
+        }
     }
 #endif
 
@@ -448,8 +491,26 @@ void SirenOrchestraPluginProcessor::renderClic(juce::AudioBuffer<float>& audio)
 #endif
 
 #if COMPOSESIREN_SETTINGS
+#if COMPOSESIREN_RESETALLCONTROLLERS
+void SirenOrchestraPluginProcessor::applyControllerResetSetting()
+{
+    const auto policy = settings->getDspChannelModePolicy();
+    auto bits = policy.packed();
+#if COMPOSESIREN_PARK_BRIDGE
+    bits |= settings->getBridgeChannelModePolicy().packed() << 7;
+#endif
+    channelModePolicy.store(bits, std::memory_order_release);
+    ensemble.setResetRequestsEnabled(policy.enabled);
+    mcp.setControllerResetEnabled(policy.enabled);
+}
+#endif
+
 void SirenOrchestraPluginProcessor::settingChanged(cs::Settings::Id id)
 {
+#if COMPOSESIREN_RESETALLCONTROLLERS
+    if (cs::Settings::isControllerResetSetting(id))
+        applyControllerResetSetting();
+#endif
 #if COMPOSESIREN_CLIC
     if (id == cs::Settings::Id::clicOutputDevice)
         applyClicOutputSetting();

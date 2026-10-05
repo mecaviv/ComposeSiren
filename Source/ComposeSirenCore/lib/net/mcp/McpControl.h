@@ -3,6 +3,9 @@
 #include <atomic>
 #include <condition_variable>
 #include <cstdint>
+#if COMPOSESIREN_RESETALLCONTROLLERS
+#include <functional>
+#endif
 #include <memory>
 #include <mutex>
 #include <string>
@@ -81,6 +84,16 @@ public:
     // The song the last `set_song_title` showed (active false: none).
     SongDisplay getSongDisplay() const;
 #endif
+#if COMPOSESIREN_RESETALLCONTROLLERS
+    // The DSP side of `reset_controllers`. Called on the message thread with
+    // 0 for every siren, or a 1-based siren number. It must be thread-safe
+    // with the audio thread (SirenEnsemble::requestReset is) and return false
+    // when it has no such siren.
+    using ResetHandler = std::function<bool(int siren)>;
+    void setResetHandler(ResetHandler handler) { resetHandler = std::move(handler); }
+    // Message thread only, like the settings listener and resetControllers.
+    void setControllerResetEnabled(bool enabled) { controllerResetEnabled = enabled; }
+#endif
 
     struct ToolCount
     {
@@ -138,6 +151,9 @@ private:
     mutable std::mutex songMutex;
     mutable SongDisplay song;
 #endif
+#if COMPOSESIREN_RESETALLCONTROLLERS
+    std::string resetControllers(int siren) const;
+#endif
     juce::RangedAudioParameter* findParameter(const juce::String& id) const;
     static juce::var parameterObject(juce::RangedAudioParameter& parameter);
     static char* duplicate(const std::string& text);
@@ -146,6 +162,10 @@ private:
     std::shared_ptr<State> state;
     cs_mcp_server_t* server = nullptr;
     int port = 0;
+#if COMPOSESIREN_RESETALLCONTROLLERS
+    ResetHandler resetHandler;
+    bool controllerResetEnabled = true;
+#endif
 #if COMPOSESIREN_RECORD
     Recorder* recorder = nullptr;
     std::string recording(const juce::String& op, const juce::var& request) const;

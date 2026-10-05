@@ -15,6 +15,9 @@
 #include "OneMidiRouter.h"
 #include "lib/wrappers/SirenStateMonitor.h"
 #include <lib/net/mcp/McpControl.h>
+#if COMPOSESIREN_RESETALLCONTROLLERS && COMPOSESIREN_SETTINGS
+#include <lib/settings/Settings.h>
+#endif
 // #include "UiState.h"
 
 class OneSirenPluginProcessor :
@@ -22,6 +25,9 @@ class OneSirenPluginProcessor :
     public juce::Timer,
     public MainButtonsComponent::Listener,
     public VoiceManagerState::Listener
+#if COMPOSESIREN_RESETALLCONTROLLERS && COMPOSESIREN_SETTINGS
+    , private cs::Settings::Listener
+#endif
 {
 public:
     //==========================================================================
@@ -112,6 +118,13 @@ private:
     std::function<std::string(void)> getResourcesPathFunction;
 
     McpControl mcp;
+
+#if COMPOSESIREN_RESETALLCONTROLLERS && COMPOSESIREN_SETTINGS
+    void settingChanged(cs::Settings::Id id) override;
+    void applyControllerResetSetting();
+    std::atomic<std::uint32_t> channelModePolicy { cs::DspChannelModePolicy{}.packed() };
+    juce::SharedResourcePointer<cs::Settings> settings;
+#endif
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(OneSirenPluginProcessor)
 };

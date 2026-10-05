@@ -132,6 +132,22 @@ composesiren_option(COMPOSESIREN_MCP
         "In-process MCP server for parameters, MIDI, and standalone audio/MIDI devices"
         ON)
 
+# DEAL WITH THE CONTROLLER RESET ###############################################
+# Adds thread-safe DSP reset requests, a zero-volume callback before MIDI CC
+# 121 resets the controllers, and MIDI CC 120 (All Sound Off) / 123 (All Notes Off).
+# With COMPOSESIREN_MCP, also adds reset_controllers (the reset-all-controllers
+# Rust feature in Source/composesiren-mcp). Off: retain the main branch's DSP
+# behaviour and MCP tools. See Source/ComposeSirenCore/Mcp.cmake.
+# With COMPOSESIREN_SETTINGS, an Enable checkbox controls it at runtime.
+
+option(COMPOSESIREN_RESETALLCONTROLLERS
+        "Thread-safe controller reset, MIDI CC 120/123, and the MCP reset_controllers tool"
+        OFF)
+# Register only when enabled so the default About options also match master.
+if(COMPOSESIREN_RESETALLCONTROLLERS)
+  set_property(GLOBAL APPEND PROPERTY COMPOSESIREN_OPTIONS COMPOSESIREN_RESETALLCONTROLLERS)
+endif()
+
 # DEAL WITH THE RECORDER #######################################################
 # Records the audio output to FLAC or WAV (Rust crate Source/composesiren-record,
 # pure Rust encoders): a Record dialog in the editor, and, with COMPOSESIREN_MCP,
@@ -187,6 +203,10 @@ if (APPLE)
 endif()
 
 composesiren_add_build_info() # after the options: it records them
+
+if(BUILD_TESTING)
+  enable_testing()
+endif()
 
 add_subdirectory(Assets)
 add_subdirectory(Source)
