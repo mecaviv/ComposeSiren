@@ -7,6 +7,7 @@
 
 
 #include <functional>
+#include "ChannelModePolicy.h"
 #include "../definitions/parameterDefinitions.h"
 #include "../dsp/Sirene.h"
 
@@ -34,15 +35,17 @@ public:
     void resetSirene();
 #if COMPOSESIREN_RESETALLCONTROLLERS
     // Audio thread only: the wrapper copies its atomic setting once per block.
-    void setControllerResetEnabled(bool enabled) { controllerResetEnabled = enabled; }
-    bool isControllerResetEnabled() const { return controllerResetEnabled; }
-    void allSoundOff();
-    void allNotesOff();
+    void setControllerResetEnabled(bool enabled) { channelModePolicy.enabled = enabled; }
+    bool isControllerResetEnabled() const { return channelModePolicy.enabled; }
+    void setChannelModePolicy(cs::DspChannelModePolicy policy) { channelModePolicy = policy; }
+    bool acceptsChannelMode(int cc, int value) const { return channelModePolicy.accepts(cc, value); }
+    void onMidiAllSoundsOff();
+    void onMidiAllNotesOff();
 #endif
 
 private:
 #if COMPOSESIREN_RESETALLCONTROLLERS
-    bool controllerResetEnabled = true;
+    cs::DspChannelModePolicy channelModePolicy;
 #endif
 	// per-siren midi message management, refactored from MidiIn class :
 

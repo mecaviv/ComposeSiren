@@ -131,7 +131,7 @@ $ cmake --build cmake-build-debug --target OneSiren_Standalone
 Controller reset is experimental and opt-in. Configure with
 `-DCOMPOSESIREN_RESETALLCONTROLLERS=ON` to compile thread-safe DSP reset
 requests and additional MIDI CC 120/123 handling. The default is `OFF`:
-the additions, their runtime setting, and the MCP reset tool are excluded.
+the additions, their runtime settings, and the MCP reset tool are excluded.
 The Rust server feature is `reset-all-controllers`.
 
 With `COMPOSESIREN_SETTINGS=ON`, **Settings... → Controller reset → Enable**
@@ -153,10 +153,56 @@ Reset requests are applied at an audio block boundary. The runtime flag is
 sampled per block; the audio thread does not read the settings ValueTree.
 Pending requests consumed in a disabled block are discarded.
 
+#### Configurable MIDI interpretation
+
+With both `COMPOSESIREN_RESETALLCONTROLLERS=ON` and `COMPOSESIREN_SETTINGS=ON`,
+**Controller reset: DSP** provides a separate value rule for each of CC 120,
+121 and 123: **Ignore**, **Zero only**, **Positive only**, or **Any value**.
+Accepted messages keep the operations described below; these choices do not
+remap one controller to another or implement a different controller-reset map.
+CC 121 knob synchronization follows the same rule as the DSP, including
+SirenOrchestra's channel-16 reset routing. Ignored messages remain in the
+routed MIDI output, so the bridge can interpret them independently. While the
+experiment is enabled, incoming CC 120/121/123 values bypass the button
+parameters' 0–1 range conversion and remain intact in the routed MIDI.
+
+With `COMPOSESIREN_PARK_BRIDGE=ON`, **Controller reset: bridge** adds an
+independent accepted-value rule and output value for each of these controllers.
+Output choices are **Preserve**, **Send 0**, and **Send 127**. Filtering uses
+the incoming value before conversion; only the bridge copy changes. Channel,
+controller number, host MIDI output and DSP input are preserved. Conversion
+does not add command support at the receiving device.
+
+| Controller | Default DSP value rule | Default bridge value rule | Default bridge output |
+|---|---|---|---|
+| CC 120 All Sound Off | Positive only | Any value | Preserve |
+| CC 121 Reset All Controllers | Any value | Any value | Preserve |
+| CC 123 All Notes Off | Positive only | Any value | Preserve |
+
+The defaults preserve the existing experiment. To accept standard value-zero
+CC 120/123, select **Zero only** or **Any value** for the DSP. A standard
+value-zero input can independently become a positive bridge value by choosing
+**Zero only → Send 127** there. For a momentary button that emits 127 on press
+and 0 on release, **Positive only** accepts the press and filters the release;
+**Positive only → Send 0** converts just the press to a standard outgoing value.
+
+These settings are persisted per user and shared by plugin instances in the
+same process, rather than stored in a DAW project. They are copied to the
+audio thread at block boundaries. Turning **Controller reset → Enable** off
+bypasses the custom value rules and bridge conversions, restoring the existing
+MIDI behavior. With settings compiled out, the defaults above remain fixed.
+
+The rules govern MIDI messages. MCP `reset_controllers` and SirenOrchestra's
+native Reset buttons still make their existing explicit reset calls to the
+bridge, independently of these MIDI filters. The native buttons also keep
+their existing DSP stop call; the injected CC 121 and knob reset follow the
+DSP value rule. OneSiren's native Reset button keeps its existing stop behavior.
+
 #### End-user behaviour change
 
 The enabled column assumes `COMPOSESIREN_RESETALLCONTROLLERS=ON` and the
-runtime switch is on (its default). MCP entries also require `COMPOSESIREN_MCP=ON`.
+runtime switch is on (its default), with the default value rules above. MCP
+entries also require `COMPOSESIREN_MCP=ON`.
 
 | Surface | Compile option OFF (default) | Compile option ON, runtime enabled |
 |---|---|---|
@@ -177,16 +223,15 @@ DSP still models flap interpolation/leakage, and reverb is not cleared.
 
 #### MIDI behavior and current limitations
 
-CC 121 accepts any value and keeps the existing controller-reset map and
-knob synchronization. With this feature enabled, it also requests zero
+CC 121 accepts any value by default and keeps the existing controller-reset map
+and knob synchronization. With this feature enabled, it also requests zero
 MIDI-level volume before the reset and clears accumulated modulation depth.
-The MIDI controller-reset map and MCP's plugin-default
-reset are distinct operations.
+The MIDI controller-reset map and MCP's plugin-default reset are distinct operations.
 
 CC 120 requests zero MIDI-level volume and cancels ramps; CC 123 releases
-the current monophonic note through the existing release path. Both currently
-act **only when the value is greater than zero**. The standard value zero
-is ignored: this is a known interoperability limitation. The
+the current monophonic note through the existing release path. By default both
+act **only when the value is greater than zero**; standard value zero is ignored.
+The DSP settings above can enable zero-value reception. The
 [MIDI controller table](https://midi.org/midi-1-0-control-change-messages)
 specifies zero for CC 120, 121 and 123. This siren-specific CC 121 behavior
 also differs from the controller-only reset described in
@@ -201,7 +246,8 @@ on channel 16 convention for resetting all sirens.
 Characterization tests can be enabled with
 `-DCOMPOSESIREN_RESETALLCONTROLLERS=ON -DBUILD_TESTING=ON`. Build
 `ComposeSirenControllerResetTests`, then run `ctest --test-dir <build>`.
-The tests record the current behavior, including the value-zero limitation.
+The tests cover the default behavior, all value rules, release/ramp behavior,
+knob synchronization and independent bridge filtering/conversion.
 
 ### Recorder
 

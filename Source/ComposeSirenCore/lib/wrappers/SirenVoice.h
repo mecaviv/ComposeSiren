@@ -50,6 +50,7 @@ public:
 #if COMPOSESIREN_RESETALLCONTROLLERS
     void resetSiren();
     void setControllerResetEnabled(bool enabled);
+    void setChannelModePolicy(cs::DspChannelModePolicy policy);
 #endif
 
     void beginProcessBlock();
@@ -80,7 +81,9 @@ class SirenVoice
 #if COMPOSESIREN_RESETALLCONTROLLERS
     // set from any thread, consumed by the audio thread in beginProcessBlock
     std::atomic<bool> resetRequested { false };
-    std::atomic<bool> controllerResetEnabled { true };
+    // Request acceptance updates immediately; DSP interpretation uses a block snapshot.
+    std::atomic<bool> resetRequestsEnabled { true };
+    std::atomic<std::uint32_t> channelModePolicy { cs::DspChannelModePolicy{}.packed() };
 #endif
 
 protected:
@@ -132,11 +135,19 @@ public:
     virtual void setSampleRate(double newSampleRate);
     void stop();
 #if COMPOSESIREN_RESETALLCONTROLLERS
-    // Thread-safe : resets every controller, releases notes and silences the
-    // siren (like MIDI CC 121). Applied at the start of the next audio block.
+    // Thread-safe: restores the existing controller map and requests zero
+    // MIDI volume. Applied at the start of the next audio block.
     void requestReset();
     void setControllerResetEnabled(bool enabled) {
-        controllerResetEnabled.store(enabled, std::memory_order_release);
+        setResetRequestsEnabled(enabled);
+        if (enabled) channelModePolicy.fetch_or(1u, std::memory_order_release);
+        else channelModePolicy.fetch_and(~1u, std::memory_order_release);
+    }
+    void setResetRequestsEnabled(bool enabled) {
+        resetRequestsEnabled.store(enabled, std::memory_order_release);
+    }
+    void setChannelModePolicy(cs::DspChannelModePolicy policy) {
+        channelModePolicy.store(policy.packed(), std::memory_order_release);
     }
 #endif
     void update();

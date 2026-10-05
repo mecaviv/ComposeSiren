@@ -117,7 +117,11 @@ public:
     std::enable_if<std::is_same_v<Q, CCParam>, void>::type
     handleIncomingEvent(const juce::MidiMessage& msg,
                         int samplePosition,
-                        MidiScheduler& scheduler) {
+                        MidiScheduler& scheduler
+#if COMPOSESIREN_RESETALLCONTROLLERS && COMPOSESIREN_SETTINGS
+                        , bool preserveIncomingValue = false
+#endif
+                        ) {
         int channel = msg.getChannel();
         // int ccNumber = msg.getControllerNumber();
         int ccValue = msg.getControllerValue();
@@ -131,6 +135,14 @@ public:
             audioParam.setValueNotifyingHost(value);
         }
 
+#if COMPOSESIREN_RESETALLCONTROLLERS && COMPOSESIREN_SETTINGS
+        if (preserveIncomingValue) {
+            auto routed = msg;
+            routed.setChannel(mapChannel(channel));
+            scheduler.schedule(routed, samplePosition);
+            return;
+        }
+#endif
         handleEventInternal({ channel, value, samplePosition }, scheduler);
     }
 

@@ -194,6 +194,7 @@ private:
     void settingChanged(cs::Settings::Id id) override;
 #if COMPOSESIREN_RESETALLCONTROLLERS
     void applyControllerResetSetting();
+    std::atomic<std::uint32_t> channelModePolicy { cs::DspChannelModePolicy{}.packed() };
 #endif
     juce::SharedResourcePointer<cs::Settings> settings;
 #endif

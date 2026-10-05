@@ -70,14 +70,15 @@ void OneSirenPluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlo
 #if COMPOSESIREN_RESETALLCONTROLLERS && COMPOSESIREN_SETTINGS
 void OneSirenPluginProcessor::applyControllerResetSetting()
 {
-    const bool enabled = settings->getBool(cs::Settings::controllerResetEnabled);
-    siren.setControllerResetEnabled(enabled);
-    mcp.setControllerResetEnabled(enabled);
+    const auto policy = settings->getDspChannelModePolicy();
+    channelModePolicy.store(policy.packed(), std::memory_order_release);
+    siren.setResetRequestsEnabled(policy.enabled);
+    mcp.setControllerResetEnabled(policy.enabled);
 }
 
 void OneSirenPluginProcessor::settingChanged(cs::Settings::Id id)
 {
-    if (id == cs::Settings::controllerResetEnabled)
+    if (cs::Settings::isControllerResetSetting(id))
         applyControllerResetSetting();
 }
 #endif
@@ -181,6 +182,11 @@ void OneSirenPluginProcessor::setSirenId(sirenId id)
 void OneSirenPluginProcessor::processBlock(juce::AudioBuffer<float>& audio,
                                            juce::MidiBuffer& midiIn)
 {
+#if COMPOSESIREN_RESETALLCONTROLLERS && COMPOSESIREN_SETTINGS
+    const auto policy = cs::DspChannelModePolicy::unpack(channelModePolicy.load(std::memory_order_acquire));
+    router.setChannelModePolicy(policy);
+    siren.setChannelModePolicy(policy);
+#endif
     juce::MidiBuffer midiOut;
 
     // MIDI ROUTING / SCHEDULING / UI SYNCING //////////////////////////////////

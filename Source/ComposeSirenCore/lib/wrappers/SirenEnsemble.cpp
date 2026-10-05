@@ -125,6 +125,14 @@ void SirenEnsemble::setControllerResetEnabled(bool enabled) {
     for (auto& t : tracks | std::views::values) { t->setControllerResetEnabled(enabled); }
 }
 
+void SirenEnsemble::setChannelModePolicy(cs::DspChannelModePolicy policy) {
+    for (auto& t : tracks | std::views::values) { t->setChannelModePolicy(policy); }
+}
+
+void SirenEnsemble::setResetRequestsEnabled(bool enabled) {
+    for (auto& t : tracks | std::views::values) { t->setResetRequestsEnabled(enabled); }
+}
+
 void SirenEnsemble::requestReset(std::optional<sirenId> id) {
     if (id.has_value()) {
         tracks.at(id.value())->requestReset();

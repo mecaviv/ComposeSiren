@@ -267,6 +267,15 @@ void SirenOrchestraPluginProcessor::timerCallback()
 void SirenOrchestraPluginProcessor::processBlock(juce::AudioBuffer<float>& audio,
                                                  juce::MidiBuffer& midiIn)
 {
+#if COMPOSESIREN_RESETALLCONTROLLERS && COMPOSESIREN_SETTINGS
+    const auto policyBits = channelModePolicy.load(std::memory_order_acquire);
+    const auto policy = cs::DspChannelModePolicy::unpack(policyBits);
+    router.setChannelModePolicy(policy);
+    ensemble.setChannelModePolicy(policy);
+#if COMPOSESIREN_PARK_BRIDGE
+    const auto bridgePolicy = cs::BridgeChannelModePolicy::unpack(policyBits >> 7);
+#endif
+#endif
     juce::MidiBuffer midiOut;
 
     // MIDI ROUTING / SCHEDULING / UI SYNCING //////////////////////////////////
@@ -310,10 +319,19 @@ void SirenOrchestraPluginProcessor::processBlock(juce::AudioBuffer<float>& audio
     // (lock-free : les envois réseau se font sur le thread du bridge)
     for (const auto metadata : midiIn) {
         const auto& m = metadata.getMessage();
-        if (m.getRawDataSize() == 3)
+        if (m.getRawDataSize() == 3) {
+#if COMPOSESIREN_RESETALLCONTROLLERS && COMPOSESIREN_SETTINGS
+            if (m.isController()) {
+                const auto value = bridgePolicy.forwardedValue(m.getControllerNumber(), m.getControllerValue());
+                if (value.has_value())
+                    udpBridge.pushMidi(m.getRawData()[0], m.getRawData()[1], static_cast<std::uint8_t>(*value));
+                continue;
+            }
+#endif
             udpBridge.pushMidi(m.getRawData()[0],
                                m.getRawData()[1],
                                m.getRawData()[2]);
+        }
     }
 #endif
 
@@ -476,16 +494,21 @@ void SirenOrchestraPluginProcessor::renderClic(juce::AudioBuffer<float>& audio)
 #if COMPOSESIREN_RESETALLCONTROLLERS
 void SirenOrchestraPluginProcessor::applyControllerResetSetting()
 {
-    const bool enabled = settings->getBool(cs::Settings::controllerResetEnabled);
-    ensemble.setControllerResetEnabled(enabled);
-    mcp.setControllerResetEnabled(enabled);
+    const auto policy = settings->getDspChannelModePolicy();
+    auto bits = policy.packed();
+#if COMPOSESIREN_PARK_BRIDGE
+    bits |= settings->getBridgeChannelModePolicy().packed() << 7;
+#endif
+    channelModePolicy.store(bits, std::memory_order_release);
+    ensemble.setResetRequestsEnabled(policy.enabled);
+    mcp.setControllerResetEnabled(policy.enabled);
 }
 #endif
 
 void SirenOrchestraPluginProcessor::settingChanged(cs::Settings::Id id)
 {
 #if COMPOSESIREN_RESETALLCONTROLLERS
-    if (id == cs::Settings::controllerResetEnabled)
+    if (cs::Settings::isControllerResetSetting(id))
         applyControllerResetSetting();
 #endif
 #if COMPOSESIREN_CLIC

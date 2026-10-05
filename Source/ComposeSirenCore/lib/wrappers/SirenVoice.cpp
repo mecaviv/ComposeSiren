@@ -61,10 +61,8 @@ void SirenVoiceUnit::handleMidi(int status, int value1, int value2) {
     } else if (status >> 4 == 0xB) { // cc
         midiIn->handleControlChange(value1, value2);
 #if COMPOSESIREN_RESETALLCONTROLLERS
-        // all sound off, reset all controllers, all notes off
-        // CC 121 resets on any value; CC 120/123 act on value > 0.
         if (midiIn->isControllerResetEnabled()
-            && (value1 == 121 || ((value1 == 120 || value1 == 123) && value2 > 0))) {
+            && midiIn->acceptsChannelMode(value1, value2)) {
             ino = false;
         }
 #endif
@@ -80,6 +78,10 @@ void SirenVoiceUnit::stopSiren() {
 #if COMPOSESIREN_RESETALLCONTROLLERS
 void SirenVoiceUnit::setControllerResetEnabled(bool enabled) {
     midiIn->setControllerResetEnabled(enabled);
+}
+
+void SirenVoiceUnit::setChannelModePolicy(cs::DspChannelModePolicy policy) {
+    midiIn->setChannelModePolicy(policy);
 }
 
 void SirenVoiceUnit::resetSiren() {
@@ -234,7 +236,7 @@ void SirenVoice::stop()
 #if COMPOSESIREN_RESETALLCONTROLLERS
 void SirenVoice::requestReset()
 {
-    if (controllerResetEnabled.load(std::memory_order_acquire))
+    if (resetRequestsEnabled.load(std::memory_order_acquire))
         resetRequested.store(true, std::memory_order_release);
 }
 
@@ -252,10 +254,10 @@ void SirenVoice::handleMidi(int status, int value1, int value2)
 void SirenVoice::beginProcessBlock()
 {
 #if COMPOSESIREN_RESETALLCONTROLLERS
-    const auto resetEnabled = controllerResetEnabled.load(std::memory_order_acquire);
-    rawSiren->setControllerResetEnabled(resetEnabled);
+    const auto policy = cs::DspChannelModePolicy::unpack(channelModePolicy.load(std::memory_order_acquire));
+    rawSiren->setChannelModePolicy(policy);
     // Consume pending requests even when disabled; don't replay them later.
-    if (resetRequested.exchange(false, std::memory_order_acq_rel) && resetEnabled) {
+    if (resetRequested.exchange(false, std::memory_order_acq_rel) && policy.enabled) {
         rawSiren->resetSiren();
     }
 #endif
@@ -290,4 +292,3 @@ void SirenVoice::notifyListeners()
         });
     }
 }
-

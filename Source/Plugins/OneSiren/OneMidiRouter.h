@@ -22,6 +22,12 @@ public:
     }
     ~OneMidiRouter() = default;
 
+#if COMPOSESIREN_RESETALLCONTROLLERS && COMPOSESIREN_SETTINGS
+    void setChannelModePolicy(cs::DspChannelModePolicy policy) {
+        midiBridges->setChannelModePolicy(policy);
+    }
+#endif
+
     void setInputMidiChannel(const AnyOrOneBasedMidiChannel& ch) {
         inch = ch;
         OneBasedMidiChannel defaultInputChannel = inch.isAny
