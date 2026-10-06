@@ -37,6 +37,7 @@ Usage :
 
 import argparse
 import shutil
+import time
 from pathlib import Path
 
 import numpy as np
@@ -154,14 +155,17 @@ def traiter(resources, sortie, sirene, reduit, dry_run):
     assert n_notes * 4 * MAX_TAB * MAX_PARTIEL == taille, \
         f"{sirene}: taille de fichier inattendue ({taille})"
 
+    t0 = time.perf_counter()
     amp = np.fromfile(chemin_amp, dtype=np.float32).reshape(
         (n_notes, MAX_TAB, MAX_PARTIEL))
     freq = np.fromfile(chemin_freq, dtype=np.float32).reshape(
         (n_notes, MAX_TAB, MAX_PARTIEL))
     dure = np.fromfile(chemin_dure, dtype=np.float32).reshape(
         (n_notes, 3)).copy()
+    t1 = time.perf_counter()
 
     grille = detecter_grille(freq, amp, dure, n_notes)
+    t2 = time.perf_counter()
     new_amp, new_freq, dure, stats = corriger_sirene(
         freq, amp, dure, n_notes, grille)
 
@@ -171,6 +175,7 @@ def traiter(resources, sortie, sirene, reduit, dry_run):
     else:
         amp_sortie = new_amp
         taille_apres = new_amp.nbytes + new_freq.nbytes
+    t3 = time.perf_counter()
 
     print(f"{sirene}: {n_notes} notes, grille=f0x{grille}, "
           f"harmonique max={stats['harm_max']}, "
@@ -180,12 +185,21 @@ def traiter(resources, sortie, sirene, reduit, dry_run):
           f"{taille * 2 / 1e6:.0f} Mo -> {taille_apres / 1e6:.1f} Mo")
 
     if dry_run:
-        return
+        phases = (t1 - t0, t2 - t1, t3 - t2, 0.0)
+        print(f"PHASE {sirene}: read {phases[0] * 1e3:.0f} | "
+              f"grille {phases[1] * 1e3:.0f} | corriger {phases[2] * 1e3:.0f} | "
+              f"write 0 (ms)")
+        return phases
 
     amp_sortie.astype(np.float32).tofile(sortie / f"dataAmp{sirene}")
     dure.astype(np.float32).tofile(sortie / f"datadureTabs{sirene}")
     if not reduit:
         new_freq.astype(np.float32).tofile(sortie / f"dataFreq{sirene}")
+    phases = (t1 - t0, t2 - t1, t3 - t2, time.perf_counter() - t3)
+    print(f"PHASE {sirene}: read {phases[0] * 1e3:.0f} | "
+          f"grille {phases[1] * 1e3:.0f} | corriger {phases[2] * 1e3:.0f} | "
+          f"write {phases[3] * 1e3:.0f} (ms)")
+    return phases
 
 
 def main():
@@ -210,16 +224,27 @@ def main():
     if not args.dry_run:
         args.output.mkdir(parents=True, exist_ok=True)
 
+    all_phases = []
     for sirene in SIRENES:
-        traiter(args.resources, args.output, sirene, args.reduit, args.dry_run)
+        all_phases.append(
+            traiter(args.resources, args.output, sirene, args.reduit, args.dry_run))
 
+    copy_s = 0.0
     if not args.dry_run and not args.reduit:
         # compléter le dossier de sortie pour qu'il soit un drop-in complet
+        t_copy = time.perf_counter()
         for f in sorted(args.resources.glob("dataVectorInterval*")):
             shutil.copy2(f, args.output / f.name)
+        copy_s = time.perf_counter() - t_copy
+        print(f"PHASE copy: {copy_s * 1e3:.0f} (ms)")
         print(f"\nSortie drop-in complète dans : {args.output}")
         print("Test A/B : échanger temporairement Resources/ et ce dossier "
               "(les originaux restent la source de vérité).")
+
+    tot = [sum(p[i] for p in all_phases) * 1e3 for i in range(4)]
+    print(f"TOTAL: read {tot[0]:.0f} | grille {tot[1]:.0f} | "
+          f"corriger {tot[2]:.0f} | write {tot[3]:.0f} | "
+          f"copy {copy_s * 1e3:.0f} (ms)")
 
 
 if __name__ == "__main__":
