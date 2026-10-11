@@ -11,6 +11,9 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 #include <Components/EditorSnapshot.h>
+#if COMPOSESIREN_SLINT_UI
+#include "SlintSirenOrchestraEditor.h"
+#endif
 #include "AboutDialog.h"
 
 SirenOrchestraPluginProcessor::SirenOrchestraPluginProcessor() :
@@ -602,6 +605,11 @@ juce::AudioProcessorEditor* SirenOrchestraPluginProcessor::createEditor()
 {
     uiActive.store(true, std::memory_order_release);
     mcp.setDispatchPaused(false);
+#if COMPOSESIREN_SLINT_UI
+    if (!cs::dev::wantsJuceEditor()) {
+        return cs::dev::withSnapshot(new SlintSirenOrchestraEditor(*this));
+    }
+#endif
     return cs::dev::withSnapshot(new SirenOrchestraPluginEditor(*this));
 }
 

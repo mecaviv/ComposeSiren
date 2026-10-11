@@ -54,7 +54,8 @@ public:
         voiceManager.addListener(VoiceManagerState::Listener::Key::category, this);
         categoryChanged(voiceManager.getSirenCategory());
 
-        setSize(760, 262);
+        setSize(static_cast<int>(static_cast<float>(pixels.getWidth()) / scale),
+                static_cast<int>(static_cast<float>(pixels.getHeight()) / scale)); // 754 x 200, the JUCE editor's
         startTimerHz(60);
     }
 
