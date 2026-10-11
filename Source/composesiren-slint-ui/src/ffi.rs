@@ -251,3 +251,226 @@ pub extern "C" fn cs_slint_ui_param_code_name(param: u32) -> *const c_char {
         .get(param as usize)
         .map_or(std::ptr::null(), |n| CStr::as_ptr(n))
 }
+
+// ---------------------------------------------------------------------------------------------------------
+// SirenOrchestra (`cs_slint_orch_*`): the same pattern over [`crate::orchestra`].
+
+use crate::orchestra::{EmbeddedOrchestra, OrchestraSink, OrchestraStore};
+
+/// Callbacks from the orchestra editor to the plugin. `context` is handed back unchanged.
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct CsSlintOrchCallbacks {
+    /// The plugin's editor object.
+    pub context: *mut c_void,
+    /// A parameter moved: index into the editor's table ([`cs_slint_orch_param_id`]), value in its range.
+    pub param_changed: Option<extern "C" fn(context: *mut c_void, param: u32, value: f32)>,
+    /// A gesture on a parameter begins (`true`) or ends (`false`).
+    pub gesture: Option<extern "C" fn(context: *mut c_void, param: u32, begin: bool)>,
+    /// A track title was clicked: 0 = the top track (S7) .. 6 = the bottom one (S3), `sirenOrder`.
+    pub track_selected: Option<extern "C" fn(context: *mut c_void, track: u32)>,
+    /// Reset (`all` false: the selected siren) or Reset All.
+    pub reset: Option<extern "C" fn(context: *mut c_void, all: bool)>,
+    /// The Menu button.
+    pub menu: Option<extern "C" fn(context: *mut c_void)>,
+    /// "Sirenes physiques" (`st` false) or "ST" (`st` true) toggled.
+    pub park_switch: Option<extern "C" fn(context: *mut c_void, st: bool, on: bool)>,
+    /// A key of the on-screen keyboard went down or up.
+    pub note: Option<extern "C" fn(context: *mut c_void, note: u8, on: bool)>,
+}
+
+struct OrchCallbacks(CsSlintOrchCallbacks);
+
+impl OrchestraSink for OrchCallbacks {
+    fn param_changed(&self, index: usize, value: f32) {
+        if let Some(f) = self.0.param_changed {
+            f(self.0.context, index as u32, value);
+        }
+    }
+    fn gesture(&self, index: usize, begin: bool) {
+        if let Some(f) = self.0.gesture {
+            f(self.0.context, index as u32, begin);
+        }
+    }
+    fn track_selected(&self, track: usize) {
+        if let Some(f) = self.0.track_selected {
+            f(self.0.context, track as u32);
+        }
+    }
+    fn reset(&self, all: bool) {
+        if let Some(f) = self.0.reset {
+            f(self.0.context, all);
+        }
+    }
+    fn menu(&self) {
+        if let Some(f) = self.0.menu {
+            f(self.0.context);
+        }
+    }
+    fn park_switch(&self, st: bool, on: bool) {
+        if let Some(f) = self.0.park_switch {
+            f(self.0.context, st, on);
+        }
+    }
+    fn note(&self, note: u8, on: bool) {
+        if let Some(f) = self.0.note {
+            f(self.0.context, note, on);
+        }
+    }
+}
+
+/// An orchestra editor owned by the plugin (opaque).
+pub struct CsSlintOrch {
+    store: Arc<OrchestraStore>,
+    ids: Vec<CString>,
+    editor: EmbeddedOrchestra,
+}
+
+/// Create the orchestra editor. `clic`: the build has `COMPOSESIREN_CLIC` (the Clic pane and its
+/// parameters); `park_bridge`: it has `COMPOSESIREN_PARK_BRIDGE`. Null when Slint cannot create it.
+#[unsafe(no_mangle)]
+pub extern "C" fn cs_slint_orch_new(
+    callbacks: CsSlintOrchCallbacks,
+    clic: bool,
+    park_bridge: bool,
+    scale: f32,
+) -> *mut CsSlintOrch {
+    let store = Arc::new(OrchestraStore::new(clic));
+    let ids = store
+        .params()
+        .iter()
+        .map(|p| CString::new(p.juce_id()).unwrap_or_default())
+        .collect();
+    let sink: Rc<dyn OrchestraSink> = Rc::new(OrchCallbacks(callbacks));
+    match EmbeddedOrchestra::new(&store, &sink, park_bridge, scale) {
+        Ok(editor) => Box::into_raw(Box::new(CsSlintOrch { store, ids, editor })),
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+/// Destroy an editor made by [`cs_slint_orch_new`] (null is ignored).
+///
+/// # Safety
+/// `ui` comes from `cs_slint_orch_new` and is not used afterwards.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn cs_slint_orch_free(ui: *mut CsSlintOrch) {
+    if !ui.is_null() {
+        drop(unsafe { Box::from_raw(ui) });
+    }
+}
+
+/// Width of the pixel buffer.
+///
+/// # Safety
+/// `ui` is a live editor.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn cs_slint_orch_width(ui: *const CsSlintOrch) -> u32 {
+    unsafe { &*ui }.editor.size().0
+}
+
+/// Height of the pixel buffer.
+///
+/// # Safety
+/// `ui` is a live editor.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn cs_slint_orch_height(ui: *const CsSlintOrch) -> u32 {
+    unsafe { &*ui }.editor.size().1
+}
+
+/// Number of parameters in the editor's table.
+///
+/// # Safety
+/// `ui` is a live editor.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn cs_slint_orch_param_count(ui: *const CsSlintOrch) -> u32 {
+    unsafe { &*ui }.ids.len() as u32
+}
+
+/// The JUCE parameter id of table entry `param` (`"S5 | Volume"`), valid while the editor lives. Null past
+/// the end.
+///
+/// # Safety
+/// `ui` is a live editor.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn cs_slint_orch_param_id(ui: *const CsSlintOrch, param: u32) -> *const c_char {
+    unsafe { &*ui }
+        .ids
+        .get(param as usize)
+        .map_or(std::ptr::null(), |n| CStr::as_ptr(n))
+}
+
+/// The host changed a parameter; shown on the next tick.
+///
+/// # Safety
+/// `ui` is a live editor.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn cs_slint_orch_set_param(ui: *const CsSlintOrch, param: u32, value: f32) {
+    unsafe { &*ui }.store.set_from_host(param as usize, value);
+}
+
+/// Select a track (0 = top) as the MIDI input channel says, without reporting it back.
+///
+/// # Safety
+/// `ui` is a live editor.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn cs_slint_orch_select_track(ui: *const CsSlintOrch, track: u32) {
+    unsafe { &*ui }.editor.editor().select_track(track as usize);
+}
+
+/// Light or clear a track's note LED.
+///
+/// # Safety
+/// `ui` is a live editor.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn cs_slint_orch_set_playing(ui: *const CsSlintOrch, track: u32, playing: bool) {
+    unsafe { &*ui }.editor.editor().set_playing(track as usize, playing);
+}
+
+/// Like [`cs_slint_ui_tick_region`], for the orchestra editor.
+///
+/// # Safety
+/// `ui` is a live editor; `pixels` holds `stride * height` pixels; `dirty` is null or writable.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn cs_slint_orch_tick_region(
+    ui: *const CsSlintOrch,
+    pixels: *mut u8,
+    stride: u32,
+    dirty: *mut CsRect,
+) -> bool {
+    let ui = unsafe { &*ui };
+    let len = stride as usize * ui.editor.size().1 as usize;
+    let pixels = unsafe { std::slice::from_raw_parts_mut(pixels.cast::<Bgra8Premultiplied>(), len) };
+    match ui.editor.tick_region(pixels, stride as usize) {
+        Some(DirtyRect { x, y, width, height }) => {
+            if let Some(out) = unsafe { dirty.as_mut() } {
+                *out = CsRect { x, y, width, height };
+            }
+            true
+        }
+        None => false,
+    }
+}
+
+/// Forward a pointer event at logical coordinates.
+///
+/// # Safety
+/// `ui` is a live editor.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn cs_slint_orch_pointer(ui: *const CsSlintOrch, kind: CsPointer, x: f32, y: f32) {
+    let kind = match kind {
+        CsPointer::Down => Pointer::Down,
+        CsPointer::Up => Pointer::Up,
+        CsPointer::Move => Pointer::Move,
+        CsPointer::Exit => Pointer::Exit,
+    };
+    unsafe { &*ui }.editor.pointer(kind, x, y);
+}
+
+/// Forward a wheel event (logical pixels).
+///
+/// # Safety
+/// `ui` is a live editor.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn cs_slint_orch_wheel(ui: *const CsSlintOrch, x: f32, y: f32, dx: f32, dy: f32) {
+    unsafe { &*ui }.editor.wheel(x, y, dx, dy);
+}
