@@ -10,6 +10,7 @@
 #endif
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
+#include <Components/EditorSnapshot.h>
 #include "AboutDialog.h"
 
 SirenOrchestraPluginProcessor::SirenOrchestraPluginProcessor() :
@@ -601,7 +602,7 @@ juce::AudioProcessorEditor* SirenOrchestraPluginProcessor::createEditor()
 {
     uiActive.store(true, std::memory_order_release);
     mcp.setDispatchPaused(false);
-    return new SirenOrchestraPluginEditor(*this);
+    return cs::dev::withSnapshot(new SirenOrchestraPluginEditor(*this));
 }
 
 
