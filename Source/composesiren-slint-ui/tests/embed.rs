@@ -29,7 +29,7 @@ fn renders_and_drags_a_knob() {
     let sink: Rc<dyn HostSink> = log.clone();
     let editor = EmbeddedEditor::new(&store, &sink, 2.0).expect("editor");
     let (w, h) = editor.size();
-    assert_eq!((w, h), (1520, 524));
+    assert_eq!((w, h), (1508, 400));
     let mut pixels = vec![Bgra8Premultiplied::default(); (w * h) as usize];
     assert!(editor.tick(&mut pixels, w as usize), "first frame draws");
     assert!(
@@ -41,7 +41,7 @@ fn renders_and_drags_a_knob() {
         "nothing changed, nothing redrawn"
     );
 
-    let (x, y) = (219.0, 108.0); // the Portamento knob
+    let (x, y) = (219.0, 94.0); // the Portamento knob
     editor.pointer(Pointer::Move, x, y);
     editor.pointer(Pointer::Down, x, y);
     for step in 1..=10 {

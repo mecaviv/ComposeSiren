@@ -1,170 +1,82 @@
-// OneSiren's editor (Source/Plugins/OneSiren/PluginEditor.cpp) in Slint: the header (siren type, MIDI routing,
-// Reset), the strip of the siren's 14 parameters in five groups, and a keyboard. Values, captions and
-// formatting come from the Rust parameter model (src/params.rs); every change goes back through callbacks.
+// OneSiren's editor (Source/Plugins/OneSiren/PluginEditor.cpp) in Slint, at the JUCE geometry (754 x 200):
+// the voice manager on the left of the top bar (siren type, LED, MIDI In, MIDI Out drop-downs), Reset and
+// Menu on the right, the strip of the siren's 14 parameters in five sections, and the keyboard.
 
-import { Knob, Spin, Group, Pill } from "widgets.slint";
+import { Combo, Led, Button, Keyboard, Look } from "widgets.slint";
+import { SirenStrip, GroupRow } from "strip.slint";
 import { Theme } from "generated/metadata.slint";
 
-export struct ParamRow {
-    caption: string,     // label, and "ccN" on a second line
-    value: float,
-    text: string,        // formatted value
-    minimum: float,
-    maximum: float,
-    step: float,
-    default-value: float,
-    kind: int,           // 0 knob, 1 centred knob, 2 spin
-}
-
-// One group of the strip with its own rows: a repeater over `params` follows changes row by row, so a
-// knob that moves re-evaluates that cell only (indexing one flat model would make every cell depend on all).
-export struct GroupRow {
-    title: string,
-    first: int,          // index of the group's first parameter in the parameter table
-    params: [ParamRow],
-}
-
-component Keyboard inherits Rectangle {
-    in property <color> accent;
-    in property <int> lowest: 24;           // C1
-    in property <int> white-keys: 43;       // C1..C7
-    callback note(int, bool);
-    property <[int]> degree: [0, 2, 4, 5, 7, 9, 11];
-    property <length> key-width: root.width / root.white-keys;
-    property <int> held: -1;
-    background: #101215;
-    for i in root.white-keys : Rectangle {
-        property <int> n: root.lowest + 12 * floor(i / 7) + root.degree[mod(i, 7)];
-        x: i * root.key-width;
-        width: root.key-width - 1px;
-        background: root.held == self.n ? root.accent : white;
-        border-radius: 2px;
-        if mod(i, 7) == 0 : Text {
-            y: parent.height - 14px; x: 3px;
-            text: "C" + floor(i / 7 + 1);
-            color: #333; font-size: 10px;
-        }
-        TouchArea {
-            pointer-event(e) => {
-                if e.kind == PointerEventKind.down { root.held = parent.n; root.note(parent.n, true); }
-                if e.kind == PointerEventKind.up { root.held = -1; root.note(parent.n, false); }
-            }
-        }
-    }
-    for i in root.white-keys - 1 : Rectangle {
-        property <int> d: mod(i, 7);
-        property <int> n: root.lowest + 12 * floor(i / 7) + root.degree[self.d] + 1;
-        visible: self.d != 2 && self.d != 6;
-        x: (i + 1) * root.key-width - root.key-width * 0.3;
-        y: 0;
-        width: root.key-width * 0.6;
-        height: root.height * 0.6;
-        background: root.held == self.n ? root.accent : #555b63;
-        border-radius: 2px;
-        TouchArea {
-            enabled: parent.visible;
-            pointer-event(e) => {
-                if e.kind == PointerEventKind.down { root.held = parent.n; root.note(parent.n, true); }
-                if e.kind == PointerEventKind.up { root.held = -1; root.note(parent.n, false); }
-            }
-        }
-    }
-}
-
 export component OneSiren inherits Window {
-    title: "OneSiren — Slint proof of concept";
-    width: 760px;
-    height: 262px;
-    background: #1d2027;
-    default-font-size: 13px;
+    title: "OneSiren";
+    width: Theme.editor-one-siren-width;
+    height: Theme.editor-one-siren-height;
+    background: Look.editor-background;
+    default-font-size: 12px;
 
     in property <[GroupRow]> groups;
     in property <color> strip-colour: #3a78d6;
     in property <[string]> categories: ["Alto", "Bass", "Tenor", "Soprano", "Piccolo"];
     in-out property <int> category: 3;
+    in property <[string]> midi-in-channels: ["Any", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16"];
+    in property <[string]> midi-out-channels: ["Thru", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16"];
     in-out property <int> midi-in: 0;       // 0 = Any, 1..16
+    in-out property <int> midi-out: 0;      // 0 = Thru, 1..16
+    in property <bool> playing;             // the voice manager's note LED
+    in property <[{ from: int, to: int, label: string, colour: color }]> ranges;
     in property <string> midi-out-text;
 
     callback param-changed(int, float);
     callback param-gesture(int, bool);
     callback category-picked(int);
+    callback midi-in-picked(int);
+    callback midi-out-picked(int);
     callback reset-all();
+    callback menu();
     callback note(int, bool);
 
-    VerticalLayout {
-        padding: 4px;
-        spacing: 4px;
-        // header ---------------------------------------------------------------
-        HorizontalLayout {
-            height: 26px;
-            spacing: 8px;
-            Pill {
-                text: "▾ " + root.categories[root.category];
-                clicked => {
-                    root.category = mod(root.category + 1, root.categories.length);
-                    root.category-picked(root.category);
-                }
-            }
-            Text { text: "Siren type"; color: white; vertical-alignment: center; }
-            Rectangle { width: 8px; height: 8px; y: 9px; border-radius: 4px; background: #5ee05e; }
-            Pill {
-                text: "▾ " + (root.midi-in == 0 ? "Any" : root.midi-in);
-                clicked => { root.midi-in = mod(root.midi-in + 1, 17); }
-            }
-            Text { text: "MIDI In"; color: white; vertical-alignment: center; }
-            Text {
-                text: root.midi-out-text;
-                color: #9aa4b2; font-size: 12px;
-                vertical-alignment: center; horizontal-alignment: right;
-                horizontal-stretch: 1;
-                overflow: elide;
-            }
-            Pill { text: "Reset"; tint: #8b1d1d; clicked => { root.reset-all(); } }
+    // top bar: VoiceManagerComponent (left) over MainButtonsComponent (right), 30 px, 5 px margins
+    HorizontalLayout {
+        y: 0; height: 30px;
+        padding: 5px;
+        spacing: 5px;
+        Combo {
+            width: 75px; model: root.categories; current-index <=> root.category;
+            selected(i) => { root.category-picked(i); }
         }
-        // the strip --------------------------------------------------------------
-        Rectangle {
-            height: 148px;
-            border-radius: 9px;
-            background: Theme.colour-background-strip-grey;
-            HorizontalLayout {
-                padding: 3px;
-                spacing: 3px;
-                for g in root.groups : Group {
-                    title: g.title;
-                    colour: root.strip-colour;
-                    horizontal-stretch: g.params.length;
-                    for p[k] in g.params : VerticalLayout {
-                        property <int> i: g.first + k;
-                        spacing: 0px;
-                        min-width: 44px;
-                        Text {
-                            text: p.caption;
-                            height: 30px;
-                            color: white; font-size: 12px;
-                            horizontal-alignment: center; vertical-alignment: top;
-                        }
-                        if p.kind != 2 : Knob {
-                            height: 88px;
-                            value: p.value; minimum: p.minimum; maximum: p.maximum; step: p.step;
-                            default-value: p.default-value; centred: p.kind == 1; text: p.text;
-                            changed(v) => { root.param-changed(i, v); }
-                            gesture(b) => { root.param-gesture(i, b); }
-                        }
-                        if p.kind == 2 : Spin {
-                            height: 88px;
-                            value: p.value; step: p.step; text: p.text;
-                            changed(v) => { root.param-changed(i, v); }
-                            gesture(b) => { root.param-gesture(i, b); }
-                        }
-                    }
-                }
-            }
+        Text { width: 60px; text: "Siren type"; color: white; vertical-alignment: center; }
+        Rectangle { width: 16px; Led { on: root.playing; } }
+        Combo {
+            width: 55px; model: root.midi-in-channels; current-index <=> root.midi-in;
+            selected(i) => { root.midi-in-picked(i); }
         }
-        // keyboard ---------------------------------------------------------------
-        Keyboard {
-            height: 68px;
-            accent: Theme.colour-orange-mecanique;
-            note(n, on) => { root.note(n, on); }
+        Text { width: 55px; text: "MIDI In"; color: white; vertical-alignment: center; }
+        Combo {
+            width: 55px; model: root.midi-out-channels; current-index <=> root.midi-out;
+            selected(i) => { root.midi-out-picked(i); }
         }
+        Text { width: 55px; text: "MIDI Out"; color: white; vertical-alignment: center; }
+        Text {
+            horizontal-stretch: 1;
+            text: root.midi-out-text;
+            color: #9aa4b2; font-size: 11px;
+            vertical-alignment: center; horizontal-alignment: right;
+            overflow: elide;
+        }
+        Button { width: 70px; text: "Reset"; tint: Look.dark-red; clicked => { root.reset-all(); } }
+        Button { width: 64px; text: "Menu"; clicked => { root.menu(); } }
+    }
+    SirenStrip {
+        x: 0; y: 30px;
+        width: root.width; height: Theme.strip-min-full-strip-height;
+        groups: root.groups;
+        colour: root.strip-colour;
+        param-changed(i, v) => { root.param-changed(i, v); }
+        param-gesture(i, b) => { root.param-gesture(i, b); }
+    }
+    Keyboard {
+        x: 0; y: 130px;
+        width: root.width; height: 70px;
+        ranges: root.ranges;
+        note(n, on) => { root.note(n, on); }
     }
 }
