@@ -67,7 +67,7 @@ fn main() {
             .ok()
             .and_then(|v| v.parse().ok())
             .unwrap_or(219.0_f32),
-        108.0_f32,
+        94.0_f32,
     );
     editor.pointer(Pointer::Move, x, y);
     editor.pointer(Pointer::Down, x, y);

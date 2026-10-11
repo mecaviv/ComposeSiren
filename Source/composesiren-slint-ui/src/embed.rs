@@ -132,8 +132,73 @@ pub enum Pointer {
     Exit,
 }
 
-/// The editor's size in logical pixels (`OneSiren`'s `width` and `height` in `ui/onesiren.slint`).
-pub const LOGICAL_SIZE: (f32, f32) = (760.0, 262.0);
+/// The editor's size in logical pixels (`OneSiren`'s `width` and `height` in `ui/onesiren.slint`, the JUCE
+/// editor's 754 x 200).
+pub const LOGICAL_SIZE: (f32, f32) = (754.0, 200.0);
+
+/// Install the platform and prepare the window the next component creation picks up.
+pub(crate) fn prepare_window(repaint: RepaintBufferType) -> Rc<MinimalSoftwareWindow> {
+    install_platform();
+    let window = MinimalSoftwareWindow::new(repaint);
+    NEXT_WINDOW.with(|w| *w.borrow_mut() = Some(window.clone()));
+    window
+}
+
+/// Scale and size the window once its component exists; returns the size in physical pixels.
+pub(crate) fn size_window(window: &MinimalSoftwareWindow, logical: (f32, f32), scale: f32) -> PhysicalSize {
+    window.dispatch_event(WindowEvent::ScaleFactorChanged {
+        scale_factor: scale,
+    });
+    let size = PhysicalSize::new(
+        (logical.0 * scale).round() as u32,
+        (logical.1 * scale).round() as u32,
+    );
+    window.set_size(size);
+    size
+}
+
+/// Run queued work, timers and animations, and redraw what changed into `pixels`.
+pub(crate) fn tick_window(
+    window: &MinimalSoftwareWindow,
+    pixels: &mut [Bgra8Premultiplied],
+    stride: usize,
+) -> Option<DirtyRect> {
+    run_jobs();
+    slint::platform::update_timers_and_animations();
+    let dirty = Cell::new(None);
+    window.draw_if_needed(|renderer| {
+        let region = renderer.render(pixels, stride);
+        let (origin, size) = (region.bounding_box_origin(), region.bounding_box_size());
+        dirty.set(Some(DirtyRect {
+            x: origin.x.max(0) as u32,
+            y: origin.y.max(0) as u32,
+            width: size.width,
+            height: size.height,
+        }));
+    });
+    dirty.get()
+}
+
+/// Forward a pointer event at logical coordinates.
+pub(crate) fn pointer_window(window: &MinimalSoftwareWindow, kind: Pointer, x: f32, y: f32) {
+    let position = LogicalPosition::new(x, y);
+    let button = PointerEventButton::Left;
+    window.dispatch_event(match kind {
+        Pointer::Down => WindowEvent::PointerPressed { position, button },
+        Pointer::Up => WindowEvent::PointerReleased { position, button },
+        Pointer::Move => WindowEvent::PointerMoved { position },
+        Pointer::Exit => WindowEvent::PointerExited,
+    });
+}
+
+/// Forward a wheel event (logical pixels).
+pub(crate) fn wheel_window(window: &MinimalSoftwareWindow, x: f32, y: f32, dx: f32, dy: f32) {
+    window.dispatch_event(WindowEvent::PointerScrolled {
+        position: LogicalPosition::new(x, y),
+        delta_x: dx,
+        delta_y: dy,
+    });
+}
 
 /// The part of the host's pixels a tick redrew, in physical pixels.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -180,18 +245,9 @@ impl EmbeddedEditor {
         scale: f32,
         repaint: RepaintBufferType,
     ) -> Result<Self, slint::PlatformError> {
-        install_platform();
-        let window = MinimalSoftwareWindow::new(repaint);
-        NEXT_WINDOW.with(|w| *w.borrow_mut() = Some(window.clone()));
+        let window = prepare_window(repaint);
         let editor = Editor::new(store, sink)?;
-        window.dispatch_event(WindowEvent::ScaleFactorChanged {
-            scale_factor: scale,
-        });
-        let size = PhysicalSize::new(
-            (LOGICAL_SIZE.0 * scale).round() as u32,
-            (LOGICAL_SIZE.1 * scale).round() as u32,
-        );
-        window.set_size(size);
+        let size = size_window(&window, LOGICAL_SIZE, scale);
         editor.component.show()?;
         Ok(Self {
             window,
@@ -225,20 +281,7 @@ impl EmbeddedEditor {
         pixels: &mut [Bgra8Premultiplied],
         stride: usize,
     ) -> Option<DirtyRect> {
-        run_jobs();
-        slint::platform::update_timers_and_animations();
-        let dirty = Cell::new(None);
-        self.window.draw_if_needed(|renderer| {
-            let region = renderer.render(pixels, stride);
-            let (origin, size) = (region.bounding_box_origin(), region.bounding_box_size());
-            dirty.set(Some(DirtyRect {
-                x: origin.x.max(0) as u32,
-                y: origin.y.max(0) as u32,
-                width: size.width,
-                height: size.height,
-            }));
-        });
-        dirty.get()
+        tick_window(&self.window, pixels, stride)
     }
 
     /// Mark the whole editor for redrawing (after the host lost its pixels, or to measure a full frame).
@@ -248,22 +291,11 @@ impl EmbeddedEditor {
 
     /// Forward a pointer event at logical coordinates (JUCE's component coordinates).
     pub fn pointer(&self, kind: Pointer, x: f32, y: f32) {
-        let position = LogicalPosition::new(x, y);
-        let button = PointerEventButton::Left;
-        self.window.dispatch_event(match kind {
-            Pointer::Down => WindowEvent::PointerPressed { position, button },
-            Pointer::Up => WindowEvent::PointerReleased { position, button },
-            Pointer::Move => WindowEvent::PointerMoved { position },
-            Pointer::Exit => WindowEvent::PointerExited,
-        });
+        pointer_window(&self.window, kind, x, y);
     }
 
     /// Forward a wheel event (logical pixels; positive `dy` scrolls up).
     pub fn wheel(&self, x: f32, y: f32, dx: f32, dy: f32) {
-        self.window.dispatch_event(WindowEvent::PointerScrolled {
-            position: LogicalPosition::new(x, y),
-            delta_x: dx,
-            delta_y: dy,
-        });
+        wheel_window(&self.window, x, y, dx, dy);
     }
 }

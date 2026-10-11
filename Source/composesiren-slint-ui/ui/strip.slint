@@ -1,0 +1,76 @@
+// A siren strip (SirenStripComponent): the siren colour, its sections as glass groups, one glass cell per
+// parameter. Used whole by OneSiren and by the first SirenOrchestra track; compact (no titles, no
+// captions) by the other tracks. Rows come from the Rust model, built from the generated metadata.
+
+import { Knob, Spin, Cell, Group, Look } from "widgets.slint";
+import { Theme } from "generated/metadata.slint";
+
+export struct ParamRow {
+    caption: string,     // strip label, and "ccN" on a second line
+    value: float,
+    text: string,        // formatted value
+    minimum: float,
+    maximum: float,
+    step: float,
+    default-value: float,
+    kind: int,           // 0 knob, 1 centred knob, 2 spin, 3 toggle, 4 dark (notched) knob
+}
+
+// One group with its own rows: a repeater over `params` follows changes row by row, so a knob that moves
+// re-evaluates that cell only.
+export struct GroupRow {
+    title: string,
+    first: int,          // index of the group's first parameter in the editor's parameter table
+    params: [ParamRow],
+}
+
+// The cell of one parameter.
+export component ParamCell inherits Cell {
+    in property <ParamRow> p;
+    in property <int> index;
+    in property <bool> full: true;
+    callback param-changed(int, float);
+    callback param-gesture(int, bool);
+    caption: root.p.caption;
+    show-caption: root.full;
+    min-width: root.p.kind == 2 ? Theme.strip-min-inc-dec-slider-width : Theme.strip-min-knob-slider-width;
+    preferred-width: self.min-width;
+    horizontal-stretch: 0;
+    if root.p.kind != 2 : Knob {
+        value: root.p.value; minimum: root.p.minimum; maximum: root.p.maximum; step: root.p.step;
+        default-value: root.p.default-value; centred: root.p.kind == 1; dark: root.p.kind == 4;
+        text: root.p.text;
+        changed(v) => { root.param-changed(root.index, v); }
+        gesture(b) => { root.param-gesture(root.index, b); }
+    }
+    if root.p.kind == 2 : Spin {
+        value: root.p.value; step: root.p.step; text: root.p.text;
+        changed(v) => { root.param-changed(root.index, v); }
+        gesture(b) => { root.param-gesture(root.index, b); }
+    }
+}
+
+export component SirenStrip inherits Rectangle {
+    in property <[GroupRow]> groups;
+    in property <color> colour;
+    in property <bool> full: true;      // section titles and knob captions
+    callback param-changed(int, float);
+    callback param-gesture(int, bool);
+    border-radius: Look.corner;
+    background: root.colour;
+    HorizontalLayout {
+        padding: Look.spacer;
+        spacing: Look.spacer;
+        alignment: start;
+        for g in root.groups : Group {
+            horizontal-stretch: 0;
+            title: g.title;
+            show-title: root.full;
+            for p[k] in g.params : ParamCell {
+                p: p; index: g.first + k; full: root.full;
+                param-changed(i, v) => { root.param-changed(i, v); }
+                param-gesture(i, b) => { root.param-gesture(i, b); }
+            }
+        }
+    }
+}
