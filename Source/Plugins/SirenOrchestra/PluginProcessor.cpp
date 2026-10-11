@@ -10,6 +10,7 @@
 #endif
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
+#include <Components/EditorSnapshot.h>
 #include "AboutDialog.h"
 
 SirenOrchestraPluginProcessor::SirenOrchestraPluginProcessor() :
@@ -528,7 +529,7 @@ bool SirenOrchestraPluginProcessor::hasEditor() const
 
 juce::AudioProcessorEditor* SirenOrchestraPluginProcessor::createEditor()
 {
-    return new SirenOrchestraPluginEditor(*this);
+    return cs::dev::withSnapshot(new SirenOrchestraPluginEditor(*this));
 }
 
 
