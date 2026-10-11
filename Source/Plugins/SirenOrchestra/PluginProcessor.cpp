@@ -11,6 +11,9 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 #include <Components/EditorSnapshot.h>
+#if COMPOSESIREN_SLINT_UI
+#include "SlintSirenOrchestraEditor.h"
+#endif
 #include "AboutDialog.h"
 
 SirenOrchestraPluginProcessor::SirenOrchestraPluginProcessor() :
@@ -529,6 +532,11 @@ bool SirenOrchestraPluginProcessor::hasEditor() const
 
 juce::AudioProcessorEditor* SirenOrchestraPluginProcessor::createEditor()
 {
+#if COMPOSESIREN_SLINT_UI
+    if (!cs::dev::wantsJuceEditor()) {
+        return cs::dev::withSnapshot(new SlintSirenOrchestraEditor(*this));
+    }
+#endif
     return cs::dev::withSnapshot(new SirenOrchestraPluginEditor(*this));
 }
 
