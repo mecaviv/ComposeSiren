@@ -24,6 +24,9 @@ typedef enum {
     CS_POINTER_EXIT,
 } CsPointer;
 
+// An orchestra editor owned by the plugin (opaque).
+typedef struct CsSlintOrch CsSlintOrch;
+
 // An editor owned by the plugin (opaque).
 typedef struct CsSlintUi CsSlintUi;
 
@@ -52,6 +55,26 @@ typedef struct {
     // Height.
     uint32_t height;
 } CsRect;
+
+// Callbacks from the orchestra editor to the plugin. `context` is handed back unchanged.
+typedef struct {
+    // The plugin's editor object.
+    void *context;
+    // A parameter moved: index into the editor's table ([`cs_slint_orch_param_id`]), value in its range.
+    void (*param_changed)(void *context, uint32_t param, float value);
+    // A gesture on a parameter begins (`true`) or ends (`false`).
+    void (*gesture)(void *context, uint32_t param, bool begin);
+    // A track title was clicked: 0 = the top track (S7) .. 6 = the bottom one (S3), `sirenOrder`.
+    void (*track_selected)(void *context, uint32_t track);
+    // Reset (`all` false: the selected siren) or Reset All.
+    void (*reset)(void *context, bool all);
+    // The Menu button.
+    void (*menu)(void *context);
+    // "Sirenes physiques" (`st` false) or "ST" (`st` true) toggled.
+    void (*park_switch)(void *context, bool st, bool on);
+    // A key of the on-screen keyboard went down or up.
+    void (*note)(void *context, uint8_t note, bool on);
+} CsSlintOrchCallbacks;
 
 #ifdef __cplusplus
 extern "C" {
@@ -132,6 +155,84 @@ uint32_t cs_slint_ui_param_count(void);
 
 // The parameter's code name (`Volume`): the plugin's id is `"<siren> | <code name>"`. Null past the end.
 const char *cs_slint_ui_param_code_name(uint32_t param);
+
+// Create the orchestra editor. `clic`: the build has `COMPOSESIREN_CLIC` (the Clic pane and its
+// parameters); `park_bridge`: it has `COMPOSESIREN_PARK_BRIDGE`. Null when Slint cannot create it.
+CsSlintOrch *cs_slint_orch_new(CsSlintOrchCallbacks callbacks,
+                               bool clic,
+                               bool park_bridge,
+                               float scale);
+
+// Destroy an editor made by [`cs_slint_orch_new`] (null is ignored).
+//
+// # Safety
+// `ui` comes from `cs_slint_orch_new` and is not used afterwards.
+void cs_slint_orch_free(CsSlintOrch *ui);
+
+// Width of the pixel buffer.
+//
+// # Safety
+// `ui` is a live editor.
+uint32_t cs_slint_orch_width(const CsSlintOrch *ui);
+
+// Height of the pixel buffer.
+//
+// # Safety
+// `ui` is a live editor.
+uint32_t cs_slint_orch_height(const CsSlintOrch *ui);
+
+// Number of parameters in the editor's table.
+//
+// # Safety
+// `ui` is a live editor.
+uint32_t cs_slint_orch_param_count(const CsSlintOrch *ui);
+
+// The JUCE parameter id of table entry `param` (`"S5 | Volume"`), valid while the editor lives. Null past
+// the end.
+//
+// # Safety
+// `ui` is a live editor.
+const char *cs_slint_orch_param_id(const CsSlintOrch *ui,
+                                   uint32_t param);
+
+// The host changed a parameter; shown on the next tick.
+//
+// # Safety
+// `ui` is a live editor.
+void cs_slint_orch_set_param(const CsSlintOrch *ui, uint32_t param, float value);
+
+// Select a track (0 = top) as the MIDI input channel says, without reporting it back.
+//
+// # Safety
+// `ui` is a live editor.
+void cs_slint_orch_select_track(const CsSlintOrch *ui, uint32_t track);
+
+// Light or clear a track's note LED.
+//
+// # Safety
+// `ui` is a live editor.
+void cs_slint_orch_set_playing(const CsSlintOrch *ui, uint32_t track, bool playing);
+
+// Like [`cs_slint_ui_tick_region`], for the orchestra editor.
+//
+// # Safety
+// `ui` is a live editor; `pixels` holds `stride * height` pixels; `dirty` is null or writable.
+bool cs_slint_orch_tick_region(const CsSlintOrch *ui,
+                               uint8_t *pixels,
+                               uint32_t stride,
+                               CsRect *dirty);
+
+// Forward a pointer event at logical coordinates.
+//
+// # Safety
+// `ui` is a live editor.
+void cs_slint_orch_pointer(const CsSlintOrch *ui, CsPointer kind, float x, float y);
+
+// Forward a wheel event (logical pixels).
+//
+// # Safety
+// `ui` is a live editor.
+void cs_slint_orch_wheel(const CsSlintOrch *ui, float x, float y, float dx, float dy);
 
 #ifdef __cplusplus
 }  // extern "C"
