@@ -70,6 +70,14 @@ else()
   target_compile_definitions(ComposeSirenCore PUBLIC COMPOSESIREN_CLIC=0)
 endif()
 
+# The Slint editor experiment (linked by OneSiren only, in Source/CMakeLists.txt).
+# Created here, with the other Rust crates: cmake/RustStaticLib.cmake has an
+# include guard, and its variables (the Apple cargo path) are only set in the
+# directory scope that included it first.
+if(COMPOSESIREN_SLINT_UI)
+  include("${CMAKE_SOURCE_DIR}/Source/composesiren-slint-ui/SlintUi.cmake")
+endif()
+
 if(COMPOSESIREN_RECORD)
   include("${CMAKE_CURRENT_LIST_DIR}/Record.cmake")
   target_link_libraries(ComposeSirenCore PUBLIC composesiren_record)

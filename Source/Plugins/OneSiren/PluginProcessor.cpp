@@ -6,6 +6,10 @@
 #include <pathUtilities.h>
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
+#include <Components/EditorSnapshot.h>
+#if COMPOSESIREN_SLINT_UI
+#include "SlintOneSirenEditor.h"
+#endif
 
 OneSirenPluginProcessor::OneSirenPluginProcessor() :
 #ifndef JucePlugin_PreferredChannelConfigurations
@@ -285,7 +289,12 @@ bool OneSirenPluginProcessor::hasEditor() const
 
 juce::AudioProcessorEditor* OneSirenPluginProcessor::createEditor()
 {
-    return new OneSirenPluginEditor(*this);
+#if COMPOSESIREN_SLINT_UI
+    if (!cs::dev::wantsJuceEditor()) {
+        return cs::dev::withSnapshot(new SlintOneSirenEditor(*this));
+    }
+#endif
+    return cs::dev::withSnapshot(new OneSirenPluginEditor(*this));
 }
 
 

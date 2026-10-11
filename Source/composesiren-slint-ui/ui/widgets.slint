@@ -1,0 +1,417 @@
+// Controls of the ComposeSiren editors, after ComposeSirenCore/Components/LookAndFeels.h:
+// KnobLAF / CentredKnobLAF (white knob, thin track, thick value arc), NotchedKnobLAF (black "hero" knob),
+// IncDecLAF (white arrows and value box), ComboBoxLookAndFeel (dark grey drop-down), ToggleLAF /
+// HeaderSwitchLAF (LED + white square), the TextButtons of the top bar, GuiCell / GuiCellGroup (glass
+// panels) and EngravedTitle. Sizes and colours come from the generated Theme (UiMetadata.h's twin).
+
+import { Theme } from "generated/metadata.slint";
+
+// What the editors share: the glass of a cell or group over a strip colour (GuiCell's 0x22ffffff), the
+// top bar's button colours, and the text colours.
+export global Look {
+    out property <color> glass: #ffffff22;
+    out property <color> whitesmoke: #f5f5f5;
+    out property <color> menu-button: #37474f;
+    out property <color> dark-red: #8b0000;
+    out property <color> combo: #555555;            // juce::Colours::darkgrey
+    out property <length> spacer: Theme.strip-spacer-size;
+    out property <length> corner: Theme.strip-corner-size;
+    // The editor background: black under darkTransparentBackground (both editors' paint()).
+    out property <color> editor-background: #263340;
+}
+
+// Rotary range of JUCE's default slider: from 7 o'clock to 5 o'clock (-144 deg to +144 deg from 12 o'clock).
+global Rotary {
+    out property <angle> start: -144deg;
+    out property <angle> span: 288deg;
+}
+
+// An arc of the 100x100 viewbox circle of radius `r`, from angle `from` to `to` (clockwise, 0 = 12 o'clock).
+component Arc inherits Path {
+    in property <angle> from;
+    in property <angle> to;
+    in property <float> r: 44;
+    viewbox-width: 100;
+    viewbox-height: 100;
+    fill: transparent;
+    stroke-line-cap: round;
+    MoveTo { x: 50 + root.r * sin(root.from); y: 50 - root.r * cos(root.from); }
+    ArcTo {
+        x: 50 + root.r * sin(root.to);
+        y: 50 - root.r * cos(root.to);
+        radius-x: root.r;
+        radius-y: root.r;
+        large-arc: root.to - root.from > 180deg;
+        sweep: true;
+    }
+}
+
+// A rotary knob. Drag up/down (200 px for the whole range), wheel steps, double-click resets.
+// `changed` reports raw values; the Rust side snaps them to the step and clamps them.
+// `dark`: the NotchedKnobLAF look (black body, white notch) of Master Volume and Clic Vol.
+export component Knob inherits Rectangle {
+    in property <float> value;
+    in property <float> minimum: 0;
+    in property <float> maximum: 127;
+    in property <float> step: 1;
+    in property <float> default-value;
+    in property <bool> centred;
+    in property <bool> dark;
+    in property <bool> show-text: true;
+    in property <string> text;
+    callback changed(float);
+    callback gesture(bool);
+
+    property <float> pos: (root.value - root.minimum) / max(0.0001, root.maximum - root.minimum);
+    property <angle> angle: Rotary.start + Rotary.span * root.pos;
+    property <angle> origin: root.centred ? 0deg : Rotary.start;
+    property <length> text-height: root.show-text ? 14px : 0px;
+    property <length> size: max(10px, min(root.width, root.height - root.text-height));
+    property <float> drag-from;
+
+    Rectangle {
+        y: 0;
+        height: root.size;
+        width: root.size;
+        Arc {
+            width: root.size; height: root.size;
+            from: Rotary.start; to: Rotary.start + Rotary.span;
+            stroke: root.dark ? #d3d3d399 : #f5f5f599;
+            stroke-width: Theme.strip-knob-indicator-off-thickness;
+        }
+        if abs((root.angle - root.origin) / 1deg) > 1 : Arc {
+            width: root.size; height: root.size;
+            from: min(root.origin, root.angle); to: max(root.origin, root.angle);
+            stroke: root.dark ? #d3d3d3cc : #f5f5f5cc;
+            stroke-width: Theme.strip-knob-indicator-on-thickness;
+        }
+        Rectangle {
+            width: root.size * (root.dark ? 0.74 : 0.66); height: self.width;
+            border-radius: self.width / 2;
+            // Solid fills: the software renderer (the plugin path) does not clip gradients to border-radius.
+            background: root.dark ? #000000 : #f5f5f5;
+            border-width: root.dark ? 1px : 0px;
+            border-color: #222222;
+            drop-shadow-blur: 4px; drop-shadow-color: #000000a0; drop-shadow-offset-x: 2px; drop-shadow-offset-y: 2px;
+            Rectangle {
+                width: root.dark ? 5px : 4px; height: self.width; border-radius: self.width / 2;
+                background: root.dark ? #f5f5f5 : #26303d;
+                x: parent.width / 2 + parent.width * 0.33 * sin(root.angle) - self.width / 2;
+                y: parent.height / 2 - parent.height * 0.33 * cos(root.angle) - self.height / 2;
+            }
+        }
+    }
+    if root.show-text : Text {
+        y: root.height - root.text-height;
+        height: root.text-height;
+        text: root.text;
+        color: white; font-size: 11px;
+        horizontal-alignment: center;
+        overflow: elide;
+    }
+
+    TouchArea {
+        mouse-cursor: ns-resize;
+        pointer-event(e) => {
+            if e.button == PointerEventButton.left {
+                if e.kind == PointerEventKind.down { root.drag-from = root.value; root.gesture(true); }
+                if e.kind == PointerEventKind.up { root.gesture(false); }
+            }
+        }
+        moved => {
+            if self.pressed {
+                root.changed(root.drag-from + (self.pressed-y - self.mouse-y) / 200px * (root.maximum - root.minimum));
+            }
+        }
+        double-clicked => {
+            root.gesture(true);
+            root.changed(root.default-value);
+            root.gesture(false);
+        }
+        scroll-event(e) => {
+            root.gesture(true);
+            root.changed(root.value + (e.delta-y > 0 ? 1 : -1) * max(root.step, (root.maximum - root.minimum) / 100));
+            root.gesture(false);
+            accept
+        }
+    }
+}
+
+component Arrow inherits Rectangle {
+    in property <bool> up;
+    callback clicked;
+    Path {
+        width: 100%; height: 100%;
+        viewbox-width: 26; viewbox-height: 18;
+        fill: ta.pressed ? #c8c8c8 : #f5f5f5;
+        stroke: #000000; stroke-width: 1px;
+        MoveTo { x: 1; y: root.up ? 17 : 1; }
+        LineTo { x: 25; y: root.up ? 17 : 1; }
+        LineTo { x: 13; y: root.up ? 1 : 17; }
+        Close { }
+    }
+    ta := TouchArea { clicked => { root.clicked(); } }
+}
+
+// Up/down arrows and the value box (IncDecLAF), for stepped parameters (bend range, transpose).
+export component Spin inherits Rectangle {
+    in property <float> value;
+    in property <float> step: 1;
+    in property <string> text;
+    callback changed(float);
+    callback gesture(bool);
+    property <length> arrow-h: min(20px, (root.height - 4px) / 2);
+    Arrow {
+        x: 4px; y: root.height / 2 - root.arrow-h - 1px;
+        width: 28px; height: root.arrow-h; up: true;
+        clicked => { root.gesture(true); root.changed(root.value + root.step); root.gesture(false); }
+    }
+    Arrow {
+        x: 4px; y: root.height / 2 + 1px;
+        width: 28px; height: root.arrow-h; up: false;
+        clicked => { root.gesture(true); root.changed(root.value - root.step); root.gesture(false); }
+    }
+    Rectangle {
+        x: 36px; y: (root.height - self.height) / 2;
+        width: root.width - 40px; height: 16px;
+        border-radius: 5px;
+        background: Look.whitesmoke;
+        border-width: 1px; border-color: #000000;
+        Text { text: root.text; color: black; font-size: 11px; }
+    }
+}
+
+// One control in its glass cell (GuiCell / SliderCell): optional caption above, the control below.
+export component Cell inherits Rectangle {
+    in property <string> caption;
+    in property <bool> show-caption: true;
+    in property <length> caption-height: Theme.strip-slider-label-height;
+    in property <color> glass: Look.glass;
+    border-radius: Look.corner;
+    background: root.glass;
+    if root.show-caption : Text {
+        y: 1px;
+        height: root.caption-height;
+        width: root.width;
+        text: root.caption;
+        color: white; font-size: Theme.strip-slider-label-font-size;
+        horizontal-alignment: center; vertical-alignment: top;
+    }
+    Rectangle {
+        y: root.show-caption ? root.caption-height : 2px;
+        height: root.height - self.y - 1px;
+        width: root.width;
+        @children
+    }
+}
+
+// A titled glass group of cells (GuiCellGroup).
+export component Group inherits Rectangle {
+    in property <string> title;
+    in property <bool> show-title: true;
+    border-radius: Look.corner;
+    background: Look.glass;
+    VerticalLayout {
+        padding: 0px;
+        spacing: 0px;
+        if root.show-title : Text {
+            height: Theme.strip-group-label-height;
+            text: root.title;
+            color: #ffffffd9; font-size: Theme.strip-group-label-font-size; font-weight: 700;
+            horizontal-alignment: center; vertical-alignment: center;
+        }
+        HorizontalLayout {
+            spacing: Look.spacer;
+            @children
+        }
+    }
+}
+
+// Title with an engraved underline (EngravedTitle): the Reverb and Clic pane headers.
+export component EngravedTitle inherits Rectangle {
+    in property <string> text;
+    Text {
+        x: 4px;
+        text: root.text;
+        color: #ffffffeb; font-size: max(12px, min(14px, root.height * 0.6)); font-weight: 700;
+        vertical-alignment: center;
+    }
+    Rectangle { x: 0; y: root.height - 2px; width: root.width; height: 1px; background: #ffffff66; }
+}
+
+// The status LED of the voice manager, the header switches and the track titles.
+export component Led inherits Rectangle {
+    in property <bool> on;
+    in property <color> on-colour: #90ee90;
+    in property <color> off-colour: #006400;
+    width: 9px; height: 9px;
+    border-radius: self.width / 2;
+    background: root.on ? root.on-colour : root.off-colour;
+}
+
+// HeaderSwitchLAF / ToggleLAF: an LED then a white square that shows a tick when on.
+export component HeaderSwitch inherits Rectangle {
+    in-out property <bool> checked;
+    callback toggled(bool);
+    width: 40px;
+    Led { x: 2px; y: (root.height - self.height) / 2; on: root.checked; }
+    Rectangle {
+        x: 16px; y: (root.height - self.height) / 2;
+        width: 18px; height: 18px;
+        border-radius: 4px;
+        background: root.checked ? #f5f5f5 : #f5f5f5;
+        border-width: 2px; border-color: black;
+        drop-shadow-blur: 3px; drop-shadow-color: root.checked ? #000000 : #f5f5f5e6;
+        drop-shadow-offset-x: 2px; drop-shadow-offset-y: 2px;
+        if root.checked : Rectangle { width: 8px; height: 8px; border-radius: 2px; background: #26303d; }
+    }
+    TouchArea { clicked => { root.checked = !root.checked; root.toggled(root.checked); } }
+}
+
+// juce::ToggleButton with the top bar's whitesmoke text and tick ("Sirenes physiques", "ST").
+export component Toggle inherits Rectangle {
+    in property <string> text;
+    in-out property <bool> checked;
+    in property <bool> enabled: true;
+    callback toggled(bool);
+    opacity: root.enabled ? 1 : 0.5;
+    min-width: label.preferred-width + 30px;
+    Rectangle {
+        x: 2px; y: (root.height - self.height) / 2;
+        width: 18px; height: 18px;
+        border-radius: 3px;
+        border-width: 1px; border-color: Look.whitesmoke;
+        Text { text: root.checked ? "✓" : ""; color: Look.whitesmoke; font-size: 14px; }
+    }
+    label := Text {
+        x: 26px;
+        text: root.text; color: Look.whitesmoke; font-size: 13px;
+        vertical-alignment: center;
+    }
+    TouchArea {
+        enabled: root.enabled;
+        clicked => { root.checked = !root.checked; root.toggled(root.checked); }
+    }
+}
+
+// juce::TextButton of the top bar (Menu, Reset, Reset All).
+export component Button inherits Rectangle {
+    in property <string> text;
+    in property <color> tint: Look.menu-button;
+    callback clicked;
+    min-width: txt.preferred-width + 20px;
+    border-radius: 4px;
+    background: ta.pressed ? root.tint.darker(30%) : (ta.has-hover ? root.tint.brighter(15%) : root.tint);
+    border-width: 1px; border-color: #00000080;
+    txt := Text { text: root.text; color: Look.whitesmoke; font-size: 13px; }
+    ta := TouchArea { clicked => { root.clicked(); } }
+}
+
+// juce::ComboBox with ComboBoxLookAndFeel: dark grey, whitesmoke text and outline (rounded 6),
+// a pop-up list with inverted highlight.
+export component Combo inherits Rectangle {
+    in property <[string]> model;
+    in-out property <int> current-index;
+    callback selected(int);
+    border-radius: 6px;
+    background: Look.combo;
+    border-width: 1px; border-color: #f5f5f580;
+    Text {
+        x: 6px; width: root.width - 22px;
+        text: root.model[root.current-index];
+        color: Look.whitesmoke; font-size: 12px;
+        vertical-alignment: center; overflow: elide;
+    }
+    Path {
+        x: root.width - 15px; y: (root.height - 6px) / 2;
+        width: 9px; height: 6px;
+        viewbox-width: 9; viewbox-height: 6;
+        fill: Look.whitesmoke;
+        MoveTo { x: 0; y: 0; } LineTo { x: 9; y: 0; } LineTo { x: 4.5; y: 6; } Close { }
+    }
+    TouchArea { clicked => { popup.show(); } }
+    popup := PopupWindow {
+        x: 0; y: root.height;
+        width: max(root.width, 60px);
+        height: min(root.model.length * 18px + 4px, 18px * 9 + 4px);
+        Rectangle {
+            background: Look.combo;
+            border-width: 1px; border-color: #f5f5f580;
+            Flickable {
+                y: 2px; height: parent.height - 4px;
+                content-height: root.model.length * 18px;
+                for item[i] in root.model : Rectangle {
+                    y: i * 18px; height: 18px;
+                    background: ta.has-hover || i == root.current-index ? Look.whitesmoke : transparent;
+                    Text {
+                        x: 6px; text: item; font-size: 12px;
+                        color: ta.has-hover || i == root.current-index ? Look.combo : Look.whitesmoke;
+                        vertical-alignment: center;
+                    }
+                    ta := TouchArea { clicked => { root.current-index = i; root.selected(i); } }
+                }
+            }
+        }
+    }
+}
+
+// The on-screen keyboard (DbRangesMidiKeyboardComponent): white keys, grey black keys, the held key in
+// orange, C labels, and the dB-range bar under it (VOL 1 / VOL 2 / VOL 3 of the current siren).
+export component Keyboard inherits Rectangle {
+    in property <int> lowest: 24;           // C1
+    in property <int> white-keys: 52;
+    in property <[{ from: int, to: int, label: string, colour: color }]> ranges;
+    callback note(int, bool);
+    property <[int]> degree: [0, 2, 4, 5, 7, 9, 11];
+    property <length> bar: root.ranges.length > 0 ? 14px : 0px;
+    property <length> key-width: root.width / root.white-keys;
+    property <length> keys-height: root.height - root.bar;
+    property <int> held: -1;
+    background: #f5f5f5;
+    for i in root.white-keys : Rectangle {
+        property <int> n: root.lowest + 12 * floor(i / 7) + root.degree[mod(i, 7)];
+        x: i * root.key-width;
+        width: root.key-width;
+        height: root.keys-height;
+        background: root.held == self.n ? Theme.colour-orange-mecanique : white;
+        border-width: 1px; border-color: black;
+        if mod(i, 7) == 0 : Text {
+            y: parent.height - 12px; x: 2px;
+            text: "C"; color: black; font-size: 9px;
+        }
+        TouchArea {
+            pointer-event(e) => {
+                if e.kind == PointerEventKind.down { root.held = parent.n; root.note(parent.n, true); }
+                if e.kind == PointerEventKind.up { root.held = -1; root.note(parent.n, false); }
+            }
+        }
+    }
+    for i in root.white-keys - 1 : Rectangle {
+        property <int> d: mod(i, 7);
+        property <int> n: root.lowest + 12 * floor(i / 7) + root.degree[self.d] + 1;
+        visible: self.d != 2 && self.d != 6;
+        x: (i + 1) * root.key-width - root.key-width * 0.35;
+        y: 0;
+        width: root.key-width * 0.7;
+        height: root.keys-height * 0.6;
+        background: root.held == self.n ? Theme.colour-orange-mecanique : #808080;
+        TouchArea {
+            enabled: parent.visible;
+            pointer-event(e) => {
+                if e.kind == PointerEventKind.down { root.held = parent.n; root.note(parent.n, true); }
+                if e.kind == PointerEventKind.up { root.held = -1; root.note(parent.n, false); }
+            }
+        }
+    }
+    for r in root.ranges : Rectangle {
+        property <length> x0: (r.from - root.lowest) / 12 * 7 * root.key-width;
+        property <length> x1: (r.to - root.lowest) / 12 * 7 * root.key-width;
+        x: max(0px, self.x0);
+        width: min(root.width, self.x1) - self.x;
+        y: root.keys-height;
+        height: root.bar;
+        background: r.colour;
+        border-width: 1px; border-color: Theme.colour-midi-keyboard-db-range-separator-blue;
+        Text { text: r.label; color: white; font-size: 9px; }
+    }
+}
