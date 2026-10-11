@@ -15,6 +15,7 @@ build info that the About dialog shows (`cmake/BuildInfo.cmake`).
 | `COMPOSESIREN_RECORD` | OFF | `COMPOSESIREN_RECORD=0/1` | Records the audio output to FLAC or WAV (Rust crate `Source/composesiren-record`): Record... in the Menu, and the `start_recording` / `stop_recording` / `recording_status` MCP tools (cargo feature `record` of the MCP crate). | MCP tools only with `COMPOSESIREN_MCP` |
 | `COMPOSESIREN_SETTINGS` | **ON** | `COMPOSESIREN_SETTINGS=0/1` | Power-user settings described by `lib/definitions/generated/SettingsMetadata.h`, stored per user, edited in Settings... (in the Menu). Off: every setting keeps its default. | |
 | `COMPOSESIREN_SONG_TITLE` | OFF | `COMPOSESIREN_SONG_TITLE=0/1` | Shows the playing song on the left of the top bar and its progress in the window title, set over MCP (`set_song_title`, `set_song_progress`, `clear_song_title`; cargo feature `song-title` of the MCP crate). | `COMPOSESIREN_MCP` for the tools |
+| `COMPOSESIREN_RESETALLCONTROLLERS` | OFF | `COMPOSESIREN_RESETALLCONTROLLERS=0/1` | Thread-safe controller reset in the siren DSP: MIDI CC 120 / 123 (all sound off, all notes off) and Reset All Controllers, and, with MCP, the `reset_controllers` tool (cargo feature `reset-all-controllers`). With `COMPOSESIREN_SETTINGS`, an Enable checkbox switches it at runtime. Off: master's DSP behaviour and MCP tools. | MCP tool only with `COMPOSESIREN_MCP` |
 | `COMPOSESIREN_SLINT_UI` | OFF | `COMPOSESIREN_SLINT_UI=0/1` (per plugin target) | Experiment: the editors drawn by the Slint UI written in Rust (`Source/composesiren-slint-ui`), rendered into the JUCE editor's own window. JUCE keeps audio, parameters, formats and hosting. Off: the JUCE editors, unchanged. See [slint-port-investigation.md](slint-port-investigation.md). | Rust 1.92 or newer |
 | `PROCESS_RESOURCES` | **ON** | (none) | Uses the `ResourcesProcessing` outputs (`<build>/Resources-processed`) instead of the original `Resources` for the siren samples. | Python with `ResourcesProcessing/requirements.txt` |
 | `MACOS_UNIVERSAL` | OFF | (none) | macOS only: fat x86_64 + arm64 binaries (the Rust crates are built per architecture and joined with `lipo`). Off: the host architecture only. | the second Rust target (`rustup target add`), added automatically when rustup is there |
@@ -59,6 +60,7 @@ $CLION/cmake/mac/x64/bin/cmake -S . -B cmake-build-debug -G Ninja \
   -DCOMPOSESIREN_RECORD=ON \
   -DCOMPOSESIREN_SETTINGS=ON \
   -DCOMPOSESIREN_SONG_TITLE=ON \
+  -DCOMPOSESIREN_RESETALLCONTROLLERS=ON \
   -DCOMPOSESIREN_SLINT_UI=ON \
   -DPROCESS_RESOURCES=ON \
   -DCOMPOSESIREN_GIT_SUBMODULE=ON
