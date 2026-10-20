@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://mecaviv.github.io/ComposeSiren/sitemap.xml

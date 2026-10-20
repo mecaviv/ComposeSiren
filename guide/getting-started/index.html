@@ -1,0 +1,201 @@
+<!DOCTYPE html><html lang="en" dir="ltr"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><title>Getting started · ComposeSiren</title><link rel="canonical" href="https://mecaviv.github.io/ComposeSiren/guide/getting-started/" /><meta property="og:url" content="https://mecaviv.github.io/ComposeSiren/guide/getting-started/" /><meta property="og:site_name" content="ComposeSiren" /><meta property="og:locale" content="en" /><meta name="twitter:card" content="summary_large_image" /><meta property="og:title" content="Getting started" /><meta property="og:type" content="article" /><link rel="stylesheet" href="/ComposeSiren/assets/css/nacara.f8963a80.css" /><script>(()=>{var o="nacara-theme",s=matchMedia("(prefers-color-scheme: dark)"),a=()=>{try{return localStorage.getItem(o)||"system"}catch{return"system"}},c=e=>{let t=document.documentElement;t.dataset.themeSetting=e,t.dataset.theme=e==="system"?s.matches?"dark":"light":e};c(a());})();
+</script><link rel="stylesheet" href="/ComposeSiren/assets/search.css" /><style>/* Landing page (content/index.md, layout: splash). Scoped to the splash layout and to .sd-* classes. */
+
+:root {
+  --sd-accent-1 : var(--nacara-primary);
+  --sd-accent-2 : #b845fc;
+  --sd-grid     : color-mix(in oklab, var(--nacara-text) 7%, transparent);
+  --sd-glow     : 18%;
+}
+:root[data-theme="dark"] {
+  --sd-accent-2 : #c77dff;
+  --sd-grid     : color-mix(in oklab, var(--nacara-text) 6%, transparent);
+  --sd-glow     : 26%;
+}
+
+body:has(.nacara-layout--splash) { overflow-x: clip; }
+
+.nacara-layout--splash .nacara-content h2 {
+  border-top    : 0;
+  padding-top   : 0;
+  margin        : 4.5rem 0 .75rem;
+  text-align    : center;
+  font-size     : clamp(1.6rem, 1.3rem + 1vw, 2.1rem);
+  letter-spacing: -.03em;
+}
+.nacara-layout--splash .nacara-content h2 + p {
+  text-align: center;
+  color     : var(--nacara-text-muted);
+  max-width : 40rem;
+  margin    : 0 auto 2rem;
+  text-wrap : balance;
+}
+
+/* ---- Hero ---- */
+.sd-hero {
+  position  : relative;
+  isolation : isolate;
+  text-align: center;
+  padding   : 4.5rem 1rem 1.5rem;
+}
+.sd-hero::before, .sd-hero::after {
+  content       : "";
+  position      : absolute;
+  z-index       : -1;
+  pointer-events: none;
+  top           : calc(-1 * var(--nacara-navbar-height, 4rem) - 2rem);
+  left          : 50%;
+  width         : 100vw;
+  translate     : -50% 0;
+}
+.sd-hero::before {
+  height    : 36rem;
+  filter    : blur(24px);
+  background:
+    radial-gradient(30% 36% at 44% 34%, color-mix(in oklab, var(--sd-accent-1) var(--sd-glow), transparent), transparent 70%),
+    radial-gradient(24% 30% at 60% 28%, color-mix(in oklab, var(--sd-accent-2) var(--sd-glow), transparent), transparent 70%);
+}
+.sd-hero::after {
+  height             : 40rem;
+  background-image   : linear-gradient(var(--sd-grid) 1px, transparent 1px),
+                       linear-gradient(90deg, var(--sd-grid) 1px, transparent 1px);
+  background-size    : 56px 56px;
+  background-position: center top;
+  -webkit-mask-image : radial-gradient(ellipse 55% 60% at 50% 30%, #000 20%, transparent 75%);
+  mask-image         : radial-gradient(ellipse 55% 60% at 50% 30%, #000 20%, transparent 75%);
+}
+.nacara-content .sd-hero__logo {
+  display: block;
+  width  : 5.5rem;
+  height : 5.5rem;
+  margin : 0 auto 1.5rem;
+  border : 0;
+}
+.nacara-content .sd-hero h1 {
+  margin        : 0 0 1rem;
+  font-size     : clamp(2.4rem, 1.6rem + 3.2vw, 4rem);
+  line-height   : 1.05;
+  letter-spacing: -.045em;
+  font-weight   : 750;
+}
+.sd-hero__gradient {
+  background             : linear-gradient(90deg, var(--sd-accent-1), var(--sd-accent-2));
+  -webkit-background-clip: text;
+  background-clip        : text;
+  color                  : transparent;
+}
+.nacara-content .sd-hero > p {
+  max-width: 38rem;
+  margin   : 0 auto 2rem;
+  font-size: 1.15rem;
+  color    : var(--nacara-text-muted);
+  text-wrap: balance;
+}
+.sd-hero__actions {
+  display        : flex;
+  flex-wrap      : wrap;
+  gap            : .75rem;
+  justify-content: center;
+}
+.sd-install {
+  margin-top: 1.75rem;
+}
+.nacara-content .sd-install code {
+  display      : inline-block;
+  padding      : .55rem 1rem;
+  border-radius: var(--nacara-radius);
+  border       : 1px solid var(--nacara-border);
+  background   : var(--nacara-bg-subtle);
+  font-size    : .95rem;
+}
+
+/* ---- Buttons ---- */
+.nacara-content a.sd-btn {
+  display        : inline-flex;
+  align-items    : center;
+  gap            : .5rem;
+  height         : 2.75rem;
+  padding        : 0 1.25rem;
+  border-radius  : 999px;
+  font-weight    : 600;
+  text-decoration: none;
+  transition     : transform .15s ease, box-shadow .15s ease, background .15s ease;
+}
+.nacara-content a.sd-btn:hover { transform: translateY(-1px); }
+.nacara-content a.sd-btn--primary {
+  color     : var(--nacara-primary-contrast);
+  background: linear-gradient(90deg, var(--sd-accent-1), color-mix(in oklab, var(--sd-accent-1) 60%, var(--sd-accent-2)));
+  box-shadow: 0 6px 24px -8px color-mix(in oklab, var(--sd-accent-1) 70%, transparent);
+}
+.nacara-content a.sd-btn--secondary {
+  color     : var(--nacara-text);
+  background: var(--nacara-bg-raised);
+  border    : 1px solid var(--nacara-border);
+}
+.nacara-content a.sd-btn--secondary:hover { background: var(--nacara-bg-subtle); }
+
+/* ---- Features grid ---- */
+.sd-features {
+  display              : grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap                  : 1rem;
+  margin               : 0 0 2rem;
+}
+.nacara-content .sd-feature {
+  display        : block;
+  padding        : 1.25rem 1.35rem;
+  border         : 1px solid var(--nacara-border);
+  border-radius  : var(--nacara-radius);
+  background     : var(--nacara-bg-raised);
+  color          : inherit;
+  text-decoration: none;
+  transition     : border-color .15s ease, transform .15s ease, box-shadow .15s ease;
+}
+.nacara-content a.sd-feature:hover {
+  border-color: color-mix(in oklab, var(--sd-accent-1) 55%, var(--nacara-border));
+  transform   : translateY(-2px);
+  box-shadow  : var(--nacara-shadow);
+}
+.sd-feature__title {
+  font-weight  : 650;
+  margin-bottom: .4rem;
+  color        : var(--nacara-heading);
+}
+.sd-feature__text {
+  color    : var(--nacara-text-muted);
+  font-size: .95rem;
+}
+
+.nacara-content .sd-feature__shot {
+  display      : block;
+  width        : 100%;
+  margin-top   : 1rem;
+  border       : 1px solid var(--nacara-border);
+  border-radius: var(--nacara-radius-sm);
+}
+</style></head><body data-section="guide"><a class="nacara-skip-link" href="#nacara-content">Skip to content</a><header class="nacara-navbar" role="banner"><button class="nacara-icon-button" type="button" data-nacara-menu-toggle aria-label="Open the menu"><span><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16" /></svg></span></button><a class="nacara-navbar__brand" href="/ComposeSiren/">ComposeSiren</a><ul class="nacara-navbar__items" role="navigation" aria-label="Main"><li><a class="nacara-navbar__link" href="/ComposeSiren/guide/getting-started/" data-active>Guide</a></li><li><a class="nacara-navbar__link" href="https://github.com/mecaviv/ComposeSiren/releases">Releases</a></li></ul><ul class="nacara-navbar__items nacara-navbar__items--end"><li><button class="nacara-search__trigger" type="button" data-nacara-search data-bundle="/ComposeSiren/pagefind/" aria-label="Search"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg><span>Search</span><span class="nacara-search__kbd" data-nacara-search-shortcut>Ctrl K</span></button></li><li><a class="nacara-icon-button" href="https://github.com/mecaviv/ComposeSiren" aria-label="GitHub" title="GitHub"><span><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z" /></svg></span></a></li><li><select class="nacara-theme-select" data-nacara-theme aria-label="Colour scheme"><option value="light">Light</option><option value="dark">Dark</option><option value="system">System</option></select></li></ul></header><div class="nacara-layout"><nav class="nacara-sidebar" aria-label="Section"><ul class="nacara-sidebar__sections"><li><a class="nacara-sidebar__link" href="/ComposeSiren/guide/getting-started/" aria-current>Guide</a></li><li><a class="nacara-sidebar__link" href="https://github.com/mecaviv/ComposeSiren/releases">Releases</a></li></ul><ul class="nacara-sidebar__list"><li><a class="nacara-sidebar__link" href="/ComposeSiren/guide/getting-started/" aria-current="page">Getting started</a></li><li><a class="nacara-sidebar__link" href="/ComposeSiren/guide/build-options/">Build options</a></li><li><a class="nacara-sidebar__link" href="/ComposeSiren/guide/dsp-performance/">DSP performance: the Rust voices against the C++ voice</a></li></ul></nav><main id="nacara-content" tabindex="-1" class="nacara-content"><h1>Getting started</h1><div><h2 id="getting-the-plugins">Getting the plugins<a class="nacara-heading-anchor" href="#getting-the-plugins" aria-label="Link to this section" data-pagefind-ignore></a></h2><p>Download the latest installer for your OS from the <a href="https://github.com/mecaviv/ComposeSiren/releases">releases page</a> and run it. It installs both plugins, OneSiren and SirenOrchestra, in the formats available on your platform, and the shared resource files the simulation needs.</p><table><thead><tr><th>Platform</th><th>Formats</th></tr></thead><tbody><tr><td>macOS</td><td>universal (x86_64/arm64) 64 bit VST3, Audio Unit, Standalone Application</td></tr><tr><td>Windows</td><td>x64 VST3, Standalone Application</td></tr><tr><td>Linux</td><td>VST3, LV2, Standalone Application</td></tr></tbody></table><p>The plugins are currently tested on <a href="https://www.reaper.fm/">Reaper</a> and <a href="https://www.ableton.com/en/live/">Ableton Live</a>.</p><h2 id="building-from-source">Building from source<a class="nacara-heading-anchor" href="#building-from-source" aria-label="Link to this section" data-pagefind-ignore></a></h2><p>ComposeSiren is built with CMake, on top of the <a href="http://www.juce.com">JUCE</a> framework. You need:</p><ul><li><strong>CMake 3.22+</strong> and a <strong>C++20</strong> compiler;</li><li>the <strong>.NET SDK</strong> (8 or later, for <code>dotnet fsi</code>) for the resource processing step, <code>PROCESS_RESOURCES</code>, which is on by default. Configure with <code>-DPROCESS_RESOURCES=OFF</code> to build from the original files without it;</li><li><strong>Ninja</strong> is recommended, but the Xcode and Visual Studio generators work on macOS and Windows;</li><li><strong>NSIS</strong> for the Windows installer.</li></ul><p>Clone with the JUCE submodule:</p><figure class="nacara-code" data-language="sh" data-frame="code" data-source="git clone --recursive https://github.com/mecaviv/ComposeSiren.git
+# or, in an existing clone
+git submodule update --init"><div class="nacara-code__body"><pre><code><span class="nacara-code__line"><span class="tok-function">git</span> clone <span class="tok-constant">--recursive</span> https://github.com/mecaviv/ComposeSiren.git
+</span><span class="nacara-code__line"><span class="tok-comment"># or, in an existing clone</span>
+</span><span class="nacara-code__line"><span class="tok-function">git</span> submodule update <span class="tok-constant">--init</span>
+</span></code></pre><button class="nacara-code__copy" type="button" aria-label="Copy code"><svg class="nacara-code__copy-idle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15V5a2 2 0 0 1 2-2h10" /></svg><svg class="nacara-code__copy-done" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg></button></div></figure><p>The template config file <code>Config.cmake</code> lists the variables the project consumes (VST2 SDK path, and the credentials for software signing). Derive your own <code>MyConfig.cmake</code> from it, then:</p><figure class="nacara-code" data-language="sh" data-frame="code" data-source="cmake -B &lt;my_cmake_build_dir&gt; -DCMAKE_BUILD_TYPE=&lt;my_build_type&gt; -C MyConfig.cmake
+cmake --build &lt;my_cmake_build_dir&gt; --target &lt;my_target&gt;"><div class="nacara-code__body"><pre><code><span class="nacara-code__line"><span class="tok-function">cmake</span> <span class="tok-constant">-B</span> <span class="tok-operator">&lt;</span>my_cmake_build_dir<span class="tok-operator">></span> -DCMAKE_BUILD_TYPE=<span class="tok-operator">&lt;</span>my_build_type<span class="tok-operator">></span> -C MyConfig.cmake
+</span><span class="nacara-code__line"><span class="tok-function">cmake</span> <span class="tok-constant">--build</span> <span class="tok-operator">&lt;</span>my_cmake_build_dir<span class="tok-operator">></span> --target <span class="tok-operator">&lt;</span>my_target<span class="tok-operator">></span>
+</span></code></pre><button class="nacara-code__copy" type="button" aria-label="Copy code"><svg class="nacara-code__copy-idle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15V5a2 2 0 0 1 2-2h10" /></svg><svg class="nacara-code__copy-done" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg></button></div></figure><p>A debug standalone, with Ninja:</p><figure class="nacara-code" data-language="sh" data-frame="code" data-source="cmake -B cmake-build-debug -G Ninja -DCMAKE_BUILD_TYPE=Debug
+cmake --build cmake-build-debug --target OneSiren_Standalone"><div class="nacara-code__body"><pre><code><span class="nacara-code__line"><span class="tok-function">cmake</span> <span class="tok-constant">-B</span> cmake-build-debug <span class="tok-constant">-G</span> Ninja <span class="tok-constant">-DCMAKE_BUILD_TYPE=Debug</span>
+</span><span class="nacara-code__line"><span class="tok-function">cmake</span> <span class="tok-constant">--build</span> cmake-build-debug <span class="tok-constant">--target</span> OneSiren_Standalone
+</span></code></pre><button class="nacara-code__copy" type="button" aria-label="Copy code"><svg class="nacara-code__copy-idle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15V5a2 2 0 0 1 2-2h10" /></svg><svg class="nacara-code__copy-done" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg></button></div></figure><p>Each plugin has a target per format, such as <code>OneSiren_VST3</code>, <code>SirenOrchestra_VST3</code> or <code>SirenOrchestra_Standalone</code>. The <a href="/ComposeSiren/guide/build-options/">build options</a> turn the optional features on.</p><h3 id="packaging">Packaging<a class="nacara-heading-anchor" href="#packaging" aria-label="Link to this section" data-pagefind-ignore></a></h3><p>macOS, with Xcode:</p><figure class="nacara-code" data-language="sh" data-frame="code" data-source="cmake -B cmake-build-release -DCMAKE_BUILD_TYPE=RELEASE -C MyConfig.cmake
+cmake --build cmake-build-RELEASE --target dist"><div class="nacara-code__body"><pre><code><span class="nacara-code__line"><span class="tok-function">cmake</span> <span class="tok-constant">-B</span> cmake-build-release <span class="tok-constant">-DCMAKE_BUILD_TYPE=RELEASE</span> <span class="tok-constant">-C</span> MyConfig.cmake
+</span><span class="nacara-code__line"><span class="tok-function">cmake</span> <span class="tok-constant">--build</span> cmake-build-RELEASE <span class="tok-constant">--target</span> dist
+</span></code></pre><button class="nacara-code__copy" type="button" aria-label="Copy code"><svg class="nacara-code__copy-idle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15V5a2 2 0 0 1 2-2h10" /></svg><svg class="nacara-code__copy-done" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg></button></div></figure><p>Windows, with Visual Studio 2022:</p><figure class="nacara-code" data-language="sh" data-frame="code" data-source='cmake -B cmake-build-release -G "Visual Studio 17 2022" -C MyConfig.cmake
+cmake --build cmake-build-release --config Release --target dist'><div class="nacara-code__body"><pre><code><span class="nacara-code__line"><span class="tok-function">cmake</span> <span class="tok-constant">-B</span> cmake-build-release <span class="tok-constant">-G</span> <span class="tok-string">"Visual Studio 17 2022"</span> <span class="tok-constant">-C</span> MyConfig.cmake
+</span><span class="nacara-code__line"><span class="tok-function">cmake</span> <span class="tok-constant">--build</span> cmake-build-release <span class="tok-constant">--config</span> Release <span class="tok-constant">--target</span> dist
+</span></code></pre><button class="nacara-code__copy" type="button" aria-label="Copy code"><svg class="nacara-code__copy-idle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15V5a2 2 0 0 1 2-2h10" /></svg><svg class="nacara-code__copy-done" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg></button></div></figure><p>The installer (built with <code>productbuild</code> on macOS and NSIS on Windows) is created in <code>build/Packaging/ComposeSiren_Installer_artefacts</code>.</p><h3 id="tests">Tests<a class="nacara-heading-anchor" href="#tests" aria-label="Link to this section" data-pagefind-ignore></a></h3><p><code>-DBUILD_TESTING=ON</code> (CTest's standard switch) enables the tests, whatever else is on:</p><figure class="nacara-code" data-language="sh" data-frame="code" data-source="cmake -B cmake-build-debug -G Ninja -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTING=ON
+cmake --build cmake-build-debug
+ctest --test-dir cmake-build-debug"><div class="nacara-code__body"><pre><code><span class="nacara-code__line"><span class="tok-function">cmake</span> <span class="tok-constant">-B</span> cmake-build-debug <span class="tok-constant">-G</span> Ninja <span class="tok-constant">-DCMAKE_BUILD_TYPE=Debug</span> <span class="tok-constant">-DBUILD_TESTING=ON</span>
+</span><span class="nacara-code__line"><span class="tok-function">cmake</span> <span class="tok-constant">--build</span> cmake-build-debug
+</span><span class="nacara-code__line"><span class="tok-function">ctest</span> <span class="tok-constant">--test-dir</span> cmake-build-debug
+</span></code></pre><button class="nacara-code__copy" type="button" aria-label="Copy code"><svg class="nacara-code__copy-idle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15V5a2 2 0 0 1 2-2h10" /></svg><svg class="nacara-code__copy-done" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg></button></div></figure><h2 id="dependencies">Dependencies<a class="nacara-heading-anchor" href="#dependencies" aria-label="Link to this section" data-pagefind-ignore></a></h2><p>Linux:</p><figure class="nacara-code" data-language="sh" data-frame="code" data-source="sudo apt-get install libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libfreetype-dev"><div class="nacara-code__body"><pre><code><span class="nacara-code__line"><span class="tok-function">sudo</span> apt-get install libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libfreetype-dev
+</span></code></pre><button class="nacara-code__copy" type="button" aria-label="Copy code"><svg class="nacara-code__copy-idle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15V5a2 2 0 0 1 2-2h10" /></svg><svg class="nacara-code__copy-done" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg></button></div></figure><p>Raspberry Pi:</p><figure class="nacara-code" data-language="sh" data-frame="code" data-source="sudo apt install cmake libxrandr-dev libxinerama-dev libxcursor-dev libfreetype6-dev libasound2-dev"><div class="nacara-code__body"><pre><code><span class="nacara-code__line"><span class="tok-function">sudo</span> apt install cmake libxrandr-dev libxinerama-dev libxcursor-dev libfreetype6-dev libasound2-dev
+</span></code></pre><button class="nacara-code__copy" type="button" aria-label="Copy code"><svg class="nacara-code__copy-idle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15V5a2 2 0 0 1 2-2h10" /></svg><svg class="nacara-code__copy-done" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg></button></div></figure><p>On the Raspberry Pi the resource path is hardcoded to <code>/home/sirenateur/Documents/src/mecaviv/ComposeSiren/Resources/</code>, so check the repository out in <code>/home/sirenateur/Documents/src/mecaviv/</code>.</p><h2 id="git-tips">Git tips<a class="nacara-heading-anchor" href="#git-tips" aria-label="Link to this section" data-pagefind-ignore></a></h2><ul><li>Clone with <code>--recursive</code> to fetch the JUCE submodule, or run <code>git submodule update --init</code> after cloning.</li><li>If an IDE alters the <code>Dependencies/JUCE</code> submodule, reset it with <code>git submodule deinit -f .</code> then <code>git submodule update --init</code>.</li></ul><h2 id="this-site">This site<a class="nacara-heading-anchor" href="#this-site" aria-label="Link to this section" data-pagefind-ignore></a></h2><p>The site is <a href="https://mangelmaxime.github.io/Nacara/">Nacara</a>, in <code>docs/</code>, and needs the .NET 10 SDK. From the repository root:</p><figure class="nacara-code" data-language="sh" data-frame="code" data-source="dotnet run --project docs -- watch"><div class="nacara-code__body"><pre><code><span class="nacara-code__line"><span class="tok-function">dotnet</span> run <span class="tok-constant">--project</span> docs <span class="tok-constant">--</span> watch
+</span></code></pre><button class="nacara-code__copy" type="button" aria-label="Copy code"><svg class="nacara-code__copy-idle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15V5a2 2 0 0 1 2-2h10" /></svg><svg class="nacara-code__copy-done" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg></button></div></figure></div><a class="nacara-edit-link" href="https://github.com/mecaviv/ComposeSiren/edit/master/docs/content/guide/getting-started.md"><span><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg></span><span>Edit this page</span></a><nav class="nacara-page-nav"><a class="nacara-page-nav__link nacara-page-nav__link--next" href="/ComposeSiren/guide/build-options/"><span class="nacara-page-nav__label">Next</span><span>Build options</span></a></nav></main><nav class="nacara-toc" aria-label="On this page"><p class="nacara-toc__title">On this page</p><ul class="nacara-toc__list"><li><a class="nacara-toc__link" data-level="2" href="#getting-the-plugins">Getting the plugins</a></li><li><a class="nacara-toc__link" data-level="2" href="#building-from-source">Building from source</a></li><li><a class="nacara-toc__link" data-level="3" href="#packaging">Packaging</a></li><li><a class="nacara-toc__link" data-level="3" href="#tests">Tests</a></li><li><a class="nacara-toc__link" data-level="2" href="#dependencies">Dependencies</a></li><li><a class="nacara-toc__link" data-level="2" href="#git-tips">Git tips</a></li><li><a class="nacara-toc__link" data-level="2" href="#this-site">This site</a></li></ul></nav></div><footer class="nacara-footer"><p>ComposeSiren · GPL-3.0 · Built with Nacara</p></footer><script src="/ComposeSiren/assets/nacara.b41588fb.js" defer="defer"></script><script src="/ComposeSiren/assets/search.js" defer="defer"></script></body></html>
