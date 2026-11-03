@@ -12,6 +12,10 @@
 //! Slint's platform is process-global and single-threaded. Every editor of the process (several plugin
 //! instances in one host) is created and driven on the same thread (JUCE's message thread). Each plugin binary
 //! links its own copy of Slint, so other plugins using Slint do not share this platform.
+//!
+//! The window functions ([`prepare_window`], [`size_window`], [`tick_window`], [`pointer_window`],
+//! [`wheel_window`]) are public for other hosts' panels built on these widgets (`ui/widgets.slint`,
+//! `ui/strip.slint`): `SirenManager`'s CONTROLEURS tab in mecaviv-qml-ui embeds its own component with them.
 
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
@@ -137,7 +141,8 @@ pub enum Pointer {
 pub const LOGICAL_SIZE: (f32, f32) = (754.0, 200.0);
 
 /// Install the platform and prepare the window the next component creation picks up.
-pub(crate) fn prepare_window(repaint: RepaintBufferType) -> Rc<MinimalSoftwareWindow> {
+#[must_use]
+pub fn prepare_window(repaint: RepaintBufferType) -> Rc<MinimalSoftwareWindow> {
     install_platform();
     let window = MinimalSoftwareWindow::new(repaint);
     NEXT_WINDOW.with(|w| *w.borrow_mut() = Some(window.clone()));
@@ -145,7 +150,7 @@ pub(crate) fn prepare_window(repaint: RepaintBufferType) -> Rc<MinimalSoftwareWi
 }
 
 /// Scale and size the window once its component exists; returns the size in physical pixels.
-pub(crate) fn size_window(window: &MinimalSoftwareWindow, logical: (f32, f32), scale: f32) -> PhysicalSize {
+pub fn size_window(window: &MinimalSoftwareWindow, logical: (f32, f32), scale: f32) -> PhysicalSize {
     window.dispatch_event(WindowEvent::ScaleFactorChanged {
         scale_factor: scale,
     });
@@ -158,7 +163,7 @@ pub(crate) fn size_window(window: &MinimalSoftwareWindow, logical: (f32, f32), s
 }
 
 /// Run queued work, timers and animations, and redraw what changed into `pixels`.
-pub(crate) fn tick_window(
+pub fn tick_window(
     window: &MinimalSoftwareWindow,
     pixels: &mut [Bgra8Premultiplied],
     stride: usize,
@@ -180,7 +185,7 @@ pub(crate) fn tick_window(
 }
 
 /// Forward a pointer event at logical coordinates.
-pub(crate) fn pointer_window(window: &MinimalSoftwareWindow, kind: Pointer, x: f32, y: f32) {
+pub fn pointer_window(window: &MinimalSoftwareWindow, kind: Pointer, x: f32, y: f32) {
     let position = LogicalPosition::new(x, y);
     let button = PointerEventButton::Left;
     window.dispatch_event(match kind {
@@ -192,7 +197,7 @@ pub(crate) fn pointer_window(window: &MinimalSoftwareWindow, kind: Pointer, x: f
 }
 
 /// Forward a wheel event (logical pixels).
-pub(crate) fn wheel_window(window: &MinimalSoftwareWindow, x: f32, y: f32, dx: f32, dy: f32) {
+pub fn wheel_window(window: &MinimalSoftwareWindow, x: f32, y: f32, dx: f32, dy: f32) {
     window.dispatch_event(WindowEvent::PointerScrolled {
         position: LogicalPosition::new(x, y),
         delta_x: dx,
