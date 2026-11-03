@@ -1,0 +1,290 @@
+// SirenOrchestra's editor (Source/Plugins/SirenOrchestra/PluginEditor.cpp) in Slint, at the JUCE geometry
+// (928 x 630): the top bar (Sirenes physiques / ST with the park bridge, Reset All, Reset, Menu), the seven
+// tracks (S7 on top, full; the others compact), each a siren strip plus its Master group (Pan, Gain) and
+// a title cell that selects the siren; under them Reverb, the keyboard, Clic (COMPOSESIREN_CLIC) and
+// Master Volume.
+//
+// The bottom panes share one chassis: the bottom siren's colour, the glass panel inset by the strip
+// spacer, transparent cells. The Clic pane uses it too (in the JUCE editor it is drawn without the
+// glass, so it looks like another colour, and its knobs overlap: see docs/slint-port-investigation.md).
+
+import { Knob, Cell, Group, Look, HeaderSwitch, EngravedTitle, Led, Toggle, Button, Keyboard } from "widgets.slint";
+import { SirenStrip, ParamCell, ParamRow, GroupRow } from "strip.slint";
+import { Theme } from "generated/metadata.slint";
+
+export struct TrackRow {
+    title: string,       // "Piccolo\nch7"
+    colour: color,
+    selected: bool,
+    playing: bool,
+    groups: [GroupRow],  // the siren's sections, then "Master" (Pan, Gain)
+}
+
+// The bottom panes' chassis: strip colour, then the glass panel inset by the spacer.
+component Pane inherits Rectangle {
+    in property <color> strip-colour;
+    border-radius: Look.corner;
+    background: root.strip-colour;
+    Rectangle {
+        x: Look.spacer; y: Look.spacer;
+        width: root.width - 2 * Look.spacer; height: root.height - 2 * Look.spacer;
+        border-radius: Look.corner;
+        background: Look.glass;
+        @children
+    }
+}
+
+component Track inherits Rectangle {
+    in property <TrackRow> track;
+    in property <bool> full;
+    in property <bool> park-bridge;
+    in property <int> st-state;      // 0 unknown, 1 on, 2 off (SirenUdpBridge::StState)
+    callback param-changed(int, float);
+    callback param-gesture(int, bool);
+    callback clicked();
+    SirenStrip {
+        x: 0; width: root.width; height: root.height;
+        groups: root.track.groups;
+        colour: root.track.colour;
+        full: root.full;
+        param-changed(i, v) => { root.param-changed(i, v); }
+        param-gesture(i, b) => { root.param-gesture(i, b); }
+    }
+    // title cell (MouseListeningTitleLabel): name and channel, hover glass, click selects
+    title := Rectangle {
+        x: root.width - Theme.strip-title-area-width;
+        width: Theme.strip-title-area-width - Look.spacer;
+        y: Look.spacer; height: root.height - 2 * Look.spacer;
+        border-radius: Look.corner;
+        background: ta.has-hover ? Look.glass : transparent;
+        Text {
+            text: root.track.title;
+            color: white; font-size: Theme.strip-title-font-size; font-weight: 700;
+            horizontal-alignment: center; vertical-alignment: center;
+        }
+        ta := TouchArea { clicked => { root.clicked(); } }
+    }
+    // note LED (SirenStateMonitor) at the top right of the title cell
+    Led {
+        x: root.width - 12px; y: 5px;
+        width: 8px; height: 8px;
+        on: root.track.playing; off-colour: #006400;
+    }
+    // ST LED (park bridge) on the left of the title
+    if root.park-bridge : Rectangle {
+        x: root.width - Theme.strip-title-area-width + 4px;
+        y: (root.height - 9px) / 2;
+        width: 9px; height: 9px; border-radius: 4.5px;
+        background: root.st-state == 1 ? #32cd32 : root.st-state == 2 ? #8b0000 : transparent;
+        border-width: root.st-state == 0 ? 1px : 0px; border-color: #80808099;
+    }
+    // selection outline
+    if root.track.selected : Rectangle {
+        x: 2px; y: 1px; width: root.width - 4px; height: root.height - 2px;
+        border-radius: Look.corner;
+        border-width: 1px; border-color: Look.whitesmoke;
+    }
+}
+
+export component SirenOrchestra inherits Window {
+    title: "SirenOrchestra";
+    width: 928px;
+    height: 630px;
+    background: Look.editor-background;
+    default-font-size: 12px;
+
+    in property <[TrackRow]> tracks;
+    in property <[int]> st-states: [0, 0, 0, 0, 0, 0, 0];
+    in property <bool> park-bridge;          // COMPOSESIREN_PARK_BRIDGE: Sirenes physiques, ST, ST LEDs
+    in property <bool> has-clic;             // COMPOSESIREN_CLIC: the Clic pane
+    in-out property <bool> physical-sirens;
+    in-out property <bool> st-all;
+    in property <color> bottom-colour: #4650c8;
+    in property <int> reverb-enable-index;
+    in property <ParamRow> reverb-enable;
+    in property <[GroupRow]> reverb-groups;
+    in property <int> master-index;
+    in property <ParamRow> master;
+    in property <int> clic-first;            // ClicEnable, ClicSpread, ClicDecay, ClicBias, ClicVolume
+    in property <[ParamRow]> clic;
+    in property <[{ from: int, to: int, label: string, colour: color }]> ranges;
+
+    callback param-changed(int, float);
+    callback param-gesture(int, bool);
+    callback track-clicked(int);
+    callback reset();
+    callback reset-all();
+    callback menu();
+    callback physical-sirens-toggled(bool);
+    callback st-all-toggled(bool);
+    callback note(int, bool);
+
+    // geometry of PluginEditor::resized()
+    property <length> full-h: Theme.strip-min-full-strip-height;   // 100
+    property <length> compact-h: 55px;
+    property <length> controls-w: 754px;                           // sirenControlsWidth
+    property <length> clic-w: root.has-clic ? 136px : 0px;         // clicBorrow
+    property <length> bottom-y: 30px + root.full-h + Look.spacer + 6 * (root.compact-h + Look.spacer);
+    property <length> reverb-h: root.full-h - Theme.strip-group-label-height;
+    property <length> keyboard-h: 70px;
+
+    // top bar (MainButtonsComponent): right-aligned, 5 px margins
+    HorizontalLayout {
+        y: 0; height: 30px;
+        padding: 5px;
+        spacing: 5px;
+        alignment: end;
+        if root.park-bridge : Toggle {
+            text: "Sirenes physiques"; checked <=> root.physical-sirens;
+            toggled(b) => { root.physical-sirens-toggled(b); }
+        }
+        if root.park-bridge : Toggle {
+            text: "ST"; checked <=> root.st-all; enabled: root.physical-sirens;
+            toggled(b) => { root.st-all-toggled(b); }
+        }
+        Button { width: 88px; text: "Reset All"; tint: Look.dark-red; clicked => { root.reset-all(); } }
+        Button { width: 70px; text: "Reset"; tint: Look.dark-red; clicked => { root.reset(); } }
+        Button { width: 64px; text: "Menu"; clicked => { root.menu(); } }
+    }
+
+    for t[i] in root.tracks : Track {
+        x: 0;
+        y: i == 0 ? 30px : 30px + root.full-h + Look.spacer + (i - 1) * (root.compact-h + Look.spacer);
+        width: root.width;
+        height: i == 0 ? root.full-h : root.compact-h;
+        track: t; full: i == 0;
+        park-bridge: root.park-bridge;
+        st-state: root.st-states[i];
+        param-changed(p, v) => { root.param-changed(p, v); }
+        param-gesture(p, b) => { root.param-gesture(p, b); }
+        clicked => { root.track-clicked(i); }
+    }
+
+    // Reverb: enable switch and title, then DryWet / Damp / Size / Width and LowCut / HighCut
+    Pane {
+        x: Look.spacer; y: root.bottom-y;
+        width: root.controls-w - 2 * Look.spacer - root.clic-w; height: root.reverb-h;
+        strip-colour: root.bottom-colour;
+        VerticalLayout {
+            padding: 2px;
+            spacing: 0px;
+            HorizontalLayout {
+                height: 18px;
+                spacing: 2px;
+                HeaderSwitch {
+                    checked: root.reverb-enable.value > 0.5;
+                    toggled(b) => {
+                        root.param-gesture(root.reverb-enable-index, true);
+                        root.param-changed(root.reverb-enable-index, b ? 1 : 0);
+                        root.param-gesture(root.reverb-enable-index, false);
+                    }
+                }
+                EngravedTitle { width: 120px; text: "Reverb"; }
+                Rectangle { }
+            }
+            HorizontalLayout {
+                spacing: Look.spacer;
+                for g in root.reverb-groups : Rectangle {
+                    horizontal-stretch: g.params.length;
+                    border-radius: Look.corner;
+                    background: Look.glass;
+                    HorizontalLayout {
+                        for p[k] in g.params : ParamCell {
+                            p: p; index: g.first + k;
+                            caption-height: 14px;
+                            glass: transparent;
+                            horizontal-stretch: 1;
+                            param-changed(i, v) => { root.param-changed(i, v); }
+                            param-gesture(i, b) => { root.param-gesture(i, b); }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Keyboard {
+        x: 0; y: root.bottom-y + root.reverb-h + Look.spacer;
+        width: root.controls-w - root.clic-w; height: root.keyboard-h;
+        lowest: 24; white-keys: 49;
+        ranges: root.ranges;
+        note(n, on) => { root.note(n, on); }
+    }
+
+    // Clic: header switch and title, Spread | Decay | Bias in one row, Vol (dark) under them
+    if root.has-clic && root.clic.length >= 5 : Pane {
+        x: root.controls-w - root.clic-w; y: root.bottom-y;
+        width: root.clic-w; height: root.reverb-h + root.keyboard-h + Look.spacer;
+        strip-colour: root.bottom-colour;
+        VerticalLayout {
+            padding: 2px;
+            spacing: 2px;
+            HorizontalLayout {
+                height: 22px;
+                spacing: 0px;
+                HeaderSwitch {
+                    checked: root.clic[0].value > 0.5;
+                    toggled(b) => {
+                        root.param-gesture(root.clic-first, true);
+                        root.param-changed(root.clic-first, b ? 1 : 0);
+                        root.param-gesture(root.clic-first, false);
+                    }
+                }
+                EngravedTitle { text: "Clic"; }
+            }
+            HorizontalLayout {
+                vertical-stretch: 45;
+                for k in [1, 2, 3] : Cell {
+                    caption: root.clic[k].caption;
+                    caption-height: 14px;
+                    glass: transparent;
+                    horizontal-stretch: 1;
+                    Knob {
+                        value: root.clic[k].value; minimum: root.clic[k].minimum; maximum: root.clic[k].maximum;
+                        step: root.clic[k].step; default-value: root.clic[k].default-value;
+                        centred: root.clic[k].kind == 1; show-text: false;
+                        changed(v) => { root.param-changed(root.clic-first + k, v); }
+                        gesture(b) => { root.param-gesture(root.clic-first + k, b); }
+                    }
+                }
+            }
+            Cell {
+                vertical-stretch: 55;
+                caption: root.clic[4].caption;
+                caption-height: 14px;
+                glass: transparent;
+                Rectangle {
+                    Knob {
+                        width: min(parent.width, parent.height);
+                        x: (parent.width - self.width) / 2;
+                        value: root.clic[4].value; minimum: root.clic[4].minimum; maximum: root.clic[4].maximum;
+                        step: root.clic[4].step; default-value: root.clic[4].default-value;
+                        dark: true; show-text: false;
+                        changed(v) => { root.param-changed(root.clic-first + 4, v); }
+                        gesture(b) => { root.param-gesture(root.clic-first + 4, b); }
+                    }
+                }
+            }
+        }
+    }
+
+    // Master Volume: the dark knob and its value
+    Pane {
+        x: root.controls-w; y: root.bottom-y;
+        width: root.width - root.controls-w - Look.spacer; height: root.reverb-h + root.keyboard-h + Look.spacer;
+        strip-colour: root.bottom-colour;
+        Cell {
+            caption: "Master Volume";
+            caption-height: 22px;
+            glass: transparent;
+            Knob {
+                x: (parent.width - self.width) / 2; width: min(parent.width - 20px, 110px);
+                value: root.master.value; minimum: root.master.minimum; maximum: root.master.maximum;
+                step: root.master.step; default-value: root.master.default-value;
+                dark: true; text: root.master.text;
+                changed(v) => { root.param-changed(root.master-index, v); }
+                gesture(b) => { root.param-gesture(root.master-index, b); }
+            }
+        }
+    }
+}

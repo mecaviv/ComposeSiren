@@ -1,0 +1,82 @@
+// OneSiren's editor (Source/Plugins/OneSiren/PluginEditor.cpp) in Slint, at the JUCE geometry (754 x 200):
+// the voice manager on the left of the top bar (siren type, LED, MIDI In, MIDI Out drop-downs), Reset and
+// Menu on the right, the strip of the siren's 14 parameters in five sections, and the keyboard.
+
+import { Combo, Led, Button, Keyboard, Look } from "widgets.slint";
+import { SirenStrip, GroupRow } from "strip.slint";
+import { Theme } from "generated/metadata.slint";
+
+export component OneSiren inherits Window {
+    title: "OneSiren";
+    width: Theme.editor-one-siren-width;
+    height: Theme.editor-one-siren-height;
+    background: Look.editor-background;
+    default-font-size: 12px;
+
+    in property <[GroupRow]> groups;
+    in property <color> strip-colour: #3a78d6;
+    in property <[string]> categories: ["Alto", "Bass", "Tenor", "Soprano", "Piccolo"];
+    in-out property <int> category: 3;
+    in property <[string]> midi-in-channels: ["Any", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16"];
+    in property <[string]> midi-out-channels: ["Thru", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16"];
+    in-out property <int> midi-in: 0;       // 0 = Any, 1..16
+    in-out property <int> midi-out: 0;      // 0 = Thru, 1..16
+    in property <bool> playing;             // the voice manager's note LED
+    in property <[{ from: int, to: int, label: string, colour: color }]> ranges;
+    in property <string> midi-out-text;
+
+    callback param-changed(int, float);
+    callback param-gesture(int, bool);
+    callback category-picked(int);
+    callback midi-in-picked(int);
+    callback midi-out-picked(int);
+    callback reset-all();
+    callback menu();
+    callback note(int, bool);
+
+    // top bar: VoiceManagerComponent (left) over MainButtonsComponent (right), 30 px, 5 px margins
+    HorizontalLayout {
+        y: 0; height: 30px;
+        padding: 5px;
+        spacing: 5px;
+        Combo {
+            width: 75px; model: root.categories; current-index <=> root.category;
+            selected(i) => { root.category-picked(i); }
+        }
+        Text { width: 60px; text: "Siren type"; color: white; vertical-alignment: center; }
+        Rectangle { width: 16px; Led { on: root.playing; } }
+        Combo {
+            width: 55px; model: root.midi-in-channels; current-index <=> root.midi-in;
+            selected(i) => { root.midi-in-picked(i); }
+        }
+        Text { width: 55px; text: "MIDI In"; color: white; vertical-alignment: center; }
+        Combo {
+            width: 55px; model: root.midi-out-channels; current-index <=> root.midi-out;
+            selected(i) => { root.midi-out-picked(i); }
+        }
+        Text { width: 55px; text: "MIDI Out"; color: white; vertical-alignment: center; }
+        Text {
+            horizontal-stretch: 1;
+            text: root.midi-out-text;
+            color: #9aa4b2; font-size: 11px;
+            vertical-alignment: center; horizontal-alignment: right;
+            overflow: elide;
+        }
+        Button { width: 70px; text: "Reset"; tint: Look.dark-red; clicked => { root.reset-all(); } }
+        Button { width: 64px; text: "Menu"; clicked => { root.menu(); } }
+    }
+    SirenStrip {
+        x: 0; y: 30px;
+        width: root.width; height: Theme.strip-min-full-strip-height;
+        groups: root.groups;
+        colour: root.strip-colour;
+        param-changed(i, v) => { root.param-changed(i, v); }
+        param-gesture(i, b) => { root.param-gesture(i, b); }
+    }
+    Keyboard {
+        x: 0; y: 130px;
+        width: root.width; height: 70px;
+        ranges: root.ranges;
+        note(n, on) => { root.note(n, on); }
+    }
+}

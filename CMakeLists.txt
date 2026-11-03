@@ -218,9 +218,24 @@ composesiren_option(COMPOSESIREN_SIREN_WAVES
         "Animated waves in SirenOrchestra's title cells (OpenGL, software fallback)"
         OFF)
 
+# DEAL WITH THE SLINT EDITOR (EXPERIMENT) ######################################
+# OneSiren's editor drawn by the Slint UI written in Rust (Rust crate
+# Source/composesiren-slint-ui), rendered into the JUCE editor's own window.
+# JUCE keeps the audio, the parameters and the plugin formats. Off: the JUCE
+# components editor, unchanged. See docs/slint-port-investigation.md and
+# Source/composesiren-slint-ui/SlintUi.cmake.
+
+composesiren_option(COMPOSESIREN_SLINT_UI
+        "Experimental OneSiren editor drawn by the Slint UI (Rust) inside the JUCE editor"
+        OFF)
+
 #set(PLUGIN_TARGETS OneSiren)
 set(PLUGIN_TARGETS OneSiren SirenOrchestra)
 #set(PLUGIN_TARGETS CustomMix)
+
+# Clones without --recursive: fetch Dependencies/JUCE first (cmake/GitSubmodules.cmake)
+include("${CMAKE_CURRENT_LIST_DIR}/cmake/GitSubmodules.cmake")
+composesiren_ensure_git_submodules()
 
 # JUCE patches (Dependencies/patches), applied to the submodule's working tree, once.
 # juce-linux-touch.patch: JUCE creates touch sources on Linux, for the multi-touch that

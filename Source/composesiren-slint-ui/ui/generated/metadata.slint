@@ -1,0 +1,190 @@
+// GENERATED from the shared metadata (composesiren-parameters.csv, composesiren-ui-sections.csv, composesiren-ui-sirens.csv, composesiren-ui-theme.csv, composesiren-siren-waves.csv and sirens.csv). Do not edit: change the metadata and regenerate.
+
+export enum ParameterClass { siren, reverb, track, master, clic }
+export enum MidiKind { none, cc, pitch-wheel }
+export enum WidgetKind { none, knob, centred-knob, spin, toggle, button }
+
+export struct ParameterMeta {
+    code-name: string,
+    parameter-class: ParameterClass,
+    label: string,
+    strip-label: string,
+    unit: string,
+    min-value: float,
+    max-value: float,
+    step: float,
+    default-value: float,
+    midi: MidiKind,
+    cc: int,
+    widget: WidgetKind,
+    section: int,
+    position: int,
+    required-option: string,
+}
+
+export struct SectionMeta {
+    id: string,
+    parameter-class: ParameterClass,
+    title: string,
+}
+
+export struct SirenMeta {
+    id: string,
+    strip-colour: color,
+    category-default: bool,
+}
+
+// A look of the SirenWaves shader: the uniform components that stay put while the sound
+// changes. siren-waves[default-siren-wave[i]] is the default look of sirens[i].
+export struct SirenWaveMeta {
+    label: string,
+    siren: string,
+    // uAccent: override_color, or the siren's colour
+    accent: color,
+    accent-overridden: bool,
+    // uFills.w, px
+    seam-zone: int,
+    // uRipple.w
+    parallax: float,
+    // uLook.z
+    flatness: float,
+    // uLook.w
+    opacity: float,
+    // uLayers.x
+    layers: int,
+    // uLayers.y
+    steps: int,
+    // uExtra.x, px
+    stroke-width: float,
+    // uExtra.y
+    clouds: float,
+}
+
+export global UiMetadata {
+    out property <[ParameterMeta]> parameters: [
+        { code-name: "Transpose", parameter-class: ParameterClass.siren, label: "Transpose", strip-label: "Transpose", unit: "semitones", min-value: -24.0, max-value: 24.0, step: 1.0, default-value: 0.0, midi: MidiKind.none, cc: -1, widget: WidgetKind.spin, section: 0, position: 2, required-option: "" },
+        { code-name: "AllSoundOff", parameter-class: ParameterClass.siren, label: "All Sound Off", strip-label: "", unit: "", min-value: 0.0, max-value: 1.0, step: 1.0, default-value: 0.0, midi: MidiKind.cc, cc: 120, widget: WidgetKind.button, section: -1, position: -1, required-option: "" },
+        { code-name: "ResetAllController", parameter-class: ParameterClass.siren, label: "Reset All Controller", strip-label: "", unit: "", min-value: 0.0, max-value: 1.0, step: 1.0, default-value: 0.0, midi: MidiKind.cc, cc: 121, widget: WidgetKind.button, section: -1, position: -1, required-option: "" },
+        { code-name: "AllNoteOff", parameter-class: ParameterClass.siren, label: "All Note Off", strip-label: "", unit: "", min-value: 0.0, max-value: 1.0, step: 1.0, default-value: 0.0, midi: MidiKind.cc, cc: 123, widget: WidgetKind.button, section: -1, position: -1, required-option: "" },
+        { code-name: "Volume", parameter-class: ParameterClass.siren, label: "Volume", strip-label: "Volume", unit: "", min-value: 0.0, max-value: 127.0, step: 1.0, default-value: 127.0, midi: MidiKind.cc, cc: 7, widget: WidgetKind.knob, section: 4, position: 2, required-option: "" },
+        { code-name: "PitchBend", parameter-class: ParameterClass.siren, label: "Pitch Bend", strip-label: "Bend", unit: "", min-value: -1.0, max-value: 1.0, step: 0.0, default-value: 0.0, midi: MidiKind.pitch-wheel, cc: -1, widget: WidgetKind.centred-knob, section: 0, position: 0, required-option: "" },
+        { code-name: "PitchBendRange", parameter-class: ParameterClass.siren, label: "Pitch Bend Range", strip-label: "Bend Range", unit: "semitones", min-value: 1.0, max-value: 36.0, step: 1.0, default-value: 1.0, midi: MidiKind.cc, cc: 16, widget: WidgetKind.spin, section: 0, position: 1, required-option: "" },
+        { code-name: "VibratoFrequency", parameter-class: ParameterClass.siren, label: "Vibrato Frequency", strip-label: "Speed", unit: "", min-value: 0.0, max-value: 127.0, step: 1.0, default-value: 0.0, midi: MidiKind.cc, cc: 9, widget: WidgetKind.knob, section: 1, position: 0, required-option: "" },
+        { code-name: "VibratoAmplitude", parameter-class: ParameterClass.siren, label: "Vibrato Amplitude", strip-label: "Depth", unit: "", min-value: 0.0, max-value: 127.0, step: 1.0, default-value: 0.0, midi: MidiKind.cc, cc: 1, widget: WidgetKind.knob, section: 1, position: 1, required-option: "" },
+        { code-name: "VibratoAcceleration", parameter-class: ParameterClass.siren, label: "Vibrato Acceleration", strip-label: "Evolve", unit: "", min-value: 0.0, max-value: 127.0, step: 1.0, default-value: 0.0, midi: MidiKind.cc, cc: 11, widget: WidgetKind.knob, section: 1, position: 2, required-option: "" },
+        { code-name: "Portamento", parameter-class: ParameterClass.siren, label: "Portamento", strip-label: "Porta", unit: "", min-value: 0.0, max-value: 127.0, step: 1.0, default-value: 0.0, midi: MidiKind.cc, cc: 5, widget: WidgetKind.knob, section: 0, position: 3, required-option: "" },
+        { code-name: "TremoloFrequency", parameter-class: ParameterClass.siren, label: "Tremolo Frequency", strip-label: "Speed", unit: "", min-value: 0.0, max-value: 127.0, step: 1.0, default-value: 0.0, midi: MidiKind.cc, cc: 15, widget: WidgetKind.knob, section: 2, position: 0, required-option: "" },
+        { code-name: "TremoloAmplitude", parameter-class: ParameterClass.siren, label: "Tremolo Amplitude", strip-label: "Depth", unit: "", min-value: 0.0, max-value: 127.0, step: 1.0, default-value: 0.0, midi: MidiKind.cc, cc: 92, widget: WidgetKind.knob, section: 2, position: 1, required-option: "" },
+        { code-name: "AttackDuration", parameter-class: ParameterClass.siren, label: "Attack Duration", strip-label: "Attack", unit: "", min-value: 0.0, max-value: 127.0, step: 1.0, default-value: 0.0, midi: MidiKind.cc, cc: 73, widget: WidgetKind.knob, section: 3, position: 0, required-option: "" },
+        { code-name: "ReleaseDuration", parameter-class: ParameterClass.siren, label: "Release Duration", strip-label: "Release", unit: "", min-value: 0.0, max-value: 127.0, step: 1.0, default-value: 0.0, midi: MidiKind.cc, cc: 72, widget: WidgetKind.knob, section: 3, position: 1, required-option: "" },
+        { code-name: "Timbre", parameter-class: ParameterClass.siren, label: "Timbre", strip-label: "Timbre", unit: "", min-value: 0.0, max-value: 127.0, step: 1.0, default-value: 0.0, midi: MidiKind.cc, cc: 13, widget: WidgetKind.knob, section: 4, position: 0, required-option: "" },
+        { code-name: "Mute", parameter-class: ParameterClass.siren, label: "Mute", strip-label: "Mute", unit: "", min-value: 0.0, max-value: 127.0, step: 1.0, default-value: 0.0, midi: MidiKind.cc, cc: 12, widget: WidgetKind.knob, section: 4, position: 1, required-option: "" },
+        { code-name: "ReverbEnable", parameter-class: ParameterClass.reverb, label: "Enable Reverb", strip-label: "Enable Reverb", unit: "", min-value: 0.0, max-value: 1.0, step: 0.0, default-value: 0.0, midi: MidiKind.cc, cc: 64, widget: WidgetKind.toggle, section: 5, position: 0, required-option: "" },
+        { code-name: "ReverbDryWet", parameter-class: ParameterClass.reverb, label: "Reverb Dry/Wet", strip-label: "DryWet", unit: "", min-value: 0.0, max-value: 1.0, step: 0.0, default-value: 0.0, midi: MidiKind.cc, cc: 66, widget: WidgetKind.knob, section: 6, position: 0, required-option: "" },
+        { code-name: "ReverbDamping", parameter-class: ParameterClass.reverb, label: "Reverb Damping", strip-label: "Damp", unit: "", min-value: 0.0, max-value: 1.0, step: 0.0, default-value: 0.0, midi: MidiKind.cc, cc: 67, widget: WidgetKind.knob, section: 6, position: 1, required-option: "" },
+        { code-name: "ReverbRoomSize", parameter-class: ParameterClass.reverb, label: "Reverb Room Size", strip-label: "Size", unit: "", min-value: 0.0, max-value: 1.0, step: 0.0, default-value: 0.0, midi: MidiKind.cc, cc: 65, widget: WidgetKind.knob, section: 6, position: 2, required-option: "" },
+        { code-name: "ReverbWidth", parameter-class: ParameterClass.reverb, label: "Reverb Width", strip-label: "Width", unit: "", min-value: 0.0, max-value: 1.0, step: 0.0, default-value: 0.0, midi: MidiKind.cc, cc: 70, widget: WidgetKind.knob, section: 6, position: 3, required-option: "" },
+        { code-name: "ReverbLowCut", parameter-class: ParameterClass.reverb, label: "Reverb Low Cut", strip-label: "LowCut", unit: "Hz", min-value: 20.0, max-value: 1000.0, step: 0.0, default-value: 20.0, midi: MidiKind.cc, cc: 68, widget: WidgetKind.knob, section: 7, position: 0, required-option: "" },
+        { code-name: "ReverbHighCut", parameter-class: ParameterClass.reverb, label: "Reverb High Cut", strip-label: "HighCut", unit: "Hz", min-value: 5000.0, max-value: 20000.0, step: 0.0, default-value: 20000.0, midi: MidiKind.cc, cc: 69, widget: WidgetKind.knob, section: 7, position: 1, required-option: "" },
+        { code-name: "TrackPanning", parameter-class: ParameterClass.track, label: "Track Panning", strip-label: "", unit: "", min-value: -1.0, max-value: 1.0, step: 0.0, default-value: 0.0, midi: MidiKind.cc, cc: 10, widget: WidgetKind.centred-knob, section: -1, position: -1, required-option: "" },
+        { code-name: "TrackOutputGain", parameter-class: ParameterClass.track, label: "Track Output Gain", strip-label: "", unit: "dB", min-value: 0.0, max-value: 1.0, step: 0.0, default-value: 1.0, midi: MidiKind.cc, cc: 70, widget: WidgetKind.knob, section: -1, position: -1, required-option: "" },
+        { code-name: "MasterVolume", parameter-class: ParameterClass.master, label: "Master Volume", strip-label: "", unit: "dB", min-value: 0.0, max-value: 1.0, step: 0.0, default-value: 1.0, midi: MidiKind.cc, cc: 7, widget: WidgetKind.knob, section: -1, position: -1, required-option: "" },
+        { code-name: "ClicEnable", parameter-class: ParameterClass.clic, label: "Enable Clic", strip-label: "", unit: "", min-value: 0.0, max-value: 1.0, step: 1.0, default-value: 1.0, midi: MidiKind.none, cc: -1, widget: WidgetKind.toggle, section: -1, position: -1, required-option: "COMPOSESIREN_CLIC" },
+        { code-name: "ClicVolume", parameter-class: ParameterClass.clic, label: "Clic Volume", strip-label: "", unit: "", min-value: 0.0, max-value: 1.0, step: 0.0, default-value: 1.0, midi: MidiKind.none, cc: -1, widget: WidgetKind.knob, section: -1, position: -1, required-option: "COMPOSESIREN_CLIC" },
+        { code-name: "ClicSpread", parameter-class: ParameterClass.clic, label: "Clic Spread", strip-label: "", unit: "", min-value: -1.0, max-value: 1.0, step: 0.0, default-value: 0.0, midi: MidiKind.none, cc: -1, widget: WidgetKind.centred-knob, section: -1, position: -1, required-option: "COMPOSESIREN_CLIC" },
+        { code-name: "ClicBias", parameter-class: ParameterClass.clic, label: "Clic Bias", strip-label: "", unit: "", min-value: -1.0, max-value: 1.0, step: 0.0, default-value: 0.0, midi: MidiKind.none, cc: -1, widget: WidgetKind.centred-knob, section: -1, position: -1, required-option: "COMPOSESIREN_CLIC" },
+        { code-name: "ClicDecay", parameter-class: ParameterClass.clic, label: "Clic Decay", strip-label: "", unit: "", min-value: 0.0, max-value: 1.0, step: 0.0, default-value: 1.0, midi: MidiKind.none, cc: -1, widget: WidgetKind.knob, section: -1, position: -1, required-option: "COMPOSESIREN_CLIC" },
+    ];
+    out property <[SectionMeta]> sections: [
+        { id: "pitch", parameter-class: ParameterClass.siren, title: "Pitch" },
+        { id: "vibrato", parameter-class: ParameterClass.siren, title: "Vibrato" },
+        { id: "tremolo", parameter-class: ParameterClass.siren, title: "Tremolo" },
+        { id: "envelope", parameter-class: ParameterClass.siren, title: "Envelope" },
+        { id: "output", parameter-class: ParameterClass.siren, title: "" },
+        { id: "reverb_enable", parameter-class: ParameterClass.reverb, title: "Enable" },
+        { id: "reverb", parameter-class: ParameterClass.reverb, title: "Reverb" },
+        { id: "reverb_filter", parameter-class: ParameterClass.reverb, title: "Filter" },
+    ];
+    out property <[SirenMeta]> sirens: [
+        { id: "S1", strip-colour: #295dd1, category-default: true },
+        { id: "S2", strip-colour: #1f6cd1, category-default: false },
+        { id: "S3", strip-colour: #4650c8, category-default: true },
+        { id: "S4", strip-colour: #3654ce, category-default: true },
+        { id: "S5", strip-colour: #177ccf, category-default: true },
+        { id: "S6", strip-colour: #0e8ece, category-default: false },
+        { id: "S7", strip-colour: #07a0cb, category-default: true },
+    ];
+    out property <[SirenWaveMeta]> siren-waves: [
+        { label: "s1-default", siren: "S1", accent: #fbeb4f, accent-overridden: false, seam-zone: 16, parallax: 0.5, flatness: 0.3, opacity: 0.9, layers: 1, steps: 16, stroke-width: 2.5, clouds: 0.5 },
+        { label: "s2-default", siren: "S2", accent: #64d940, accent-overridden: false, seam-zone: 16, parallax: 0.5, flatness: 0.3, opacity: 0.9, layers: 1, steps: 16, stroke-width: 2.5, clouds: 0.5 },
+        { label: "s3-default", siren: "S3", accent: #eb4125, accent-overridden: false, seam-zone: 16, parallax: 0.5, flatness: 0.3, opacity: 0.9, layers: 1, steps: 16, stroke-width: 2.5, clouds: 0.5 },
+        { label: "s4-default", siren: "S4", accent: #f4b83f, accent-overridden: false, seam-zone: 16, parallax: 0.5, flatness: 0.3, opacity: 0.9, layers: 1, steps: 16, stroke-width: 2.5, clouds: 0.5 },
+        { label: "s5-default", siren: "S5", accent: #367e21, accent-overridden: false, seam-zone: 16, parallax: 0.5, flatness: 0.3, opacity: 0.9, layers: 1, steps: 16, stroke-width: 2.5, clouds: 0.5 },
+        { label: "s6-default", siren: "S6", accent: #59aef9, accent-overridden: false, seam-zone: 16, parallax: 0.5, flatness: 0.3, opacity: 0.9, layers: 1, steps: 16, stroke-width: 2.5, clouds: 0.5 },
+        { label: "s7-default", siren: "S7", accent: #3b5df6, accent-overridden: false, seam-zone: 16, parallax: 0.5, flatness: 0.3, opacity: 0.9, layers: 1, steps: 16, stroke-width: 2.5, clouds: 0.5 },
+    ];
+    out property <[int]> default-siren-wave: [0, 1, 2, 3, 4, 5, 6];
+}
+
+export global Theme {
+    // Accent: knob arcs, the held keyboard key, selections.
+    out property <color> colour-orange-mecanique: #ff9900;
+    // Background of the overlay panels.
+    out property <color> colour-dark-transparent-background: #283541f2;
+    // Background of a siren strip.
+    out property <color> colour-background-strip-grey: #314159;
+    // First colour of the strip ramp (the lowest siren).
+    out property <color> colour-siren-ramp-dark-blue: #4650c8;
+    // Last colour of the strip ramp.
+    out property <color> colour-siren-ramp-light-blue: #00b4c8;
+    // Siren palette.
+    out property <color> colour-siren-ramp-dark-green: #3c8c28;
+    // Siren palette.
+    out property <color> colour-siren-ramp-light-green: #78b428;
+    // Siren palette.
+    out property <color> colour-siren-ramp-sunny-yellow: #d7b700;
+    // Siren palette.
+    out property <color> colour-siren-ramp-light-orange: #ff7f00;
+    // Siren palette.
+    out property <color> colour-siren-ramp-dark-orange: #ff4500;
+    // Keyboard level meter: low.
+    out property <color> colour-midi-keyboard-low-level-red: #800000;
+    // Keyboard level meter: middle.
+    out property <color> colour-midi-keyboard-mid-level-red: #ff0000;
+    // Keyboard level meter: high.
+    out property <color> colour-midi-keyboard-high-level-red: #ff6600;
+    // Keyboard level meter: the dB range separators.
+    out property <color> colour-midi-keyboard-db-range-separator-blue: #0000ff;
+    // Width of the siren title cell at the left of a strip.
+    out property <length> strip-title-area-width: 70.0px;
+    // Font size of the siren title.
+    out property <length> strip-title-font-size: 13.0px;
+    // Corner radius of a strip.
+    out property <length> strip-corner-size: 10.0px;
+    // Gap between the cells of a strip.
+    out property <length> strip-spacer-size: 2.0px;
+    // Height of a section title.
+    out property <length> strip-group-label-height: 16.0px;
+    // Font size of a section title.
+    out property <length> strip-group-label-font-size: 12.0px;
+    // Height of a knob caption (two lines: the label, then the CC number).
+    out property <length> strip-slider-label-height: 28.0px;
+    // Font size of a knob caption.
+    out property <length> strip-slider-label-font-size: 11.5px;
+    // Smallest height of a knob.
+    out property <length> strip-min-slider-height: 62.0px;
+    // Smallest height of a whole strip.
+    out property <length> strip-min-full-strip-height: 100.0px;
+    // Smallest width of a knob cell.
+    out property <length> strip-min-knob-slider-width: 47.0px;
+    // Smallest width of an up/down value cell.
+    out property <length> strip-min-inc-dec-slider-width: 70.0px;
+    // Width of the knob track.
+    out property <length> strip-knob-indicator-off-thickness: 2.0px;
+    // Width of the knob value arc.
+    out property <length> strip-knob-indicator-on-thickness: 4.0px;
+    // Initial width of the OneSiren editor.
+    out property <length> editor-one-siren-width: 754.0px;
+    // Initial height of the OneSiren editor.
+    out property <length> editor-one-siren-height: 200.0px;
+}
