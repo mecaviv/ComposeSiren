@@ -229,6 +229,10 @@ composesiren_option(COMPOSESIREN_SLINT_UI
         "Experimental OneSiren editor drawn by the Slint UI (Rust) inside the JUCE editor"
         OFF)
 
+composesiren_option(COMPOSESIREN_SLINT_STANDALONE_GPU
+        "Use the GPU Slint editor in standalone applications only; keep DAW plugin editors unchanged"
+        OFF)
+
 #set(PLUGIN_TARGETS OneSiren)
 set(PLUGIN_TARGETS OneSiren SirenOrchestra)
 #set(PLUGIN_TARGETS CustomMix)

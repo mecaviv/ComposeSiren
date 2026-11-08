@@ -7,7 +7,7 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 #include <Components/EditorSnapshot.h>
-#if COMPOSESIREN_SLINT_UI
+#if COMPOSESIREN_SLINT_UI || COMPOSESIREN_SLINT_STANDALONE_GPU
 #include "SlintOneSirenEditor.h"
 #endif
 
@@ -310,8 +310,9 @@ bool OneSirenPluginProcessor::hasEditor() const
 
 juce::AudioProcessorEditor* OneSirenPluginProcessor::createEditor()
 {
-#if COMPOSESIREN_SLINT_UI
-    if (!cs::dev::wantsJuceEditor()) {
+#if COMPOSESIREN_SLINT_UI || COMPOSESIREN_SLINT_STANDALONE_GPU
+    if ((COMPOSESIREN_SLINT_UI || wrapperType == juce::AudioProcessor::wrapperType_Standalone)
+        && !cs::dev::wantsJuceEditor()) {
         return cs::dev::withSnapshot(new SlintOneSirenEditor(*this));
     }
 #endif

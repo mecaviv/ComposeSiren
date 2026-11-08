@@ -31,6 +31,56 @@ use slint::{ComponentHandle, LogicalPosition, PhysicalSize};
 use crate::editor::{Editor, HostSink};
 use crate::store::ParamStore;
 
+#[cfg(feature = "gpu")]
+mod gpu;
+
+/// The host-driven window, with either CPU or GPU rasterization.
+pub enum EmbeddedWindow {
+    /// Software renderer, also used in DAW plugin instances and headless tests.
+    Software(Rc<MinimalSoftwareWindow>),
+    /// GPU renderer, with readback to the existing host-owned image.
+    #[cfg(feature = "gpu")]
+    Gpu(Rc<gpu::GpuWindow>),
+}
+
+impl EmbeddedWindow {
+    /// Whether this window actually acquired a hardware GPU.
+    #[must_use]
+    pub fn is_gpu(&self) -> bool {
+        match self {
+            Self::Software(_) => false,
+            #[cfg(feature = "gpu")]
+            Self::Gpu(_) => true,
+        }
+    }
+
+    /// Invalidate the software renderer's retained pixels after a resize.
+    pub fn invalidate(&self) {
+        match self {
+            Self::Software(window) => {
+                window.draw_if_needed(|renderer| {
+                    renderer.set_repaint_buffer_type(RepaintBufferType::NewBuffer);
+                    renderer.set_repaint_buffer_type(RepaintBufferType::ReusedBuffer);
+                });
+            }
+            #[cfg(feature = "gpu")]
+            Self::Gpu(_) => {}
+        }
+        self.request_redraw();
+    }
+}
+
+impl std::ops::Deref for EmbeddedWindow {
+    type Target = slint::Window;
+    fn deref(&self) -> &Self::Target {
+        match self {
+            Self::Software(window) => window.window(),
+            #[cfg(feature = "gpu")]
+            Self::Gpu(window) => window.window(),
+        }
+    }
+}
+
 /// A pixel as `juce::Image::ARGB` stores it on little-endian machines: B, G, R, A, premultiplied.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -62,7 +112,7 @@ impl TargetPixel for Bgra8Premultiplied {
 
 thread_local! {
     // The window the next component creation picks up (see `EmbedPlatform::create_window_adapter`).
-    static NEXT_WINDOW: RefCell<Option<Rc<MinimalSoftwareWindow>>> = const { RefCell::new(None) };
+    static NEXT_WINDOW: RefCell<Option<Rc<dyn WindowAdapter>>> = const { RefCell::new(None) };
 }
 
 type Job = Box<dyn FnOnce() + Send>;
@@ -103,7 +153,6 @@ impl Platform for EmbedPlatform {
     fn create_window_adapter(&self) -> Result<Rc<dyn WindowAdapter>, slint::PlatformError> {
         NEXT_WINDOW
             .with(|w| w.borrow_mut().take())
-            .map(|w| w as Rc<dyn WindowAdapter>)
             .ok_or_else(|| slint::PlatformError::Other("no embedded window prepared".into()))
     }
 
@@ -142,15 +191,34 @@ pub const LOGICAL_SIZE: (f32, f32) = (754.0, 200.0);
 
 /// Install the platform and prepare the window the next component creation picks up.
 #[must_use]
-pub fn prepare_window(repaint: RepaintBufferType) -> Rc<MinimalSoftwareWindow> {
+pub fn prepare_window(repaint: RepaintBufferType) -> Rc<EmbeddedWindow> {
+    prepare_window_with_gpu(repaint, false)
+}
+
+/// Request a GPU for a standalone host, falling back to software if no hardware adapter is available.
+#[must_use]
+pub fn prepare_window_with_gpu(repaint: RepaintBufferType, prefer_gpu: bool) -> Rc<EmbeddedWindow> {
     install_platform();
+    #[cfg(feature = "gpu")]
+    if prefer_gpu && std::env::var("MECAVIV_SLINT_RENDERER").as_deref() != Ok("software") {
+        match gpu::GpuWindow::new() {
+            Ok(window) => {
+                NEXT_WINDOW.with(|w| *w.borrow_mut() = Some(window.clone()));
+                return Rc::new(EmbeddedWindow::Gpu(window));
+            }
+            Err(error) => eprintln!("Slint GPU unavailable, using software: {error}"),
+        }
+    }
+    #[cfg(not(feature = "gpu"))]
+    let _ = prefer_gpu;
     let window = MinimalSoftwareWindow::new(repaint);
     NEXT_WINDOW.with(|w| *w.borrow_mut() = Some(window.clone()));
-    window
+    Rc::new(EmbeddedWindow::Software(window))
 }
 
 /// Scale and size the window once its component exists; returns the size in physical pixels.
-pub fn size_window(window: &MinimalSoftwareWindow, logical: (f32, f32), scale: f32) -> PhysicalSize {
+#[must_use]
+pub fn size_window(window: &EmbeddedWindow, logical: (f32, f32), scale: f32) -> PhysicalSize {
     window.dispatch_event(WindowEvent::ScaleFactorChanged {
         scale_factor: scale,
     });
@@ -164,28 +232,34 @@ pub fn size_window(window: &MinimalSoftwareWindow, logical: (f32, f32), scale: f
 
 /// Run queued work, timers and animations, and redraw what changed into `pixels`.
 pub fn tick_window(
-    window: &MinimalSoftwareWindow,
+    window: &EmbeddedWindow,
     pixels: &mut [Bgra8Premultiplied],
     stride: usize,
 ) -> Option<DirtyRect> {
     run_jobs();
     slint::platform::update_timers_and_animations();
-    let dirty = Cell::new(None);
-    window.draw_if_needed(|renderer| {
-        let region = renderer.render(pixels, stride);
-        let (origin, size) = (region.bounding_box_origin(), region.bounding_box_size());
-        dirty.set(Some(DirtyRect {
-            x: origin.x.max(0) as u32,
-            y: origin.y.max(0) as u32,
-            width: size.width,
-            height: size.height,
-        }));
-    });
-    dirty.get()
+    match window {
+        #[cfg(feature = "gpu")]
+        EmbeddedWindow::Gpu(window) => window.draw(pixels, stride),
+        EmbeddedWindow::Software(window) => {
+            let dirty = Cell::new(None);
+            window.draw_if_needed(|renderer| {
+                let region = renderer.render(pixels, stride);
+                let (origin, size) = (region.bounding_box_origin(), region.bounding_box_size());
+                dirty.set(Some(DirtyRect {
+                    x: origin.x.max(0) as u32,
+                    y: origin.y.max(0) as u32,
+                    width: size.width,
+                    height: size.height,
+                }));
+            });
+            dirty.get()
+        }
+    }
 }
 
 /// Forward a pointer event at logical coordinates.
-pub fn pointer_window(window: &MinimalSoftwareWindow, kind: Pointer, x: f32, y: f32) {
+pub fn pointer_window(window: &EmbeddedWindow, kind: Pointer, x: f32, y: f32) {
     let position = LogicalPosition::new(x, y);
     let button = PointerEventButton::Left;
     window.dispatch_event(match kind {
@@ -197,7 +271,7 @@ pub fn pointer_window(window: &MinimalSoftwareWindow, kind: Pointer, x: f32, y: 
 }
 
 /// Forward a wheel event (logical pixels).
-pub fn wheel_window(window: &MinimalSoftwareWindow, x: f32, y: f32, dx: f32, dy: f32) {
+pub fn wheel_window(window: &EmbeddedWindow, x: f32, y: f32, dx: f32, dy: f32) {
     window.dispatch_event(WindowEvent::PointerScrolled {
         position: LogicalPosition::new(x, y),
         delta_x: dx,
@@ -220,7 +294,7 @@ pub struct DirtyRect {
 
 /// One editor rendered into host pixels.
 pub struct EmbeddedEditor {
-    window: Rc<MinimalSoftwareWindow>,
+    window: Rc<EmbeddedWindow>,
     editor: Editor,
     size: PhysicalSize,
 }
@@ -250,7 +324,20 @@ impl EmbeddedEditor {
         scale: f32,
         repaint: RepaintBufferType,
     ) -> Result<Self, slint::PlatformError> {
-        let window = prepare_window(repaint);
+        Self::with_renderer(store, sink, scale, repaint, false)
+    }
+
+    /// Construct a standalone editor with GPU rasterization when available.
+    /// # Errors
+    /// When Slint cannot create the editor.
+    pub fn with_renderer(
+        store: &Arc<ParamStore>,
+        sink: &Rc<dyn HostSink>,
+        scale: f32,
+        repaint: RepaintBufferType,
+        prefer_gpu: bool,
+    ) -> Result<Self, slint::PlatformError> {
+        let window = prepare_window_with_gpu(repaint, prefer_gpu);
         let editor = Editor::new(store, sink)?;
         let size = size_window(&window, LOGICAL_SIZE, scale);
         editor.component.show()?;
@@ -265,6 +352,12 @@ impl EmbeddedEditor {
     #[must_use]
     pub fn component(&self) -> &crate::OneSiren {
         &self.editor.component
+    }
+
+    /// The renderer actually selected for this editor.
+    #[must_use]
+    pub fn is_gpu(&self) -> bool {
+        self.window.is_gpu()
     }
 
     /// Width and height in physical pixels: the size of the host's pixel buffer.

@@ -19,9 +19,11 @@ crate-type = ["staticlib", "rlib"]
 # features, and inside a host the UI renders with the software renderer into the JUCE editor's pixels
 # (src/embed.rs), so no winit, no GL, no second window in the plugin.
 default = []
+# Native standalone hosts can request GPU rasterization; plugin instances still request software.
+gpu = ["slint/renderer-femtovg-wgpu", "slint/unstable-wgpu-30"]
 # A top-level window through winit for the standalone preview:
 # `cargo run --features standalone --bin onesiren-slint`.
-standalone = ["slint/backend-winit"]
+standalone = ["slint/backend-winit", "gpu"]
 
 [dependencies]
 # Slint under its GPL-3.0-only option, like ComposeSiren (GPLv3): see docs/slint-port-investigation.md.

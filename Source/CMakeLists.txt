@@ -153,12 +153,12 @@ function(add_plugin_variant TARGET_NAME PLUGIN_CODE BUNDLE_ID)
 
   # The Slint editor experiment: OneSiren and SirenOrchestra. The crate target is
   # created in ComposeSirenCore/CMakeLists.txt, see composesiren-slint-ui/SlintUi.cmake
-  if(COMPOSESIREN_SLINT_UI AND TARGET_NAME MATCHES "^(OneSiren|SirenOrchestra)$")
+  if((COMPOSESIREN_SLINT_UI OR COMPOSESIREN_SLINT_STANDALONE_GPU) AND TARGET_NAME MATCHES "^(OneSiren|SirenOrchestra)$")
     target_link_libraries(${TARGET_NAME} PRIVATE composesiren_slint_ui)
-    target_compile_definitions(${TARGET_NAME} PRIVATE COMPOSESIREN_SLINT_UI=1)
-  else()
-    target_compile_definitions(${TARGET_NAME} PRIVATE COMPOSESIREN_SLINT_UI=0)
   endif()
+  target_compile_definitions(${TARGET_NAME} PRIVATE
+      COMPOSESIREN_SLINT_UI=$<BOOL:${COMPOSESIREN_SLINT_UI}>
+      COMPOSESIREN_SLINT_STANDALONE_GPU=$<BOOL:${COMPOSESIREN_SLINT_STANDALONE_GPU}>)
 
   # add if really needed :
   # target_compile_definitions(${TARGET_NAME}

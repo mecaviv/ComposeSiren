@@ -2,7 +2,8 @@
 // OneSiren editor drawn by the Slint UI (Rust, Source/composesiren-slint-ui), built with
 // -DCOMPOSESIREN_SLINT_UI=ON. JUCE keeps the audio, the parameters (AudioProcessorValueTreeState), the
 // plugin formats and the window: this editor is an ordinary juce::AudioProcessorEditor whose pixels come
-// from Slint's software renderer and whose mouse events go to Slint. No second native window.
+// from Slint (GPU rasterization in standalone, software in a DAW) and whose mouse events go to Slint.
+// The GPU texture is read back into the host image. No second native window.
 //
 // Thread: everything here runs on JUCE's message thread, like the Slint side (see src/embed.rs).
 //
@@ -28,7 +29,8 @@ public:
         audioProcessor(p)
     {
         scale = displayScale();
-        ui.reset(cs_slint_ui_new(callbacks(), scale));
+        ui.reset(cs_slint_ui_new_with_renderer(callbacks(), scale,
+            p.wrapperType == juce::AudioProcessor::wrapperType_Standalone));
         jassert(ui != nullptr);
         pixels = juce::Image(juce::Image::ARGB,
                              static_cast<int>(cs_slint_ui_width(ui.get())),

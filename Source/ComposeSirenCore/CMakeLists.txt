@@ -88,7 +88,7 @@ endif()
 # Created here, with the other Rust crates: cmake/RustStaticLib.cmake has an
 # include guard, and its variables (the Apple cargo path) are only set in the
 # directory scope that included it first.
-if(COMPOSESIREN_SLINT_UI)
+if(COMPOSESIREN_SLINT_UI OR COMPOSESIREN_SLINT_STANDALONE_GPU)
   include("${CMAKE_SOURCE_DIR}/Source/composesiren-slint-ui/SlintUi.cmake")
 endif()
 

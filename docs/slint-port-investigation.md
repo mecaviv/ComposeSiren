@@ -52,6 +52,45 @@ little UI logic: values, ranges and CC numbers come from the parameter definitio
 
 ## Architecture options (JUCE stays for audio and hosting)
 
+### Standalone GPU rasterization
+
+With `COMPOSESIREN_SLINT_STANDALONE_GPU=ON`, the JUCE standalone instances of
+OneSiren and SirenOrchestra use the Slint editor and request the shared
+FemtoVG/WGPU renderer (Metal on macOS). DAW plugin editors keep their existing
+selection. `COMPOSESIREN_SLINT_UI=ON` still explicitly selects Slint inside DAWs;
+those instances request software rendering, even though the same static library
+contains GPU support. Both CMake options default to OFF, keeping the experimental
+UI opt-in. The original C constructors also
+keep their software behavior; the new `_new_with_renderer` entry points make
+the choice explicit for each instance.
+
+The GPU path retains the existing host image contract: it rasterizes into a
+persistent GPU texture and reads it back through a reusable staging buffer to
+premultiplied BGRA for JUCE/Qt to paint. These buffers are reallocated only on resize. It
+does not create another native window or event loop. This is GPU rasterization,
+with a CPU image transfer; it is not direct GPU texture sharing with the host.
+Changed GPU frames redraw the full panel, whereas software retains partial
+redraws. Measure both paths for the actual panel size and update pattern.
+
+If no hardware adapter can be initialized, the editor uses software instead.
+`MECAVIV_SLINT_RENDERER=software` forces software for diagnosis. It cannot force
+GPU rendering into a DAW plugin instance.
+
+Validation from `Source/composesiren-slint-ui`:
+
+```sh
+cargo test --features gpu
+cargo test --features gpu --test gpu -- --ignored --nocapture
+MECAVIV_SLINT_RENDERER=software cargo test --features gpu --test gpu -- --ignored
+cargo run --release --features gpu --example frame_time -- --gpu
+cargo run --release --features gpu --example frame_time
+```
+
+The hardware test checks both editors, input gestures, opaque output, and a
+software plugin instance alongside a GPU standalone instance. Native application
+builds still require one of the CMake options above; the Cargo standalone preview also
+enables the GPU renderer through its `standalone` feature.
+
 ### A. Slint renders into the JUCE editor (software renderer, C ABI): **chosen, implemented in the PoC**
 
 ```

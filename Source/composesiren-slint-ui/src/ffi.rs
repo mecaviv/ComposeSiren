@@ -91,9 +91,26 @@ pub struct CsSlintUi {
 /// Create an editor at `scale` physical pixels per logical pixel. Null when Slint cannot create it.
 #[unsafe(no_mangle)]
 pub extern "C" fn cs_slint_ui_new(callbacks: CsSlintUiCallbacks, scale: f32) -> *mut CsSlintUi {
+    cs_slint_ui_new_with_renderer(callbacks, scale, false)
+}
+
+/// Create an editor, requesting GPU rasterization only for a standalone host.
+/// A hardware initialization failure falls back to software.
+#[unsafe(no_mangle)]
+pub extern "C" fn cs_slint_ui_new_with_renderer(
+    callbacks: CsSlintUiCallbacks,
+    scale: f32,
+    gpu: bool,
+) -> *mut CsSlintUi {
     let store = Arc::new(ParamStore::default());
     let sink: Rc<dyn HostSink> = Rc::new(Callbacks(callbacks));
-    match EmbeddedEditor::new(&store, &sink, scale) {
+    match EmbeddedEditor::with_renderer(
+        &store,
+        &sink,
+        scale,
+        slint::platform::software_renderer::RepaintBufferType::ReusedBuffer,
+        gpu,
+    ) {
         Ok(editor) => Box::into_raw(Box::new(CsSlintUi { store, editor })),
         Err(_) => std::ptr::null_mut(),
     }
@@ -335,6 +352,18 @@ pub extern "C" fn cs_slint_orch_new(
     park_bridge: bool,
     scale: f32,
 ) -> *mut CsSlintOrch {
+    cs_slint_orch_new_with_renderer(callbacks, clic, park_bridge, scale, false)
+}
+
+/// Create an orchestra editor, requesting the GPU only in the standalone application.
+#[unsafe(no_mangle)]
+pub extern "C" fn cs_slint_orch_new_with_renderer(
+    callbacks: CsSlintOrchCallbacks,
+    clic: bool,
+    park_bridge: bool,
+    scale: f32,
+    gpu: bool,
+) -> *mut CsSlintOrch {
     let store = Arc::new(OrchestraStore::new(clic));
     let ids = store
         .params()
@@ -342,7 +371,7 @@ pub extern "C" fn cs_slint_orch_new(
         .map(|p| CString::new(p.juce_id()).unwrap_or_default())
         .collect();
     let sink: Rc<dyn OrchestraSink> = Rc::new(OrchCallbacks(callbacks));
-    match EmbeddedOrchestra::new(&store, &sink, park_bridge, scale) {
+    match EmbeddedOrchestra::with_renderer(&store, &sink, park_bridge, scale, gpu) {
         Ok(editor) => Box::into_raw(Box::new(CsSlintOrch { store, ids, editor })),
         Err(_) => std::ptr::null_mut(),
     }
@@ -392,7 +421,10 @@ pub unsafe extern "C" fn cs_slint_orch_param_count(ui: *const CsSlintOrch) -> u3
 /// # Safety
 /// `ui` is a live editor.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn cs_slint_orch_param_id(ui: *const CsSlintOrch, param: u32) -> *const c_char {
+pub unsafe extern "C" fn cs_slint_orch_param_id(
+    ui: *const CsSlintOrch,
+    param: u32,
+) -> *const c_char {
     unsafe { &*ui }
         .ids
         .get(param as usize)
@@ -422,8 +454,15 @@ pub unsafe extern "C" fn cs_slint_orch_select_track(ui: *const CsSlintOrch, trac
 /// # Safety
 /// `ui` is a live editor.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn cs_slint_orch_set_playing(ui: *const CsSlintOrch, track: u32, playing: bool) {
-    unsafe { &*ui }.editor.editor().set_playing(track as usize, playing);
+pub unsafe extern "C" fn cs_slint_orch_set_playing(
+    ui: *const CsSlintOrch,
+    track: u32,
+    playing: bool,
+) {
+    unsafe { &*ui }
+        .editor
+        .editor()
+        .set_playing(track as usize, playing);
 }
 
 /// Like [`cs_slint_ui_tick_region`], for the orchestra editor.
@@ -439,11 +478,22 @@ pub unsafe extern "C" fn cs_slint_orch_tick_region(
 ) -> bool {
     let ui = unsafe { &*ui };
     let len = stride as usize * ui.editor.size().1 as usize;
-    let pixels = unsafe { std::slice::from_raw_parts_mut(pixels.cast::<Bgra8Premultiplied>(), len) };
+    let pixels =
+        unsafe { std::slice::from_raw_parts_mut(pixels.cast::<Bgra8Premultiplied>(), len) };
     match ui.editor.tick_region(pixels, stride as usize) {
-        Some(DirtyRect { x, y, width, height }) => {
+        Some(DirtyRect {
+            x,
+            y,
+            width,
+            height,
+        }) => {
             if let Some(out) = unsafe { dirty.as_mut() } {
-                *out = CsRect { x, y, width, height };
+                *out = CsRect {
+                    x,
+                    y,
+                    width,
+                    height,
+                };
             }
             true
         }
@@ -456,7 +506,12 @@ pub unsafe extern "C" fn cs_slint_orch_tick_region(
 /// # Safety
 /// `ui` is a live editor.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn cs_slint_orch_pointer(ui: *const CsSlintOrch, kind: CsPointer, x: f32, y: f32) {
+pub unsafe extern "C" fn cs_slint_orch_pointer(
+    ui: *const CsSlintOrch,
+    kind: CsPointer,
+    x: f32,
+    y: f32,
+) {
     let kind = match kind {
         CsPointer::Down => Pointer::Down,
         CsPointer::Up => Pointer::Up,
@@ -471,6 +526,12 @@ pub unsafe extern "C" fn cs_slint_orch_pointer(ui: *const CsSlintOrch, kind: CsP
 /// # Safety
 /// `ui` is a live editor.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn cs_slint_orch_wheel(ui: *const CsSlintOrch, x: f32, y: f32, dx: f32, dy: f32) {
+pub unsafe extern "C" fn cs_slint_orch_wheel(
+    ui: *const CsSlintOrch,
+    x: f32,
+    y: f32,
+    dx: f32,
+    dy: f32,
+) {
     unsafe { &*ui }.editor.wheel(x, y, dx, dy);
 }

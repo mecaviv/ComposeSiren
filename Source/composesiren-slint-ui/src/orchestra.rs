@@ -13,7 +13,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::time::Duration;
 
-use slint::platform::software_renderer::{MinimalSoftwareWindow, RepaintBufferType};
+use slint::platform::software_renderer::RepaintBufferType;
 use slint::{ComponentHandle, Model, ModelRc, PhysicalSize, Timer, TimerMode, VecModel};
 
 use crate::embed::{self, Bgra8Premultiplied, DirtyRect, Pointer};
@@ -486,7 +486,7 @@ fn wire(
 
 /// The orchestra editor rendered into host pixels (see [`crate::embed`]).
 pub struct EmbeddedOrchestra {
-    window: Rc<MinimalSoftwareWindow>,
+    window: Rc<embed::EmbeddedWindow>,
     editor: OrchestraEditor,
     size: PhysicalSize,
 }
@@ -502,7 +502,17 @@ impl EmbeddedOrchestra {
         park_bridge: bool,
         scale: f32,
     ) -> Result<Self, slint::PlatformError> {
-        let window = embed::prepare_window(RepaintBufferType::ReusedBuffer);
+        Self::with_renderer(store, sink, park_bridge, scale, false)
+    }
+
+    /// Construct a standalone orchestra editor, requesting hardware rasterization.
+    /// # Errors
+    /// When Slint cannot create the component.
+    pub fn with_renderer(
+        store: &Arc<OrchestraStore>, sink: &Rc<dyn OrchestraSink>, park_bridge: bool,
+        scale: f32, prefer_gpu: bool,
+    ) -> Result<Self, slint::PlatformError> {
+        let window = embed::prepare_window_with_gpu(RepaintBufferType::ReusedBuffer, prefer_gpu);
         let editor = OrchestraEditor::new(store, sink, park_bridge)?;
         let size = embed::size_window(&window, LOGICAL_SIZE, scale);
         editor.component.show()?;
@@ -514,6 +524,10 @@ impl EmbeddedOrchestra {
     pub fn editor(&self) -> &OrchestraEditor {
         &self.editor
     }
+
+    /// Whether this instance acquired a hardware GPU.
+    #[must_use]
+    pub fn is_gpu(&self) -> bool { self.window.is_gpu() }
 
     /// Width and height in physical pixels.
     #[must_use]

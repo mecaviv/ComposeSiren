@@ -83,6 +83,10 @@ extern "C" {
 // Create an editor at `scale` physical pixels per logical pixel. Null when Slint cannot create it.
 CsSlintUi *cs_slint_ui_new(CsSlintUiCallbacks callbacks, float scale);
 
+// Create an editor, requesting GPU rasterization only for a standalone host.
+// A hardware initialization failure falls back to software.
+CsSlintUi *cs_slint_ui_new_with_renderer(CsSlintUiCallbacks callbacks, float scale, bool gpu);
+
 // Destroy an editor made by [`cs_slint_ui_new`] (null is ignored).
 //
 // # Safety
@@ -162,6 +166,13 @@ CsSlintOrch *cs_slint_orch_new(CsSlintOrchCallbacks callbacks,
                                bool clic,
                                bool park_bridge,
                                float scale);
+
+// Create an orchestra editor, requesting the GPU only in the standalone application.
+CsSlintOrch *cs_slint_orch_new_with_renderer(CsSlintOrchCallbacks callbacks,
+                                             bool clic,
+                                             bool park_bridge,
+                                             float scale,
+                                             bool gpu);
 
 // Destroy an editor made by [`cs_slint_orch_new`] (null is ignored).
 //

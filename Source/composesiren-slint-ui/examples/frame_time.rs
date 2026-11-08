@@ -42,8 +42,12 @@ fn median(mut v: Vec<Duration>) -> Duration {
 fn measure(scale: f32, repaint: RepaintBufferType, change: Change) -> (Duration, u32) {
     let store = Arc::new(ParamStore::default());
     let sink: Rc<dyn HostSink> = Rc::new(Quiet);
-    let editor =
-        EmbeddedEditor::with_repaint_buffer(&store, &sink, scale, repaint).expect("editor");
+    let gpu = std::env::args().any(|arg| arg == "--gpu");
+    let editor = EmbeddedEditor::with_renderer(&store, &sink, scale, repaint, gpu).expect("editor");
+    assert!(
+        !gpu || editor.is_gpu(),
+        "GPU benchmark requires a hardware adapter"
+    );
     let (w, h) = editor.size();
     let mut pixels = vec![Bgra8Premultiplied::default(); (w * h) as usize];
     editor.tick(&mut pixels, w as usize);
@@ -76,7 +80,12 @@ fn measure(scale: f32, repaint: RepaintBufferType, change: Change) -> (Duration,
 }
 
 fn main() {
-    println!("median of {FRAMES} ticks, software renderer into BGRA host pixels");
+    let renderer = if std::env::args().any(|arg| arg == "--gpu") {
+        "GPU + readback"
+    } else {
+        "software"
+    };
+    println!("median of {FRAMES} ticks, {renderer} into BGRA host pixels");
     let cases = [
         ("full frame", RepaintBufferType::NewBuffer, Change::Full),
         (

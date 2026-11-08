@@ -1,7 +1,8 @@
 //
 // SirenOrchestra editor drawn by the Slint UI (Rust, Source/composesiren-slint-ui, src/orchestra.rs), built
 // with -DCOMPOSESIREN_SLINT_UI=ON. Like SlintOneSirenEditor: JUCE keeps the audio, the parameters, the
-// formats and the window; the pixels come from Slint's software renderer, the mouse goes to Slint.
+// formats and the window; Slint rasterizes on the GPU in standalone and in software in a DAW.
+// GPU frames are read back into the host image; the mouse goes to Slint.
 //
 // The parameter table comes from the Rust side (generated metadata): one juce::ParameterAttachment per
 // entry, looked up by its JUCE id ("S5 | Volume", "R | ReverbDryWet", "C | ClicVolume", ...).
@@ -30,7 +31,8 @@ public:
         audioProcessor(p)
     {
         scale = displayScale();
-        ui.reset(cs_slint_orch_new(callbacks(), COMPOSESIREN_CLIC != 0, COMPOSESIREN_PARK_BRIDGE != 0, scale));
+        ui.reset(cs_slint_orch_new_with_renderer(callbacks(), COMPOSESIREN_CLIC != 0, COMPOSESIREN_PARK_BRIDGE != 0, scale,
+            p.wrapperType == juce::AudioProcessor::wrapperType_Standalone));
         jassert(ui != nullptr);
         pixels = juce::Image(juce::Image::ARGB,
                              static_cast<int>(cs_slint_orch_width(ui.get())),
