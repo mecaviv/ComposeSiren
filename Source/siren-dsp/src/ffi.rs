@@ -207,6 +207,20 @@ pub unsafe extern "C" fn sdsp_voice_set_timing(v: *mut Voice, timing: i32) {
     with_voice!(v, |v: &mut Voice| v.set_timing(if timing == 1 { Timing::Plugin } else { Timing::Time }))
 }
 
+/// Enable oscillator vibrato independently of the voice's timing settings.
+///
+/// # Safety
+/// see `sdsp_voice_set_partials`
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn sdsp_voice_set_continuous_vibrato(v: *mut Voice, on: u8) {
+    with_voice!(v, |v: &mut Voice| v.siren.enable_continuous_vibrato(on != 0))
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn sdsp_voice_set_position_spectrum(v: *mut Voice, on: u8) {
+    with_voice!(v, |v: &mut Voice| v.siren.position_spectrum = on != 0)
+}
+
 /// `MidiIn::handleControlChange`: CC 7 volume, 1/9/11 vibrato, 15/92 tremolo,
 /// 5 portamento, 16 pitch-bend range, 72/73 release/attack, 121 reset
 ///

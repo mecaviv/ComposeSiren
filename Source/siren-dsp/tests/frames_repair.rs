@@ -38,7 +38,17 @@ fn the_slots_follow_the_partials_once_realigned() {
 }
 
 #[test]
-fn s7_f_sharp_5_no_longer_clicks_at_the_wrap() {
+fn s7_f_sharp_5_repairs_the_missing_fundamental_at_the_wrap() {
+    let lib = Library::new(siren_dsp::default_resources());
+    let data = lib.data(SirenId::S7.def()).unwrap();
+    let note = 66;
+    let end = data.info[note].fmax - 1;
+    let repaired = data.play_frame(note, end, true);
+    let before = data.amp(note, end - 1)[0];
+    let after = data.amp(note, 0)[0];
+    assert!(data.amp(note, repaired)[0] >= before.min(after));
+    assert!(data.amp(note, repaired)[0] <= before.max(after));
+
     // S7 n66: frame 76 of 77 has every partial one slot down: a click every 65 ms
     for var in VARIANTS.iter().filter(|v| v.engine == Engine::Rust && !v.dsp_settings().unwrap().frames_legacy) {
         let (off, _) = click_hp::render(SirenId::S7, var.id, 66, false, 3.0);
@@ -46,5 +56,33 @@ fn s7_f_sharp_5_no_longer_clicks_at_the_wrap() {
         let (p_off, p_on) = (click_hp::hp_peaks(&off, 22050)[0].0, click_hp::hp_peaks(&on, 22050)[0].0);
         eprintln!("S7 n66 {:<18} high-passed peak over context: off {p_off:.1} dB, on {p_on:.1} dB", var.id);
         assert!(p_on < 3.0 && p_on < p_off - 0.5, "{}: off {p_off:.1}, on {p_on:.1}", var.id);
+    }
+}
+
+#[test]
+fn s7_trio_fast_smooths_harmonic_changes_from_b_through_d_sharp() {
+    let lib = Library::new(siren_dsp::default_resources());
+    let mut settings = siren_dsp::settings::variant("trio-fast").unwrap().dsp_settings().unwrap();
+    // An exact number of samples per period lets us measure level changes
+    // without counting the normal motion of the waveform.
+    let period = 48;
+    let mut peak_change = |note: i32, repair| {
+        let frequency = 440.0 * 2f64.powf((note as f64 - 69.0) / 12.0);
+        let rate = frequency * period as f64;
+        settings.skip_silent = repair;
+        let mut voice = lib.voice(SirenId::S7, rate).unwrap();
+        settings.apply(&mut voice);
+        voice.glide = false;
+        voice.note_on(note + 12, 127);
+        let samples: Vec<_> = (0..(rate * 2.0) as usize).map(|_| voice.process()).collect();
+        samples[rate as usize..].windows(period + 1)
+            .map(|w| (w[period] - w[0]).abs())
+            .fold(0.0, f32::max)
+    };
+    for note in 71..=75 {
+        let off = peak_change(note, false);
+        let on = peak_change(note, true);
+        eprintln!("S7 MIDI {} peak change per cycle: {off:.5} off, {on:.5} on", note + 12);
+        assert!(on < off * 0.5, "S7 data note {note}: {off:.5} off, {on:.5} on");
     }
 }

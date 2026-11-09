@@ -19,13 +19,21 @@ ComposeSiren's synthesis in Rust:
   |---|---|---|
   | `cpp` | C++ | the plugin's DSP (the default) |
   | `rust-exact` | Rust | the port, bit-exact with `cpp` |
-  | `rust-time` | Rust | timers and frames in seconds: the same at 44.1 kHz, right at other rates |
+  | `rust-time` | Rust | sample-rate-independent timing, continuous vibrato and a spectrum blended by sounding pitch |
   | `frames` | Rust | each note loops over its frames (no plugin frame reset) |
   | `trio` | Rust | three data notes around the pitch, B-spline weights, phase-locked |
   | `trio-linear` | Rust | the two notes around the pitch, phase-locked |
   | `trio-nearest` | Rust | the nearest note alone, pitch-shifted |
 
   DSP variant and data set are app settings (global), not host-automatable parameters.
+
+The time-scaled Rust variants keep vibrato separate from the rotor's integer-cent pitch
+and frame selection. They ramp the oscillator frequency ratio between control updates
+and keep the legacy vibrato cycle length for the same speed setting.
+
+In `rust-time`, the sounding pitch (including vibrato) determines the blend between
+the first frames of adjacent data notes. A steady pitch holds that spectrum. The
+`frames` and Trio variants use their own frame clocks.
 - `data`: the data sets through [`siren-data`](../siren-data) (raw `Resources/` or compact
   `.sirendata`, the same values).
 - `ffi`: a C ABI (`sdsp_*`) for C, C++ or anything that calls C.

@@ -17,6 +17,8 @@ use crate::siren::SirenDef;
 pub trait Sink {
     fn note(&mut self, note: f32);
     fn volume(&mut self, volume: f32);
+    /// Returns true when the synthesis applies vibrato to its oscillators.
+    fn vibrato(&mut self, _speed: f32, _depth: f32) -> bool { false }
 }
 
 pub struct MidiIn {
@@ -138,7 +140,7 @@ impl MidiIn {
         }
         self.note_on = note as f32;
         self.velocite = velo as f32;
-        self.note_on_final = self.note_on + self.pitch_bend;
+        self.note_on_final = self.note_on + self.pitch_bend * self.control[16];
         self.volume_final = self.volume_of();
         self.tour_moteur = self.tour_moteur_from_note(self.note_on_final);
         self.send_varia(sink);
@@ -216,7 +218,9 @@ impl MidiIn {
         let c1 = self.control[1];
         let c9 = self.control[9];
         let mut vibrato = 0.0f32;
-        if self.var_vfo <= 628.0 && c9 != 0.0 && c1 != 0.0 {
+        if sink.vibrato(if c1 == 0.0 { 0.0 } else { c9 }, self.control_final) {
+            self.var_vfo = 0.0;
+        } else if self.var_vfo <= 628.0 && c9 != 0.0 && c1 != 0.0 {
             self.var_vfo += self.incrementation_vibrato * c9;
             vibrato = (((self.tour_moteur * self.constescursion * self.control_final) as f64 / 12700.0)
                 * (self.var_vfo as f64 / 100.0).sin()) as f32;

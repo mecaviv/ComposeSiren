@@ -140,6 +140,34 @@ pub fn repair_note(freq: &[&[f32]], amp: &[&[f32]], fmax: usize, data_frames: us
             lost[f] = true;
         }
     }
+    // A realigned loop-end frame can still have a hole in the first partial.
+    // Bridge it between the surrounding frames when both have stable slots.
+    if lim >= 3 {
+        let end = lim - 1;
+        let prev = end - 1;
+        if let Some((_, a)) = &out[end]
+            && a[0] == 0.0
+            && amp[prev][0] > 0.0
+            && amp[0][0] > 0.0
+            && out[prev].is_none()
+            && out[0].is_none()
+            && !lost[prev]
+            && !lost[0]
+            && slot_moved_share(freq[prev], amp[prev], freq[0], amp[0]) <= REALIGN_SHARE
+        {
+            let (mut f, mut a) = ([0.0; MAX_PARTIEL], [0.0; MAX_PARTIEL]);
+            for k in 0..freq[prev].len().min(freq[0].len()).min(MAX_PARTIEL) {
+                let (before, after) = (freq[prev][k], freq[0][k]);
+                f[k] = if before > 0.0 && after > 0.0 {
+                    (before + after) * 0.5
+                } else {
+                    before.max(after)
+                };
+                a[k] = (amp[prev][k] + amp[0][k]) * 0.5;
+            }
+            out[end] = Some((f, a));
+        }
+    }
     (out, lost)
 }
 

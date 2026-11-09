@@ -7,10 +7,12 @@
 
 MidiIn::MidiIn(sirenId sid,
                const std::function<void(float)>& volumeChanged,
-               const std::function<void(float)>& noteChanged) :
+               const std::function<void(float)>& noteChanged,
+               const std::function<void(float, float)>& vibratoChanged) :
     id(sid),
     onVolumeChanged(volumeChanged),
-    onNoteChanged(noteChanged)
+    onNoteChanged(noteChanged),
+    onVibratoChanged(vibratoChanged)
 {
     data = sirenPropertiesById.at(id);
     // volet ouvert (CC 7 a 127), comme reset_sirene() du firmware : une voix neuve sonne
@@ -93,7 +95,7 @@ void MidiIn::realTimeStartNote(int note, int velo) {
     }
     noteOn = note;
     velocite = velo;
-    noteOnFinal = noteOn + pitchBend;
+    noteOnFinal = noteOn + pitchBend * control[16];
     volumeFinal = velocite * (control[7] / 127.0) * (500. / 127.);
     volumeFinal = std::clamp<float>(volumeFinal, 0., 500.);
     tourMoteur = tourMoteurFromNote(noteOnFinal);
@@ -211,7 +213,9 @@ void MidiIn::sendVaria() {
 
     // <= valeur 2 * PI (pour le calcul du sinus)
     // et frequence de modulation different de 0
-    if ((varVfo <= 628) && (control[9] != 0) && (control[1] != 0)) {
+    if (onVibratoChanged) {
+        onVibratoChanged(control[1] == 0.0f ? 0.0f : control[9], controlFinal);
+    } else if ((varVfo <= 628) && (control[9] != 0) && (control[1] != 0)) {
         // valeur frequence = f*10  12,7Hz = 127 période = 1/freq
         varVfo = varVfo + incrementationVibrato * control[9];
         vibrato = ((tourMoteur * constescursion * controlFinal) / 12700.) * std::sin(varVfo / 100.);

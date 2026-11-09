@@ -5,11 +5,13 @@
 #ifndef COMPOSESIREN_ORCHESTRAMIDIROUTER_H
 #define COMPOSESIREN_ORCHESTRAMIDIROUTER_H
 
+#include <atomic>
 #include <PerSirenMidiBridges.h>
 
 class OrchestraMidiRouter
 {
     std::map<OneBasedMidiChannel, std::unique_ptr<PerSirenMidiBridges>> midiBridges;
+    std::atomic<bool> restorePending { true };
 
 public:
     OrchestraMidiRouter(const std::vector<parameterLayoutGroupData>& groups,
@@ -39,10 +41,14 @@ public:
     }
 #endif
 
-    void sendAllCurrentParameterValues() const {
-        for (const auto& bridges : midiBridges | std::ranges::views::values) {
-            bridges->sendAllCurrentParameterValues();
-        }
+    void requestParameterRestore() {
+        restorePending.store(true, std::memory_order_release);
+    }
+
+    void restoreParameters(MidiScheduler& scheduler) {
+        if (restorePending.exchange(false, std::memory_order_acquire))
+            for (const auto& bridges : midiBridges | std::ranges::views::values)
+                bridges->scheduleCurrentParameterValues(scheduler);
     }
 
     void handleMessage(MidiScheduler& scheduler,

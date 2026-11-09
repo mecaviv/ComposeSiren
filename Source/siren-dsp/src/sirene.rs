@@ -24,6 +24,57 @@ const NOTES: usize = NOMBRE_DE_NOTE + 1;
 /// The rate the data's frame durations are counted at, and the plugin's.
 pub const DATA_RATE: f64 = 44100.0;
 
+#[derive(Clone, Copy)]
+struct Vibrato {
+    phase: f64,
+    phase_step: f64,
+    depth: f64,
+    ratio: f64,
+    target: f64,
+    slope: f64,
+    remaining: f64,
+}
+
+impl Default for Vibrato {
+    fn default() -> Self {
+        Self { phase: 0.0, phase_step: 0.0, depth: 0.0, ratio: 1.0, target: 1.0, slope: 0.0, remaining: 0.0 }
+    }
+}
+
+impl Vibrato {
+    fn set_controls(&mut self, speed: f32, depth: f32) {
+        let legacy_step = (512.0 / DATA_RATE / 0.025) * f64::from(speed);
+        // Keep the legacy cycle length, including its reset tick, while
+        // distributing phase evenly across the whole cycle.
+        self.phase_step = if speed > 0.0 {
+            std::f64::consts::TAU / ((628.0 / legacy_step).floor() + 2.0)
+        } else {
+            0.0
+        };
+        self.depth = f64::from(depth) * 10.0 / 12700.0;
+    }
+
+    #[inline]
+    fn next(&mut self, period: f64) -> f64 {
+        if self.remaining <= 0.0 {
+            self.ratio = self.target;
+            if self.phase_step == 0.0 && self.ratio == 1.0 {
+                self.phase = 0.0;
+                self.remaining = 0.0;
+                return 1.0;
+            }
+            self.phase = (self.phase + self.phase_step).rem_euclid(std::f64::consts::TAU);
+            self.target = if self.phase_step == 0.0 { 1.0 } else { 1.0 + self.depth * self.phase.sin() };
+            self.remaining += period;
+            self.slope = (self.target - self.ratio) / self.remaining.ceil().max(1.0);
+        }
+        let ratio = self.ratio;
+        self.ratio += self.slope;
+        self.remaining -= 1.0;
+        ratio
+    }
+}
+
 /// How the DSP counts time at a sample rate other than [`DATA_RATE`]. The
 /// plugin counts in samples: its frames last `fdur` samples, `timerAudio` (the
 /// vibrato, tremolo, portamento, attack and release steps) runs every 512
@@ -343,6 +394,8 @@ pub struct Sirene {
     /// per note, [`Clock::carry`]
     frame_carry: [f64; NOTES],
     pitch_schift: [f32; NOTES],
+    pub(crate) position_spectrum: bool,
+    vibrato: Option<Vibrato>,
     ancienne_wave_inf: f32,
     eloignementfreq: i32,
     note_inf: i32,
@@ -367,6 +420,8 @@ pub struct Sirene {
     trio_hz: [f64; 128],
     /// `Trio::f32_phasors`: sin(h·Φ) for h below [`TRIO_HARMONICS`] at the current sample
     trio_sines: [f32; TRIO_HARMONICS],
+    trio_harmonic_amp: [f64; TRIO_HARMONICS],
+    trio_harmonic_top: usize,
     trio_mc: i32,
     trio_wave: f64,
     /// with `Trio::lock`: the phase of the target fundamental, and its step
@@ -422,6 +477,8 @@ impl Sirene {
             count_p: [0; NOTES],
             frame_carry: [0.0; NOTES],
             pitch_schift: [0.0; NOTES],
+            position_spectrum: false,
+            vibrato: None,
             ancienne_wave_inf: 0.0,
             eloignementfreq: 0,
             note_inf: 0,
@@ -441,6 +498,8 @@ impl Sirene {
             trio_notes: [(-1, 0.0); 3],
             trio_hz: [0.0; 128],
             trio_sines: [0.0; TRIO_HARMONICS],
+            trio_harmonic_amp: [0.0; TRIO_HARMONICS],
+            trio_harmonic_top: 0,
             trio_mc: i32::MIN,
             trio_wave: 0.0,
             trio_phi: 0.0,
@@ -459,6 +518,10 @@ impl Sirene {
 
     pub fn set_sample_rate(&mut self, sr: f64) {
         self.sample_rate = sr;
+        if let Some(vibrato) = &mut self.vibrato {
+            vibrato.remaining = 0.0;
+            vibrato.target = vibrato.ratio;
+        }
         self.deux_pie_sample_rate = (2.0 * std::f64::consts::PI) / sr;
         self.time_scale = match self.timing {
             Timing::Time => sr / DATA_RATE,
@@ -536,6 +599,8 @@ impl Sirene {
         }
         self.trio_notes = [(-1, 0.0); 3];
         self.trio_mc = i32::MIN;
+        self.trio_harmonic_amp.fill(0.0);
+        self.trio_harmonic_top = 0;
     }
 
     /// `Trio::envelope`'s envelope of a data note
@@ -564,7 +629,12 @@ impl Sirene {
     }
 
     pub fn current_pitch(&self) -> f32 {
-        self.note_encour
+        let ratio = self.vibrato.as_ref().map_or(1.0, |v| v.ratio);
+        if ratio == 1.0 {
+            self.note_encour
+        } else {
+            self.note_encour + (1200.0 * ratio.log2()) as f32
+        }
     }
 
     pub fn note_inf(&self) -> usize {
@@ -584,7 +654,7 @@ impl Sirene {
         self.midi_cent_voulue = note;
         if self.midi_cent_voulue >= self.note_midi_cent_max {
             self.midi_cent_voulue = self.note_midi_cent_max;
-        } else if self.midi_cent_voulue % 100 == 99 {
+        } else if !self.position_spectrum && self.midi_cent_voulue % 100 == 99 {
             self.midi_cent_voulue += 1;
         }
 
@@ -754,10 +824,36 @@ impl Sirene {
         partial_at(&self.data, &self.frames, self.skips(), n, self.count_p[n], count_k, i, clock, self.frame_carry[n])
     }
 
+    pub(crate) fn enable_continuous_vibrato(&mut self, enabled: bool) {
+        if enabled != self.vibrato.is_some() {
+            self.vibrato = enabled.then(Vibrato::default);
+        }
+    }
+
+    pub(crate) fn has_continuous_vibrato(&self) -> bool {
+        self.vibrato.is_some()
+    }
+
+    pub(crate) fn set_vibrato_controls(&mut self, speed: f32, depth: f32) -> bool {
+        if let Some(vibrato) = &mut self.vibrato {
+            vibrato.set_controls(speed, depth);
+            true
+        } else {
+            false
+        }
+    }
+
+    pub(crate) fn copy_vibrato_from(&mut self, other: &Self) {
+        if let (Some(vibrato), Some(previous)) = (&mut self.vibrato, &other.vibrato) {
+            *vibrato = *previous;
+        }
+    }
+
     /// `calculwave()`: one output sample.
     pub fn calculwave(&mut self) -> f32 {
+        let vibrato = self.vibrato.as_mut().map_or(1.0, |v| v.next((512.0 / DATA_RATE) * self.sample_rate));
         if self.trio.is_some() {
-            return self.calculwave_trio();
+            return self.calculwave_trio(vibrato);
         }
         self.is_changement_de_note = false;
         if self.note_inf != self.ancien_note_voulue {
@@ -765,8 +861,10 @@ impl Sirene {
             self.ancien_note_voulue = self.note_inf;
         }
 
-        self.count_k_inf = self.advance(self.note_inf, self.count_k_inf);
-        self.count_k_sup = self.advance(self.note_sup, self.count_k_sup);
+        if !self.position_spectrum {
+            self.count_k_inf = self.advance(self.note_inf, self.count_k_inf);
+            self.count_k_sup = self.advance(self.note_sup, self.count_k_sup);
+        }
 
         if self.ampvouluz < self.ampvoulu {
             self.ampvouluz = (self.ampvouluz as f64 + self.vitesse_clape) as f32;
@@ -779,35 +877,56 @@ impl Sirene {
         self.eloignementfreq = self.note_sup * 100 - self.midi_cent_voulue;
         self.count8bit = !self.count8bit;
 
-        let (inf, sup) = (self.note_inf, self.note_sup);
-        let ps_inf = self.pitch_schift[idx(inf)];
-        let ps_sup = self.pitch_schift[idx(sup)];
-        let el = self.eloignementfreq as f32;
-        let el_sup = (100 - self.eloignementfreq) as f32;
+        let (inf, sup, ps_inf, ps_sup, el, el_sup) = if self.position_spectrum {
+            // Use the sounding RPM for the spectral blend. A data note contributes
+            // its first frame, so a held pitch does not advance a frame clock.
+            let center = self.midi_cent_voulue as f64 / 100.0;
+            let vibrato_semitones = if vibrato == 1.0 { 0.0 } else { 12.0 * vibrato.log2() };
+            let position = (center + vibrato_semitones).clamp(
+                self.note_min as f64, self.note_midi_cent_max as f64 / 100.0);
+            let inf = position.floor() as i32;
+            let sup = inf + 1;
+            let upper = (position - inf as f64) as f32 * 100.0;
+            // The oscillator ratio is applied below. These shifts refer to
+            // the unmodulated center even if vibrato changes the data notes.
+            const SEMITONE: f32 = 1.059_463_1;
+            let center_shift = self.pitch_schift[idx(self.note_inf)];
+            let shift = match self.note_inf - inf {
+                0 => center_shift,
+                1 => center_shift * SEMITONE,
+                -1 => center_shift / SEMITONE,
+                steps => center_shift * SEMITONE.powi(steps),
+            };
+            (inf, sup, shift, shift / SEMITONE, 100.0 - upper, upper)
+        } else {
+            let (inf, sup) = (self.note_inf, self.note_sup);
+            (inf, sup, self.pitch_schift[idx(inf)], self.pitch_schift[idx(sup)],
+             self.eloignementfreq as f32, (100 - self.eloignementfreq) as f32)
+        };
         let (sa, sb) = self.smoothing_rate;
         let compute = self.is16bit || self.is_changement_de_note || self.count8bit;
 
-        if !matches!(&self.frames, FrameControl::Lab(l) if l.interpolate) {
+        if self.position_spectrum || !matches!(&self.frames, FrameControl::Lab(l) if l.interpolate) {
             // Frames read whole (the plugin's): the arithmetic of the loop below, in the same
             // order, with each note's frame looked up once per sample instead of per partial.
             let q = self.qualite as usize;
             let (ni, ns) = (idx(inf), idx(sup));
             let skip = self.skips();
-            let pi = self.data.play_frame(ni, self.count_p[ni].max(0) as usize, skip);
-            let psu = self.data.play_frame(ns, self.count_p[ns].max(0) as usize, skip);
+            let pi = self.data.play_frame(ni, if self.position_spectrum { 0 } else { self.count_p[ni].max(0) as usize }, skip);
+            let psu = self.data.play_frame(ns, if self.position_spectrum { 0 } else { self.count_p[ns].max(0) as usize }, skip);
             let (fi, ai) = (&self.data.freq(ni, pi)[..q], &self.data.amp(ni, pi)[..q]);
             let (fs, as_) = (&self.data.freq(ns, psu)[..q], &self.data.amp(ns, psu)[..q]);
             let phase = &mut self.phase_inf[..q];
             if compute {
                 let (amp, ampz) = (&mut self.amp[..q], &mut self.ampz[..q]);
-                let crossfade = self.is_crossfade;
+                let crossfade = self.is_crossfade || (self.position_spectrum && el_sup > 0.0);
                 for i in 0..q {
                     if crossfade {
-                        phase[i] += ((fi[i] * ps_inf) * el) as f64 / 100.0 + ((fs[i] * ps_sup) * el_sup) as f64 / 100.0;
+                        phase[i] += (((fi[i] * ps_inf) * el) as f64 / 100.0 + ((fs[i] * ps_sup) * el_sup) as f64 / 100.0) * vibrato;
                         amp[i] = ((ai[i] * el) as f64 / 100.0 + (as_[i] * el_sup) as f64 / 100.0) as f32;
                     } else {
                         amp[i] = ai[i];
-                        phase[i] += (fi[i] * ps_inf) as f64;
+                        phase[i] += (fi[i] * ps_inf) as f64 * vibrato;
                     }
                     ampz[i] = (sa * amp[i] as f64 + sb * ampz[i] as f64) as f32;
                     wave_inf = (wave_inf as f64 + phase[i].sin() * ampz[i] as f64) as f32;
@@ -818,9 +937,13 @@ impl Sirene {
                 if q > 0 {
                     self.ancienne_wave_inf = wave_inf;
                 }
+            } else if self.position_spectrum && el_sup > 0.0 {
+                for i in 0..q {
+                    phase[i] += (((fi[i] * ps_inf) * el) as f64 / 100.0 + ((fs[i] * ps_sup) * el_sup) as f64 / 100.0) * vibrato;
+                }
             } else {
                 for i in 0..q {
-                    phase[i] += (fi[i] * ps_inf) as f64;
+                    phase[i] += (fi[i] * ps_inf) as f64 * vibrato;
                 }
             }
         } else {
@@ -829,11 +952,11 @@ impl Sirene {
             if compute {
                 if self.is_crossfade {
                     let (f_sup, a_sup) = self.partial(sup, self.count_k_sup, i);
-                    self.phase_inf[i] += ((f_inf * ps_inf) * el) as f64 / 100.0 + ((f_sup * ps_sup) * el_sup) as f64 / 100.0;
+                    self.phase_inf[i] += (((f_inf * ps_inf) * el) as f64 / 100.0 + ((f_sup * ps_sup) * el_sup) as f64 / 100.0) * vibrato;
                     self.amp[i] = ((a_inf * el) as f64 / 100.0 + (a_sup * el_sup) as f64 / 100.0) as f32;
                 } else {
                     self.amp[i] = a_inf;
-                    self.phase_inf[i] += (f_inf * ps_inf) as f64;
+                    self.phase_inf[i] += (f_inf * ps_inf) as f64 * vibrato;
                 }
                 self.ampz[i] = (sa * self.amp[i] as f64 + sb * self.ampz[i] as f64) as f32;
                 wave_inf = (wave_inf as f64 + self.phase_inf[i].sin() * self.ampz[i] as f64) as f32;
@@ -843,7 +966,7 @@ impl Sirene {
                 }
             } else {
                 // the C++ advances with noteInf only here, crossfade or not
-                self.phase_inf[i] += (f_inf * ps_inf) as f64;
+                self.phase_inf[i] += (f_inf * ps_inf) as f64 * vibrato;
             }
         }
         }
@@ -904,7 +1027,7 @@ impl Sirene {
     /// their outputs mixed. The
     /// clapet level, the 8-bit hold and the silence under `noteMin` are the
     /// plugin's; the oscillators run in f64 throughout.
-    fn calculwave_trio(&mut self) -> f32 {
+    fn calculwave_trio(&mut self, vibrato: f64) -> f32 {
         if self.ampvouluz < self.ampvoulu {
             self.ampvouluz = (self.ampvouluz as f64 + self.vitesse_clape) as f32;
         }
@@ -962,8 +1085,7 @@ impl Sirene {
             }
         }
 
-        self.trio_prime = false;
-        let compute = self.is16bit || self.count8bit || changed;
+        let prime = std::mem::take(&mut self.trio_prime);
         let (sa, sb) = self.smoothing_rate;
         let q = self.qualite as usize;
         let scale = self.trio.as_ref().is_some_and(|t| t.scale_frames);
@@ -973,7 +1095,7 @@ impl Sirene {
         let fast = self.trio.as_ref().is_some_and(|t| t.fast);
         let phasors = fast && self.trio.as_ref().is_some_and(|t| t.f32_phasors && t.lock);
         let mut top = 0usize;
-        self.trio_phi += self.trio_dphi;
+        self.trio_phi += self.trio_dphi * vibrato;
         if fast && self.trio_phi >= std::f64::consts::TAU {
             // h·Φ moves by whole turns: the same sines, and Φ stays small
             self.trio_phi -= std::f64::consts::TAU;
@@ -981,12 +1103,15 @@ impl Sirene {
         let (phi, f0) = (self.trio_phi, self.trio_f0);
         let time_scale = self.time_scale;
         let (data, frames, envelopes, skip) = (&self.data, &self.frames, &self.envelopes, self.skips());
+        let mut harmonic_target = (lock && skip).then(|| [0.0; TRIO_HARMONICS]);
+        let compute = self.is16bit || self.count8bit || changed || (prime && harmonic_target.is_some());
         let mut wave = 0.0f64;
         for b in self.banks.iter_mut() {
             if b.note < 0 {
                 continue;
             }
             let n = idx(b.note);
+            let ps = b.ps * vibrato;
             let clock = Clock { rate: if scale { b.ratio } else { 1.0 }, time_scale };
             b.count_k = advance_frame(data, frames, n, &mut b.frame, b.count_k, clock, &mut b.carry);
             if alpha != 0.0 && b.corr_frame != b.frame {
@@ -1012,6 +1137,23 @@ impl Sirene {
                 }
             }
             let view = FrameView::new(data, frames, skip, n, b.frame, b.count_k, clock, b.carry);
+            if let Some(harmonic_target) = &mut harmonic_target {
+                if compute && b.gain != 0.0 {
+                    let to_h = b.ratio / f0;
+                    for i in 0..q.min(MAX_PARTIEL) {
+                        let (freq, amp) = view.at(i);
+                        if amp == 0.0 {
+                            continue;
+                        }
+                        let h = (freq as f64 * to_h).round().max(1.0) as usize;
+                        if h < TRIO_HARMONICS {
+                            harmonic_target[h] += b.gain * amp as f64 * b.corr[i];
+                            top = top.max(h);
+                        }
+                    }
+                }
+                continue;
+            }
             if fast {
                 if lock && !compute {
                     // a locked phase is h·Φ, made afresh when it is read: nothing to keep
@@ -1051,7 +1193,7 @@ impl Sirene {
                     b.in_order = in_order;
                     continue;
                 }
-                let (gain, ps) = (b.gain, b.ps);
+                let gain = b.gain;
                 for i in 0..q {
                     let (f, a) = view.at(i);
                     b.phase[i] = if lock {
@@ -1076,7 +1218,7 @@ impl Sirene {
                     // the harmonic the partial lands on at the target pitch
                     b.phase[i] = ((f as f64 * b.ratio) / f0).round().max(1.0) * phi;
                 } else {
-                    b.phase[i] += f as f64 * b.ps;
+                    b.phase[i] += f as f64 * ps;
                 }
                 if compute {
                     let a = if alpha != 0.0 { a as f64 * b.corr[i] } else { a as f64 };
@@ -1085,7 +1227,34 @@ impl Sirene {
                 }
             }
         }
-        if phasors && compute {
+        if let Some(harmonic_target) = harmonic_target.as_ref().filter(|_| compute) {
+            // A slot can jump from one harmonic to another when a partial drops
+            // out of the analysis. Smooth each harmonic's level independently
+            // so the old harmonic fades instead of changing phase in one sample.
+            let end = top.max(self.trio_harmonic_top) + 1;
+            let amps = &mut self.trio_harmonic_amp[..end];
+            self.trio_harmonic_top = top;
+            for (h, (amp, &target)) in amps.iter_mut().zip(harmonic_target).enumerate().skip(1) {
+                *amp = if prime { target } else { sa * target + sb * *amp };
+                if amp.abs() >= 1e-12 {
+                    self.trio_harmonic_top = self.trio_harmonic_top.max(h);
+                } else if target == 0.0 {
+                    *amp = 0.0;
+                }
+            }
+            if phasors {
+                harmonic_sines(phi, &mut self.trio_sines[..end]);
+                wave = f32_dot(&self.trio_sines[1..end], &amps[1..]);
+            } else if fast {
+                let mut phases = [0.0; TRIO_HARMONICS];
+                for (h, phase) in phases[..end].iter_mut().enumerate() {
+                    *phase = h as f64 * phi;
+                }
+                wave = crate::fastsin::sin_dot(&phases[1..end], &amps[1..]);
+            } else {
+                wave = amps.iter().enumerate().skip(1).map(|(h, amp)| (h as f64 * phi).sin() * amp).sum();
+            }
+        } else if phasors && compute {
             harmonic_sines(phi, &mut self.trio_sines[..(top + 1).min(TRIO_HARMONICS)]);
             self.trio_sines[0] = 0.0;
             let sines = &self.trio_sines;
@@ -1407,6 +1576,10 @@ impl Sink for ToSiren<'_> {
 
     fn volume(&mut self, volume: f32) {
         self.siren.set_velocite(volume as i32);
+    }
+
+    fn vibrato(&mut self, speed: f32, depth: f32) -> bool {
+        self.siren.set_vibrato_controls(speed, depth)
     }
 }
 

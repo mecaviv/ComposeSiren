@@ -42,7 +42,13 @@ SirenVoiceUnit::SirenVoiceUnit(sirenId sid, const std::string& resourcesPath) :
         // the C++ MidiIn passes floats on to Sirene's int setters: the same conversion
         auto onVolumeChanged = [this](float v) { csr_siren_set_velocite(rustSiren.get(), static_cast<int>(v)); };
         auto onNoteChanged   = [this](float v) { csr_siren_set_note_from_ext(rustSiren.get(), static_cast<int>(v)); };
-        midiIn = std::make_unique<MidiIn>(id, onVolumeChanged, onNoteChanged);
+        std::function<void(float, float)> onVibratoChanged;
+        if (csr_siren_has_continuous_vibrato(rustSiren.get())) {
+            onVibratoChanged = [this](float speed, float depth) {
+                csr_siren_set_vibrato(rustSiren.get(), speed, depth);
+            };
+        }
+        midiIn = std::make_unique<MidiIn>(id, onVolumeChanged, onNoteChanged, onVibratoChanged);
         return;
     }
 #endif
@@ -153,7 +159,12 @@ bool SirenVoiceUnit::takeOver(const SirenVoiceUnit& o) {
     if (o.rustSiren) { csr_siren_get_handoff(o.rustSiren.get(), &c); fromCsr(c, h); }
     else h = o.siren->getHandoff();
     const int wasTrio = h.trio;
-    if (rustSiren) { toCsr(h, c); csr_siren_set_handoff(rustSiren.get(), &c); }
+    if (rustSiren) {
+        toCsr(h, c);
+        csr_siren_set_handoff(rustSiren.get(), &c);
+        if (o.rustSiren)
+            csr_siren_copy_vibrato(rustSiren.get(), o.rustSiren.get());
+    }
     else siren->setHandoff(h);
     int isTrio = 0;
     if (rustSiren) { csr_siren_get_handoff(rustSiren.get(), &c); isTrio = c.trio; }

@@ -11,6 +11,7 @@
 #include "../PluginProcessor.h"
 #include "pathUtilities.h"
 
+#include <array>
 #include <cmath>
 #include <iostream>
 #include <memory>
@@ -112,10 +113,31 @@ int main(int argc, char** argv)
     {
         auto a = make();
         for (auto& v : values) set(*a, "S3", v.id, v.v);
+        set(*a, "S7", ParameterId::VibratoFrequency, 108);
+        set(*a, "S7", ParameterId::VibratoAmplitude, 3);
+        set(*a, "S7", ParameterId::VibratoAcceleration, 40);
+        set(*a, "S7", ParameterId::AttackDuration, 68);
+        set(*a, "S7", ParameterId::ReleaseDuration, 68);
+        set(*a, "S7", ParameterId::ResetAllController, 1);
         set(*a, "R", ParameterId::ReverbEnable, 1);
         pump(50);
         a->getStateInformation(saved);
     }
+
+    // Older presets stored momentary commands as though they were knobs.
+    auto xml = juce::AudioProcessor::getXmlFromBinary(saved.getData(), static_cast<int>(saved.getSize()));
+    auto* parameters = xml->getChildByName("PARAMETERS");
+    for (const auto id : { ParameterId::AllSoundOff, ParameterId::ResetAllController, ParameterId::AllNoteOff }) {
+        const juce::String parameterId(ParameterIdGet::toJuceParameterId("S7", id));
+        bool found = false;
+        for (const auto* child : parameters->getChildIterator())
+            found |= child->getStringAttribute("id") == parameterId;
+        check(!found, "new saves omit " + parameterId.toStdString());
+        auto* child = parameters->createNewChildElement("PARAM");
+        child->setAttribute("id", parameterId);
+        child->setAttribute("value", 1);
+    }
+    juce::AudioProcessor::copyXmlToBinary(*xml, saved);
 
     // as the standalone app does at launch: the processor, its state, then the audio
     auto b = make();
@@ -126,6 +148,54 @@ int main(int argc, char** argv)
         check(std::abs(get(*b, "S3", v.id) - v.v) < 0.5f,
               std::string("restored ") + ParameterIdGet::codeName(v.id) + " = " + std::to_string(get(*b, "S3", v.id)));
     check(get(*b, "R", ParameterId::ReverbEnable) > 0.5f, "restored reverb on");
+
+    for (const bool alreadyRunning : { false, true }) {
+        auto immediate = make();
+        juce::AudioBuffer<float> audio(immediate->getTotalNumOutputChannels(), block);
+        juce::MidiBuffer midi;
+        if (alreadyRunning) {
+            immediate->prepareToPlay(rate, block);
+            immediate->processBlock(audio, midi);
+            midi.clear();
+        }
+        immediate->setStateInformation(saved.getData(), static_cast<int>(saved.getSize()));
+        if (!alreadyRunning)
+            immediate->prepareToPlay(rate, block);
+        midi.addEvent(juce::MidiMessage::noteOn(7, 83, static_cast<juce::uint8>(110)), 0);
+        immediate->processBlock(audio, midi);
+
+        std::array<int, 128> restored;
+        restored.fill(-1);
+        bool noteFound = false;
+        for (const auto event : midi) {
+            const auto msg = event.getMessage();
+            if (msg.getChannel() != 7)
+                continue;
+            if (msg.isNoteOn()) {
+                noteFound = true;
+                break;
+            }
+            if (msg.isController() && event.samplePosition == 0)
+                restored[static_cast<std::size_t>(msg.getControllerNumber())] = msg.getControllerValue();
+        }
+        check(noteFound && restored[1] == 3 && restored[9] == 108 && restored[11] == 40
+                  && restored[7] == 127 && restored[72] == 68 && restored[73] == 68,
+              alreadyRunning ? "preset reload applies S7 vibrato before the next note"
+                             : "startup applies S7 vibrato before the first note");
+        bool commandSent = false;
+        // The old reset was rate-limited and could arrive after the first block.
+        for (int i = 0; i < 4; ++i) {
+            for (const auto event : midi) {
+                const auto msg = event.getMessage();
+                commandSent |= msg.isControllerOfType(120) || msg.isControllerOfType(121)
+                            || msg.isControllerOfType(123);
+            }
+            midi.clear();
+            immediate->processBlock(audio, midi);
+        }
+        check(!commandSent, "restoring an old preset does not replay saved channel-mode commands");
+        immediate->releaseResources();
+    }
 
     // the same values given directly
     auto c = make();

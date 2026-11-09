@@ -91,7 +91,6 @@ SirenOrchestraPluginProcessor::SirenOrchestraPluginProcessor() :
 #if COMPOSESIREN_RECORD
     mcp.setRecorder(&recorder);
 #endif
-    router.sendAllCurrentParameterValues();
     ensembleParameterBridges.sendParameterValues();
     reverbParameterBridges.sendParameterValues();
 #if COMPOSESIREN_CLIC
@@ -252,7 +251,7 @@ void SirenOrchestraPluginProcessor::selectedNewResourcesPath(const std::string& 
 {
     getResourcesPathFunction = getResourcesPathGetter();
     ensemble.updateResourcesPath(s);
-    router.sendAllCurrentParameterValues();
+    router.requestParameterRestore();
     ensembleParameterBridges.sendParameterValues();
 }
 
@@ -312,6 +311,7 @@ void SirenOrchestraPluginProcessor::processBlock(juce::AudioBuffer<float>& audio
 
     mcp.drainMidi(midiIn);
     scheduler.reset();
+    router.restoreParameters(scheduler);
 #if COMPOSESIREN_DSP_CONTROL_MIDI_IN
     {
         juce::MidiBuffer dspControlMidi;
@@ -686,11 +686,28 @@ void SirenOrchestraPluginProcessor::changeProgramName(int index,
 // Use an APVTS for plugin parameters, and another VTS for UI parameters
 // (siren category, input MIDI channel, output MIDI channel)
 //==============================================================================
+namespace {
+void removeChannelModeCommands(juce::ValueTree& parameters)
+{
+    for (const auto siren : allSirenIds) {
+        for (const auto command : { ParameterId::AllSoundOff, ParameterId::ResetAllController,
+                                    ParameterId::AllNoteOff }) {
+            const juce::String id(ParameterIdGet::toJuceParameterId(sirenStrIdById.at(siren), command));
+            auto child = parameters.getChildWithProperty("id", id);
+            if (child.isValid())
+                parameters.removeChild(child, nullptr);
+        }
+    }
+}
+} // namespace
+
 void SirenOrchestraPluginProcessor::getStateInformation(juce::MemoryBlock& destData)
 {
     juce::XmlElement xmlState("AllParameters");
     // copyState flushes the parameters into the tree first (APVTS does it on a timer)
-    xmlState.addChildElement(apvts.copyState().createXml().release());
+    auto parameters = apvts.copyState();
+    removeChannelModeCommands(parameters);
+    xmlState.addChildElement(parameters.createXml().release());
     xmlState.addChildElement(vms.toXml().release());
 #if COMPOSESIREN_PARK_BRIDGE
     // le pilotage des sirènes physiques suit la session, pas le plugin
@@ -719,7 +736,12 @@ void SirenOrchestraPluginProcessor::setStateInformation(const void* data,
             // correctly
             xmlSubState = xmlState->getChildByName(apvts.state.getType());
             if (xmlSubState != nullptr) {
-                apvts.replaceState(juce::ValueTree::fromXml(*xmlSubState));
+                auto parameters = juce::ValueTree::fromXml(*xmlSubState);
+                // Loading a saved command would notify its parameter listener and
+                // enqueue a reset after the restored controller values.
+                removeChannelModeCommands(parameters);
+                apvts.replaceState(parameters);
+                router.requestParameterRestore();
             }
 
 #if COMPOSESIREN_PARK_BRIDGE

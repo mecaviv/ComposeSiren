@@ -119,6 +119,16 @@ public:
         pitchBendBridge->setPending();
     }
 
+    void scheduleCurrentParameterValues(MidiScheduler& scheduler)
+    {
+        for (const auto& [cc, bridge] : bridgeByCCNumber) {
+            // Channel-mode commands are actions, not persistent controller state.
+            if (cc != 120 && cc != 121 && cc != 123)
+                bridge->scheduleCurrentValue(scheduler);
+        }
+        pitchBendBridge->scheduleCurrentValue(scheduler);
+    }
+
     // The controller values the firmware's reset_sirene() (m_seq/s_un_in.c)
     // puts back, for the knobs that exist here: volume (7) and the two
     // "ctr12/ctr13" (12 mute, 13 timbre) at 127, the others at 0. The pitch

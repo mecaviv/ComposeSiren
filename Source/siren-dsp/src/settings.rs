@@ -11,6 +11,9 @@ use std::fmt;
 /// Every switch, with the plugin's behaviour as the default.
 #[derive(Clone, Debug, PartialEq)]
 pub struct DspSettings {
+    /// Separate vibrato from the legacy integer-cent pitch controller.
+    pub continuous_vibrato: bool,
+    pub position_spectrum: bool,
     /// `dsp.timing`: `plugin` (counted in samples, as the C++) or `time` (as at 44.1 kHz)
     pub timing: Timing,
     /// `frames.legacy`: the plugin's frame reset
@@ -36,6 +39,8 @@ pub struct DspSettings {
 impl Default for DspSettings {
     fn default() -> Self {
         DspSettings {
+            continuous_vibrato: false,
+            position_spectrum: false,
             timing: Timing::Plugin,
             frames_legacy: true,
             frames_speed: 1.0,
@@ -187,6 +192,8 @@ impl DspSettings {
     /// the voice): for a host that drives a bare [`Sirene`] with its own MIDI handling. Set the
     /// timing with [`Sirene::set_timing`] before the sample rate.
     pub fn apply_synthesis(&self, s: &mut Sirene) {
+        s.enable_continuous_vibrato(self.continuous_vibrato);
+        s.position_spectrum = self.position_spectrum;
         if let Some(on) = self.crossfade {
             s.set_crossfade(on);
         }
@@ -229,7 +236,10 @@ pub enum Engine {
 
 impl Variant {
     pub fn dsp_settings(&self) -> Result<DspSettings, SettingError> {
-        DspSettings::from_pairs(self.settings.iter().copied())
+        let mut settings = DspSettings::from_pairs(self.settings.iter().copied())?;
+        settings.continuous_vibrato = self.engine == Engine::Rust && settings.timing == Timing::Time;
+        settings.position_spectrum = self.id == "rust-time";
+        Ok(settings)
     }
 }
 

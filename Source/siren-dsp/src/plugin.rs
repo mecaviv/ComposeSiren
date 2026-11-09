@@ -77,6 +77,27 @@ pub unsafe extern "C" fn csr_siren_set_sample_rate(s: *mut Sirene, sample_rate: 
     }
 }
 
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn csr_siren_has_continuous_vibrato(s: *const Sirene) -> bool {
+    unsafe { s.as_ref() }.is_some_and(Sirene::has_continuous_vibrato)
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn csr_siren_set_vibrato(s: *mut Sirene, speed: f32, depth: f32) {
+    if let Some(s) = unsafe { s.as_mut() } {
+        s.set_vibrato_controls(speed, depth);
+    }
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn csr_siren_copy_vibrato(s: *mut Sirene, previous: *const Sirene) {
+    if !std::ptr::eq(s, previous)
+        && let (Some(s), Some(previous)) = (unsafe { s.as_mut() }, unsafe { previous.as_ref() })
+    {
+        s.copy_vibrato_from(previous);
+    }
+}
+
 /// `Sirene::setVelocite`
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn csr_siren_set_velocite(s: *mut Sirene, velo: i32) {

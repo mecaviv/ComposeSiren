@@ -119,6 +119,16 @@ public:
         pending.store(true, std::memory_order_release);
     }
 
+    // Audio thread, before routing incoming events for the block. The current
+    // parameter supersedes queued knob changes and is due at sample zero.
+    void scheduleCurrentValue(MidiScheduler& scheduler)
+    {
+        Event stale;
+        mailbox.pop(stale);
+        pending.store(false, std::memory_order_release);
+        handleEventInternal({ defaultInputChannel.oneBased, audioParam.getValue(), 0 }, scheduler);
+    }
+
     template<class Q = T>
     std::enable_if<std::is_same_v<Q, CCParam>, void>::type
     handleIncomingEvent(const juce::MidiMessage& msg,

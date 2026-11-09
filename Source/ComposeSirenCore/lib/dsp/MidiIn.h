@@ -19,7 +19,8 @@ private:
 public:
     MidiIn(sirenId id,
            const std::function<void(float)>& volumeChanged,
-           const std::function<void(float)>& noteChanged);
+           const std::function<void(float)>& noteChanged,
+           const std::function<void(float, float)>& vibratoChanged = {});
     ~MidiIn();
 
 	void setSirenId(sirenId id);
@@ -122,6 +123,7 @@ private:
 
     const std::function<void(float)> onVolumeChanged;
     const std::function<void(float)> onNoteChanged;
+    const std::function<void(float, float)> onVibratoChanged;
 };
 
 #endif //COMPOSESIREN_MIDIIN_H
