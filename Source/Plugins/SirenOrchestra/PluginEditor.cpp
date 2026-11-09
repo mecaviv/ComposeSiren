@@ -66,6 +66,7 @@ SirenOrchestraPluginEditor::SirenOrchestraPluginEditor(SirenOrchestraPluginProce
 
 #if COMPOSESIREN_SIREN_WAVES
     addChildComponent(wavesOverflow); // above the tracks
+    addChildComponent(waveSurface);
 #endif
 
     addAndMakeVisible(rvbStrip);
@@ -108,7 +109,7 @@ SirenOrchestraPluginEditor::~SirenOrchestraPluginEditor()
 #if COMPOSESIREN_SIREN_WAVES
     vblank.reset();
     settings->removeListener(this);
-    glContext.detach();
+    waveSurface.setActive(false);
     // Quiet and detach the overflow painter: its Component strings are what
     // faulted if anything still writes into this object mid-teardown.
     wavesOverflow.silence();
@@ -131,7 +132,7 @@ void SirenOrchestraPluginEditor::paint(juce::Graphics& g)
     g.setColour(juce::Colour{mecaviv::Colours::darkTransparentBackground});
     g.fillRect(getLocalBounds().toFloat());
 #if COMPOSESIREN_SIREN_WAVES
-    if (waveTuning.enabled && g.clipRegionIntersects(waveColumnBounds())) {
+    if (waveTuning.enabled && !waveSurface.isRendering() && g.clipRegionIntersects(waveColumnBounds())) {
         const double start = juce::Time::getMillisecondCounterHiRes();
         waveColumn.paintCells(g, waveTuning, controlStripLayout::cornerSize);
         if (waveStats.on) {
@@ -302,6 +303,103 @@ void SirenOrchestraPluginEditor::sirenStripMenuItemSelected(std::optional<sirenI
 #if COMPOSESIREN_SIREN_WAVES
 // WAVES ///////////////////////////////////////////////////////////////////////
 
+SirenOrchestraPluginEditor::WaveSurface::WaveSurface()
+{
+    setInterceptsMouseClicks(false, false);
+    context.setComponentPaintingEnabled(false);
+    context.setRenderer(this);
+    painter.setTitleFont(juce::FontOptions(controlStripLayout::titleFontSize, juce::Font::bold));
+}
+
+SirenOrchestraPluginEditor::WaveSurface::~WaveSurface()
+{
+    context.detach();
+}
+
+void SirenOrchestraPluginEditor::WaveSurface::setActive(bool active)
+{
+    if (active == isVisible()) return;
+    setVisible(active);
+    if (active)
+        context.attachTo(*this);
+    else
+        context.detach();
+}
+
+void SirenOrchestraPluginEditor::WaveSurface::publish(const cs::waves::SirenWaveColumn& waves,
+                                                      const cs::waves::Tuning& tuning,
+                                                      std::array<Overlay, sirenOrder.size()> overlays,
+                                                      bool force)
+{
+    const auto bounds = getBounds();
+    {
+        const std::lock_guard lock(frameMutex);
+        if (!force && latest && latest->bounds == bounds && latest->overlays == overlays)
+            return;
+    }
+    auto frame = std::make_shared<Frame>(Frame { waves.makeFrame(tuning), bounds, overlays });
+    {
+        const std::lock_guard lock(frameMutex);
+        latest = std::move(frame);
+    }
+    context.triggerRepaint();
+}
+
+SirenOrchestraPluginEditor::WaveSurface::PaintStats SirenOrchestraPluginEditor::WaveSurface::takePaintStats()
+{
+    const std::lock_guard lock(frameMutex);
+    return std::exchange(paintStats, {});
+}
+
+void SirenOrchestraPluginEditor::WaveSurface::renderOpenGL()
+{
+    std::shared_ptr<const Frame> frame;
+    {
+        const std::lock_guard lock(frameMutex);
+        frame = latest;
+    }
+    juce::OpenGLHelpers::clear(juce::Colours::black);
+    if (!frame || frame->bounds.isEmpty()) return;
+
+    const auto start = juce::Time::getMillisecondCounterHiRes();
+    GLint viewport[4] {};
+    juce::gl::glGetIntegerv(juce::gl::GL_VIEWPORT, viewport);
+    if (viewport[2] <= 0 || viewport[3] <= 0) return;
+    auto graphics = juce::createOpenGLGraphicsContext(context, viewport[2], viewport[3]);
+    {
+        juce::Graphics g(*graphics);
+        g.fillAll(juce::Colour{mecaviv::Colours::darkTransparentBackground});
+        g.addTransform(juce::AffineTransform::scale(static_cast<float>(context.getRenderingScale())));
+        painter.paintFrame(g, frame->waves, controlStripLayout::cornerSize, frame->bounds.getPosition());
+
+        g.addTransform(juce::AffineTransform::translation(-frame->bounds.getPosition().toFloat()));
+        for (std::size_t i = 0; i < frame->waves.cells.size(); ++i) {
+            const auto area = frame->waves.cells[i].bounds;
+            const auto& overlay = frame->overlays[i];
+            SirenTrackComponent::paintTitleNoteIndicator(g, area, overlay.playing);
+            if (!overlay.hover.isTransparent()) {
+                g.setColour(overlay.hover);
+                g.fillRect(area);
+            }
+            if (overlay.selected) {
+                g.setColour(juce::Colours::whitesmoke);
+                g.drawRoundedRectangle(overlay.trackBounds.reduced(2, 1).toFloat(),
+                                       controlStripLayout::cornerSize, 1.0f);
+            }
+#if COMPOSESIREN_PARK_BRIDGE
+            StLedComponent::paintState(g, overlay.stBounds, overlay.stState);
+#endif
+        }
+    }
+    graphics.reset();
+    const auto ms = juce::Time::getMillisecondCounterHiRes() - start;
+    const std::lock_guard lock(frameMutex);
+    ++paintStats.count;
+    paintStats.totalMs += ms;
+    paintStats.maxMs = juce::jmax(paintStats.maxMs, ms);
+    paintStats.gpu = painter.lastPaintUsedOpenGL();
+}
+
 void SirenOrchestraPluginEditor::currentSirenState(const sirenId sid, const SirenVoice::State& s)
 {
     waveColumn.setSirenState(sid, s.level, s.currentPitch, s.isNoteOn);
@@ -318,12 +416,13 @@ void SirenOrchestraPluginEditor::settingChanged(cs::Settings::Id id)
     if (id == Id::wavesEnabled || id == Id::wavesRenderer || id == Id::wavesOverflow
         || id == Id::wavesOverflowReach)
         updateWavesSetup();
-    else
+    else {
+        publishWaveSurface(true);
         repaint();
+        wavesOverflow.repaint();
+    }
 }
 
-// The OpenGL context goes with the renderer setting: with it, JUCE renders
-// the whole editor through OpenGL, and the cells use the shader.
 void SirenOrchestraPluginEditor::updateWavesSetup()
 {
     using Renderer = cs::waves::Tuning::Renderer;
@@ -331,14 +430,10 @@ void SirenOrchestraPluginEditor::updateWavesSetup()
     for (auto& track : sirenTracks | std::views::values)
         track->setTitleFillVisible(!on);
 
-    const bool wantOpenGL = on && waveTuning.renderer != Renderer::software;
-    if (wantOpenGL && !glContext.isAttached())
-        glContext.attachTo(*this);
-    else if (!wantOpenGL && glContext.isAttached())
-        glContext.detach();
-
     wavesOverflow.setVisible(on && waveTuning.overflow);
     updateWaveCells();
+    waveSurface.setActive(on && waveTuning.renderer != Renderer::software);
+    publishWaveSurface(true);
     repaint();
 }
 
@@ -353,11 +448,34 @@ void SirenOrchestraPluginEditor::updateWaveCells()
         column = column.isEmpty() ? area : column.getUnion(area);
     }
     waveColumn.setCells(std::move(cells));
+    waveSurface.setBounds(column.getSmallestIntegerContainer());
+    publishWaveSurface(true);
 
     // room for the furthest overflow: the reach, the parallax layers, the ripples
     const float room = waveTuning.overflowReach * 1.5f + 20.0f;
     wavesOverflow.setBounds(juce::Rectangle<float>(column.getX() - room, column.getY(), room, column.getHeight())
                                 .getSmallestIntegerContainer());
+}
+
+void SirenOrchestraPluginEditor::publishWaveSurface(bool force)
+{
+    if (!waveSurface.isVisible()) return;
+
+    std::array<WaveSurface::Overlay, sirenOrder.size()> overlays;
+    for (std::size_t i = 0; i < sirenOrder.size(); ++i) {
+        const auto id = sirenOrder[i];
+        const auto& track = *sirenTracks.at(id);
+        auto& overlay = overlays[i];
+        overlay.trackBounds = track.getBounds();
+        overlay.hover = track.getTitleHoverColour();
+        overlay.playing = track.isNotePlaying();
+        overlay.selected = track.getSelected();
+#if COMPOSESIREN_PARK_BRIDGE
+        overlay.stBounds = stLeds.at(id)->getBounds();
+        overlay.stState = stLeds.at(id)->getState();
+#endif
+    }
+    waveSurface.publish(waveColumn, waveTuning, overlays, force);
 }
 
 juce::Rectangle<int> SirenOrchestraPluginEditor::waveColumnBounds() const
@@ -374,33 +492,47 @@ void SirenOrchestraPluginEditor::advanceWaves(double now)
         lastWaveFrame = 0.0;
         return;
     }
-    // the frame rate cap: skip a display refresh only when it comes well
-    // before the next frame is due (refreshes arrive late, then early)
-    if (lastWaveFrame > 0.0 && now - lastWaveFrame < 1.0 / waveTuning.frameRate - 1.0 / 120.0)
+    // Keep wave repaints off most display refreshes, including on high-refresh displays.
+    const auto frameRate = juce::jlimit(1, 30, waveTuning.frameRate);
+    if (lastWaveFrame > 0.0 && now - lastWaveFrame < 1.0 / frameRate - 0.0005)
         return;
     const double dt = lastWaveFrame > 0.0 ? juce::jlimit(0.0, 0.1, now - lastWaveFrame) : 0.0;
     lastWaveFrame = now;
 
-    const bool moving = waveColumn.advance(dt, waveTuning);
+    const auto oldOverflow = wavesOverflow.isVisible() ? waveColumn.overflowExtent(waveTuning) : 0.0f;
+    const auto dirty = waveColumn.advance(dt, waveTuning);
+    publishWaveSurface(!dirty.isEmpty());
     if (waveStats.on) {
         ++waveStats.frames;
         if (now - waveStats.since >= 1.0) {
+            const auto gpuPaints = waveSurface.takePaintStats();
+            const auto paints = waveStats.paints + gpuPaints.count;
             juce::String peaks;
             for (const auto& [id, db] : waveStats.peakDb)
                 peaks << " " << sirenStrIdById.at(id) << " " << juce::String(db, 1);
             std::fprintf(stderr, "waves: %d frames %d paints, cells %.2f ms avg %.2f max, %s, peak dB:%s\n",
-                         waveStats.frames, waveStats.paints,
-                         waveStats.paints > 0 ? waveStats.paintMs / waveStats.paints : 0.0, waveStats.paintMaxMs,
-                         waveColumn.lastPaintUsedOpenGL() ? "OpenGL" : "software", peaks.toRawUTF8());
+                         waveStats.frames, paints,
+                         paints > 0 ? (waveStats.paintMs + gpuPaints.totalMs) / paints : 0.0,
+                         juce::jmax(waveStats.paintMaxMs, gpuPaints.maxMs),
+                         gpuPaints.gpu ? "OpenGL" : "software", peaks.toRawUTF8());
             waveStats = { true, 0, 0, 0.0, 0.0, now, {} };
         }
     }
-    if (moving || wavesMoving) { // one more frame to settle
-        repaint(waveColumnBounds());
-        if (wavesOverflow.isVisible())
-            wavesOverflow.repaint();
+    if (dirty.isEmpty()) return;
+    const auto overflow = wavesOverflow.isVisible()
+        ? juce::jmax(oldOverflow, waveColumn.overflowExtent(waveTuning)) : 0.0f;
+    const auto overflowPixels = static_cast<int>(std::ceil(overflow));
+    for (const auto& area : dirty) {
+        if (!waveSurface.isRendering())
+            repaint(area);
+        if (overflowPixels > 0) {
+            const auto strip = juce::Rectangle<int>(area.getX() - overflowPixels,
+                                                   area.getY(), overflowPixels + 1, area.getHeight());
+            const auto local = strip.getIntersection(wavesOverflow.getBounds()) - wavesOverflow.getPosition();
+            if (!local.isEmpty())
+                wavesOverflow.repaint(local);
+        }
     }
-    wavesMoving = moving;
 }
 
 void SirenOrchestraPluginEditor::WavesOverflow::paint(juce::Graphics& g)

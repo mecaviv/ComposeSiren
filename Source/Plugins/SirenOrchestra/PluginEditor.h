@@ -46,7 +46,14 @@ public:
 
     void paint(juce::Graphics& g) override
     {
-        const auto area = getLocalBounds().toFloat().reduced(1.f);
+        paintState(g, getLocalBounds(), state);
+    }
+
+    SirenUdpBridge::StState getState() const { return state; }
+
+    static void paintState(juce::Graphics& g, juce::Rectangle<int> bounds, SirenUdpBridge::StState state)
+    {
+        const auto area = bounds.toFloat().reduced(1.f);
         switch (state) {
             case SirenUdpBridge::StState::on:
                 g.setColour(juce::Colours::limegreen);
@@ -246,10 +253,52 @@ private:
     juce::Colour bottomColour;
 
 #if COMPOSESIREN_SIREN_WAVES
-    // The waves in the title cells (see SirenWaveColumn). The cells are
-    // painted by paint(), beneath the tracks, which then draw the names, the
-    // LEDs and the selection on top. Overflow paints what goes past the
-    // cells, over the strips.
+    class WaveSurface : public juce::Component, private juce::OpenGLRenderer
+    {
+    public:
+        struct Overlay {
+            juce::Rectangle<int> trackBounds;
+            juce::Colour hover;
+            bool playing = false;
+            bool selected = false;
+#if COMPOSESIREN_PARK_BRIDGE
+            juce::Rectangle<int> stBounds;
+            SirenUdpBridge::StState stState = SirenUdpBridge::StState::unknown;
+#endif
+            bool operator==(const Overlay&) const = default;
+        };
+
+        WaveSurface();
+        ~WaveSurface() override;
+        void setActive(bool);
+        bool isRendering() const { return context.isAttached(); }
+        void publish(const cs::waves::SirenWaveColumn&, const cs::waves::Tuning&,
+                     std::array<Overlay, sirenOrder.size()>, bool force);
+        struct PaintStats {
+            int count = 0;
+            double totalMs = 0.0, maxMs = 0.0;
+            bool gpu = false;
+        };
+        PaintStats takePaintStats();
+
+    private:
+        struct Frame {
+            cs::waves::SirenWaveColumn::Frame waves;
+            juce::Rectangle<int> bounds;
+            std::array<Overlay, sirenOrder.size()> overlays;
+        };
+        void newOpenGLContextCreated() override {}
+        void renderOpenGL() override;
+        void openGLContextClosing() override {}
+
+        std::mutex frameMutex;
+        std::shared_ptr<const Frame> latest;
+        PaintStats paintStats;
+        cs::waves::SirenWaveColumn painter;
+        juce::OpenGLContext context;
+    };
+
+    // Overflow blends over the strip controls in normal JUCE component paint.
     class WavesOverflow : public juce::Component
     {
     public:
@@ -273,16 +322,16 @@ private:
     void updateWavesSetup();
     void updateWaveCells();
     void advanceWaves(double now);
+    void publishWaveSurface(bool force);
     juce::Rectangle<int> waveColumnBounds() const;
 
     juce::SharedResourcePointer<cs::Settings> settings;
     cs::waves::Tuning waveTuning;
     cs::waves::SirenWaveColumn waveColumn;
     WavesOverflow wavesOverflow { *this };
-    juce::OpenGLContext glContext;
+    WaveSurface waveSurface;
     std::unique_ptr<juce::VBlankAttachment> vblank;
     double lastWaveFrame = 0.0;
-    bool wavesMoving = false;
 
     // COMPOSESIREN_WAVES_STATS=1 in the environment: once a second on stderr,
     // the animation and paint rates, the cells' paint time, each siren's peak level

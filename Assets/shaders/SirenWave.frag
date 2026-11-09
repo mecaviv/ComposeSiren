@@ -20,6 +20,7 @@ uniform vec4 uPhase;   // main wave, parallax layers 1 to 3
 uniform vec4 uLook;    // level, depth, flatness, opacity
 uniform vec4 uLayers;  // parallax layers, shades in the edge, corner radius (logical px), unused
 uniform vec4 uExtra;   // pencil line width (logical px), clouds, column top, column height (logical px)
+uniform vec2 uCloudOffset; // surface origin in the editor (logical px)
 
 float ripple(float x, float ph, float shape)
 {
@@ -103,7 +104,7 @@ void main()
     float d = uEdgeX - pixelPos.x;
 
     vec4 c = uBase;
-    c.rgb += (vec3(c.a) - c.rgb) * cloudLight(pixelPos / uScale);
+    c.rgb += (vec3(c.a) - c.rgb) * cloudLight(pixelPos / uScale + uCloudOffset);
     c = backLayer(c, 3.0, uPhase.w, a, d);
     c = backLayer(c, 2.0, uPhase.z, a, d);
     c = backLayer(c, 1.0, uPhase.y, a, d);

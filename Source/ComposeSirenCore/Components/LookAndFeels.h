@@ -47,11 +47,11 @@ constexpr float knobIndicatorOnThickness{4};
 // the display scale, so it is rendered once into a software image and reused.
 // Painting is serialised by the message manager lock, so one cache is enough.
 inline void drawCachedDropShadow(juce::Graphics& g, const juce::DropShadow& ds,
-                                 const juce::Path& path, int kind)
+                                 const juce::Path& path, int kind, float direction = 0.0f)
 {
     const auto bounds = path.getBounds();
     const float scale = g.getInternalContext().getPhysicalPixelScaleFactor();
-    const auto key = std::make_tuple(kind, juce::roundToInt(bounds.getWidth() * 16.0f),
+    const auto key = std::make_tuple(kind, direction, juce::roundToInt(bounds.getWidth() * 16.0f),
                                      juce::roundToInt(bounds.getHeight() * 16.0f),
                                      juce::roundToInt(scale * 100.0f), ds.radius,
                                      ds.offset.x, ds.offset.y, ds.colour.getARGB());
@@ -212,7 +212,8 @@ public:
         Button(name),
         colour(arrowColour),
         padding(arrowPadding),
-        strokeWidth(arrowStrokeWidth)
+        strokeWidth(arrowStrokeWidth),
+        direction(arrowDirection)
     {
         path.addTriangle(0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 0.5f);
         path.applyTransform
@@ -263,37 +264,22 @@ public:
             )
         );
 
-        // shadows :
-        juce::Path btnPath = p;
-
         juce::Path maskPath;
-        maskPath.addRectangle(btnPath.getBounds().expanded(5.0f, 5.0f));
-        maskPath.addPath(btnPath);
-
-        juce::Path shadowPath;
-        shadowPath.addPath(btnPath);
-
-        // looks like we have to choose between drawing inner and outer shadows
-        // whatever order we use, only first DS is rendered
-        // todo : find out why !
+        maskPath.addRectangle(p.getBounds().expanded(5.0f, 5.0f));
+        maskPath.addPath(p);
         maskPath.setUsingNonZeroWinding(false);
-        shadowPath.setUsingNonZeroWinding(true);
-        juce::DropShadow outerDs(juce::Colour{0x99000000}, 10, {3, 2});
-        g.reduceClipRegion(maskPath);
-        outerDs.drawForPath(g, shadowPath);
 
-        // this one will not be drawn as it comes last :(
-        // maskPath.setUsingNonZeroWinding(true);
-        // shadowPath.setUsingNonZeroWinding(false);
-        // juce::DropShadow innerDs(juce::Colour{0xff000000}, 2, {0, 0});
-        // g.reduceClipRegion(shadowPath);
-        // innerDs.drawForPath(g, maskPath);
+        juce::Graphics::ScopedSaveState state(g);
+        g.reduceClipRegion(maskPath);
+        const juce::DropShadow shadow(juce::Colour{0x99000000}, 10, {3, 2});
+        drawCachedDropShadow(g, shadow, p, 2, direction);
     }
 
 private:
     juce::Colour colour;
     float padding;
     float strokeWidth;
+    float direction;
     juce::Path path;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(IncDecArrowButton)
@@ -642,7 +628,6 @@ public:
                           juce::Slider& slider) override
 
     {
-        auto outline = slider.findColour(juce::Slider::rotarySliderOutlineColourId);
         auto fill = slider.findColour(juce::Slider::rotarySliderFillColourId);
 
         auto bounds = juce::Rectangle<int> (x, y, width, height).toFloat().reduced(2);
@@ -651,40 +636,46 @@ public:
         // clip max knob size (but textbox below is still annoying) :
         radius = juce::jmin(radius, 18.f);
         auto toAngle = rotaryStartAngle + sliderPos * (rotaryEndAngle - rotaryStartAngle);
-        auto lineW = juce::jmin (8.0f, radius * 0.5f);
         auto arcRadius = 0.75f * radius;
-        // auto arcRadius = radius - lineW * 0.5f;
-
-        // auto c = juce::Colours::lightgoldenrodyellow;
-        // auto c = juce::Colours::gold;
-        // auto c = juce::Colours::orangered;
-        // auto c = juce::Colours::hotpink;
-        // auto c = juce::Colours::limegreen;
-        // auto c = juce::Colour{255, 153, 0}; // orange mecanique
         auto c = fill;
 
         juce::Rectangle r{2 * arcRadius, 2 * arcRadius};
 
-        juce::Path backgroundArc;
-        backgroundArc.addCentredArc(bounds.getCentreX(),
-                                    bounds.getCentreY(),
-                                    arcRadius * 1.33f,
-                                    arcRadius * 1.33f,
-                                    0.0f,
-                                    rotaryStartAngle,
-                                    rotaryEndAngle,
-                                    true);
+        const auto area = juce::Rectangle<int>(x, y, width, height).expanded(16).toFloat();
+        const auto scale = g.getInternalContext().getPhysicalPixelScaleFactor();
+        const auto key = std::make_tuple(width, height, scale, fill.getARGB(), rotaryStartAngle, rotaryEndAngle);
+        if (key != staticLayersKey || !arcImage.isValid()) {
+            staticLayersKey = key;
+            arcImage = makeLayer(area, scale);
+            faceImage = makeLayer(area, scale);
+            juce::Graphics arcGraphics(arcImage);
+            arcGraphics.addTransform(juce::AffineTransform::translation(-area.getX(), -area.getY()).scaled(scale));
+            juce::Path backgroundArc;
+            backgroundArc.addCentredArc(bounds.getCentreX(),
+                                        bounds.getCentreY(),
+                                        arcRadius * 1.33f,
+                                        arcRadius * 1.33f,
+                                        0.0f,
+                                        rotaryStartAngle,
+                                        rotaryEndAngle,
+                                        true);
 
-        g.setColour(c.withAlpha(0.6f));
-        // g.setColour(juce::Colour{0x99ffffff});
-        g.strokePath(
-            backgroundArc,
-            juce::PathStrokeType(
-                controlStripLayout::knobIndicatorOffThickness,
-                juce::PathStrokeType::curved,
-                juce::PathStrokeType::rounded
-            )
-        );
+            arcGraphics.setColour(c.withAlpha(0.6f));
+            arcGraphics.strokePath(
+                backgroundArc,
+                juce::PathStrokeType(
+                    controlStripLayout::knobIndicatorOffThickness,
+                    juce::PathStrokeType::curved,
+                    juce::PathStrokeType::rounded
+                )
+            );
+
+            juce::Graphics faceGraphics(faceImage);
+            faceGraphics.addTransform(juce::AffineTransform::translation(-area.getX(), -area.getY()).scaled(scale));
+            drawFace(faceGraphics, r, bounds.getCentre(), c);
+        }
+        g.setOpacity(1.0f);
+        g.drawImage(arcImage, area, juce::RectanglePlacement::stretchToFit);
 
         if (slider.isEnabled() && slider.getValue() > 0)
         {
@@ -711,6 +702,40 @@ public:
             );
         }
 
+        g.setOpacity(1.0f);
+        g.drawImage(faceImage, area, juce::RectanglePlacement::stretchToFit);
+
+        auto thumbWidth = arcRadius * 0.7f;
+        auto thumbHeight = 5;
+        juce::Point<float> thumbPoint(
+            bounds.getCentreX()
+                + (arcRadius * 0.8f) * std::cos(toAngle - juce::MathConstants<float>::halfPi),
+            bounds.getCentreY()
+                + (arcRadius * 0.8f) * std::sin(toAngle - juce::MathConstants<float>::halfPi));
+        const auto rotation = toAngle - juce::MathConstants<float>::halfPi;
+        juce::Path p;
+        p.addRoundedRectangle(thumbPoint.x - thumbWidth * 0.5f, thumbPoint.y - thumbHeight * 0.5f,
+                              thumbWidth, thumbHeight, 5);
+        p.applyTransform(juce::AffineTransform::rotation(rotation, thumbPoint.x, thumbPoint.y));
+        g.setColour(juce::Colour{0x99000000});
+        g.fillPath(p);
+        g.setColour(juce::Colour{0x66000000});
+        g.strokePath(p, juce::PathStrokeType(2.0f));
+    }
+
+private:
+    static juce::Image makeLayer(juce::Rectangle<float> area, float scale)
+    {
+        return juce::Image(juce::Image::ARGB,
+                           juce::jmax(1, juce::roundToInt(area.getWidth() * scale)),
+                           juce::jmax(1, juce::roundToInt(area.getHeight() * scale)),
+                           true, juce::SoftwareImageType());
+    }
+
+    static void drawFace(juce::Graphics& g, juce::Rectangle<float> r,
+                         juce::Point<float> centre, juce::Colour c)
+    {
+        const auto bounds = r.withCentre(centre);
         // DRAW SHADOWS ---------------------------------------
         juce::Path ellipsis;
         ellipsis.addEllipse(r.withCentre(bounds.getCentre()));
@@ -749,43 +774,9 @@ public:
         g.setColour (c);
         g.fillEllipse (r2.withCentre(bounds.getCentre() - juce::Point<float>(1, 1)));
 
-        //=====================================================================
-
-        auto thumbWidth = arcRadius * 0.7f;//lineW * 1.2f;
-        auto thumbHeight = 5;
-        juce::Point<float> thumbPoint(
-            bounds.getCentreX()
-                + (arcRadius * 0.8f) * std::cos(toAngle - juce::MathConstants<float>::halfPi),
-            bounds.getCentreY()
-                + (arcRadius * 0.8f) * std::sin(toAngle - juce::MathConstants<float>::halfPi));
-        // juce::Point<float> thumbPoint(bounds.getCentreX() * std::cos(toAngle - juce::MathConstants<float>::halfPi),
-        //                               bounds.getCentreY() * std::sin(toAngle - juce::MathConstants<float>::halfPi));
-
-        // g.setColour(slider.findColour(juce::Slider::thumbColourId));
-        // g.setColour(juce::Colour{0x99000000});
-        // g.fillEllipse(juce::Rectangle<float>(thumbWidth, thumbWidth).withCentre(thumbPoint));
-
-        juce::AffineTransform transform;
-        float rotation = toAngle - juce::MathConstants<float>::halfPi;
-        transform = juce::AffineTransform::scale(1.f)
-            .rotation(rotation, thumbPoint.x, thumbPoint.y);
-            //.translated(thumbWidth,thumbHeight);
-        juce::Path p;
-        p.addRoundedRectangle(
-            thumbPoint.x - thumbWidth * 0.5f,
-            thumbPoint.y - thumbHeight * 0.5f,
-            thumbWidth,
-            thumbHeight,
-            5
-        );
-        p.applyTransform(transform);
-        g.setColour(juce::Colour{0x99000000});
-        g.fillPath(p);
-        g.setColour(juce::Colour{0x66000000});
-        g.strokePath(p, juce::PathStrokeType(2.0f));
     }
-private:
-    // bool initialized = false;
+    std::tuple<int, int, float, juce::uint32, float, float> staticLayersKey {};
+    juce::Image arcImage, faceImage;
 };
 
 ///////////////////////////////////////////////////////////////////////////////

@@ -89,8 +89,11 @@ void SirenTrackComponent::paint(juce::Graphics& g)
         g.setColour(backgroundColour);
         g.fillRoundedRectangle(area, controlStripLayout::cornerSize);
     }
+    paintTitleNoteIndicator(g, area, isPlayingNote);
+}
 
-    // draw midi note playing monitor led
+void SirenTrackComponent::paintTitleNoteIndicator(juce::Graphics& g, juce::Rectangle<float> area, bool playing)
+{
     float ledAreaWidth = 16;
     auto tr = area.getTopRight();
     auto ledBounds = juce::Rectangle<float>(
@@ -103,7 +106,7 @@ void SirenTrackComponent::paint(juce::Graphics& g)
     g.setColour(juce::Colours::darkgreen);
     g.fillEllipse(ledBounds.withSizeKeepingCentre(8, 8));
 
-    if (isPlayingNote) {
+    if (playing) {
         g.setColour(juce::Colours::lightgreen);
         g.fillEllipse(ledBounds.withSizeKeepingCentre(6,6));
     }

@@ -57,7 +57,8 @@ Tuning Tuning::from(const Settings& s)
 
 SirenWaveColumn::SirenWaveColumn() :
     shaderCode(juce::String::createStringFromData(BinaryData::SirenWave_frag,
-                                                  BinaryData::SirenWave_fragSize))
+                                                  BinaryData::SirenWave_fragSize)),
+    requestedShader(shaderCode)
 {
     shader = std::make_unique<juce::OpenGLGraphicsContextCustomShader>(shaderCode);
 #if COMPOSESIREN_DEV_BUILD && defined(COMPOSESIREN_WAVES_SHADER_DIR)
@@ -122,8 +123,7 @@ void SirenWaveColumn::reloadShaderIfChanged(double seconds)
     const auto code = shaderFile.loadFileAsString();
     if (first && code == shaderCode) return;
     DBG("SirenWaveColumn: reloading " << shaderFile.getFullPathName());
-    shader = std::make_unique<juce::OpenGLGraphicsContextCustomShader>(code);
-    shaderErrorLogged = false;
+    requestedShader = code;
     shaderReloaded = true;
 }
 #endif
@@ -153,15 +153,18 @@ static float wavenumberOf(float note, float noteMin, const Tuning& t)
     return twoPi * cycles / densityLength;
 }
 
-bool SirenWaveColumn::advance(double seconds, const Tuning& t)
+juce::RectangleList<int> SirenWaveColumn::advance(double seconds, const Tuning& t)
 {
     const auto dt = static_cast<float>(seconds);
-    bool moving = false;
+    juce::RectangleList<int> dirty;
 #if COMPOSESIREN_DEV_BUILD && defined(COMPOSESIREN_WAVES_SHADER_DIR)
     reloadShaderIfChanged(seconds);
-    moving = std::exchange(shaderReloaded, false);
+    if (std::exchange(shaderReloaded, false))
+        for (const auto& cell : cells)
+            dirty.add(cell.bounds.getSmallestIntegerContainer());
 #endif
     for (auto& [id, m] : motion) {
+        const bool wasVisible = m.level > 0.0f;
         // auto level: full at the loudest this siren played lately (decaying 0.1 dB/s),
         // within 15 dB under the full level
         m.peakDb = juce::jmax(m.peakDb - 0.1f * dt, m.target);
@@ -172,8 +175,12 @@ bool SirenWaveColumn::advance(double seconds, const Tuning& t)
         if (std::abs(m.level - target) < 1.0e-4f) m.level = target;
         if (m.targetNote >= 0.0f) m.note += (m.targetNote - m.note) * (1.0f - std::exp(-dt / 0.05f));
 
+        if (wasVisible || m.level > 0.0f) {
+            for (const auto& cell : cells)
+                if (cell.id == id)
+                    dirty.add(cell.bounds.getSmallestIntegerContainer());
+        }
         if (m.level <= 0.0f) continue;
-        moving = true;
 
         const float pitchNorm = pitchNormOf(m.note, m.noteMin, m.noteMax);
         const float k = wavenumberOf(m.note, m.noteMin, t);
@@ -184,7 +191,7 @@ bool SirenWaveColumn::advance(double seconds, const Tuning& t)
             ph = std::fmod(ph + double(dt * layerSpeed * k * layerK(i, t.parallaxDepth)), phaseWrap);
         }
     }
-    return moving;
+    return dirty;
 }
 
 // Low tide at the slightest sound; the reach at full loudness, the highest
@@ -254,12 +261,43 @@ float SirenWaveColumn::overflowExtent(const Tuning& t) const
 
 void SirenWaveColumn::paintCells(juce::Graphics& g, const Tuning& t, float cornerSize)
 {
-    const bool allowGpu = t.renderer != Tuning::Renderer::software;
     for (std::size_t i = 0; i < cells.size(); ++i) {
         const auto area = cells[i].bounds;
+        if (!g.clipRegionIntersects(area.getSmallestIntegerContainer())) continue;
         const auto p = paramsFor(i, t);
-        paintCell(g, p, area, {}, area.getRight(), 1.0f, allowGpu, i, cornerSize);
+        paintCell(g, p, area, {}, area.getRight(), 1.0f, false, i, cornerSize);
         paintTitle(g, p, i, t);
+    }
+}
+
+SirenWaveColumn::Frame SirenWaveColumn::makeFrame(const Tuning& t) const
+{
+    Frame frame { cells, {}, requestedShader, t };
+    frame.params.reserve(cells.size());
+    for (std::size_t i = 0; i < cells.size(); ++i)
+        frame.params.push_back(paramsFor(i, t));
+    return frame;
+}
+
+void SirenWaveColumn::paintFrame(juce::Graphics& g, const Frame& frame, float cornerSize,
+                                 juce::Point<int> surfaceOrigin)
+{
+    if (cells != frame.cells)
+        setCells(frame.cells);
+    if (requestedShader != frame.shaderSource) {
+        requestedShader = frame.shaderSource;
+        shader = std::make_unique<juce::OpenGLGraphicsContextCustomShader>(requestedShader);
+        shaderErrorLogged = false;
+    }
+
+    juce::Graphics::ScopedSaveState state(g);
+    g.setOrigin(-surfaceOrigin);
+    const auto origin = surfaceOrigin.toFloat();
+    for (std::size_t i = 0; i < cells.size(); ++i) {
+        const auto area = cells[i].bounds;
+        const auto& p = frame.params[i];
+        paintCell(g, p, area, -origin, area.getRight(), 1.0f, true, i, cornerSize, origin);
+        paintTitle(g, p, i, frame.tuning);
     }
 }
 
@@ -333,25 +371,25 @@ void SirenWaveColumn::paintOverflow(juce::Graphics& g, const Tuning& t, juce::Po
 {
     const float extent = overflowExtent(t);
     if (extent <= 0.0f) return;
-    const bool allowGpu = t.renderer != Tuning::Renderer::software;
     for (std::size_t i = 0; i < cells.size(); ++i) {
         const auto p = paramsFor(i, t);
         if (p.fill * layerScale(p.layers, p.parallax) + p.amp <= p.width) continue;
         const auto cell = cells[i].bounds;
         const auto area = juce::Rectangle<float>(cell.getX() - extent, cell.getY(), extent, cell.getHeight()) - origin;
+        if (!g.clipRegionIntersects(area.getSmallestIntegerContainer())) continue;
         juce::Graphics::ScopedSaveState state(g);
         g.reduceClipRegion(area.toNearestInt());
-        paintCell(g, p, area, origin, cell.getRight() - origin.x, 0.0f, allowGpu, cells.size(), 0.0f);
+        paintCell(g, p, area, origin, cell.getRight() - origin.x, 0.0f, false, cells.size(), 0.0f);
     }
 }
 
 void SirenWaveColumn::paintCell(juce::Graphics& g, const CellParams& p, juce::Rectangle<float> area,
                                 juce::Point<float> origin, float edgeX, float baseAlpha, bool allowGpu,
-                                std::size_t index, float cornerSize)
+                                std::size_t index, float cornerSize, juce::Point<float> cloudOffset)
 {
     // the shader rounds the corners itself: a clip path would split its quad
     // into one per line, which JUCE's OpenGL renderer queues slowly
-    const bool gpu = allowGpu && paintWithShader(g, p, area, origin, edgeX, baseAlpha, cornerSize);
+    const bool gpu = allowGpu && paintWithShader(g, p, area, origin, edgeX, baseAlpha, cornerSize, cloudOffset);
     if (!gpu) {
         juce::Graphics::ScopedSaveState state(g);
         if (cornerSize > 0.0f) {
@@ -371,7 +409,8 @@ void SirenWaveColumn::paintCell(juce::Graphics& g, const CellParams& p, juce::Re
 // `area` and `edgeX` are in g's coordinates, g being the Graphics of a
 // component at `origin` in the editor, which the OpenGL context renders.
 bool SirenWaveColumn::paintWithShader(juce::Graphics& g, const CellParams& p, juce::Rectangle<float> area,
-                                      juce::Point<float> origin, float edgeX, float baseAlpha, float cornerSize)
+                                      juce::Point<float> origin, float edgeX, float baseAlpha, float cornerSize,
+                                      juce::Point<float> cloudOffset)
 {
     auto& context = g.getInternalContext();
     const auto compiled = shader->checkCompilation(context);
@@ -410,6 +449,7 @@ bool SirenWaveColumn::paintWithShader(juce::Graphics& g, const CellParams& p, ju
         program.setUniform("uLayers", static_cast<GLfloat>(p.layers), static_cast<GLfloat>(p.steps),
                            cornerSize, 0.0f);
         program.setUniform("uExtra", p.strokeWidth, p.clouds, p.columnTop, p.columnHeight);
+        program.setUniform("uCloudOffset", cloudOffset.x, cloudOffset.y);
     };
     g.setColour(juce::Colours::white); // pixelAlpha: the clip's antialiasing only
     shader->fillRect(context, area.getSmallestIntegerContainer());

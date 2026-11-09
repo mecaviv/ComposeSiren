@@ -3,9 +3,7 @@
 //
 // The column follows each siren's output level and pitch (SirenStateMonitor,
 // 30 times a second), animates them at the display's rate, and paints the
-// title cells: with OpenGL (Assets/shaders/SirenWave.frag) when the
-// Graphics it is given renders through an attached juce::OpenGLContext,
-// in software (SirenWaveRaster.h) otherwise. Message thread only.
+// title cells in software or from a snapshot on the OpenGL render thread.
 //
 
 #ifndef COMPOSESIREN_SIRENWAVECOLUMN_H
@@ -68,6 +66,14 @@ public:
         juce::Rectangle<float> bounds; // in the editor
         juce::Colour colour;           // the cell's colour when silent
         juce::String title;            // the siren's name, drawn over the wave
+        bool operator==(const Cell&) const = default;
+    };
+
+    struct Frame {
+        std::vector<Cell> cells;
+        std::vector<CellParams> params;
+        juce::String shaderSource;
+        Tuning tuning;
     };
 
     SirenWaveColumn();
@@ -80,11 +86,13 @@ public:
     // the latest state of a siren: output level (linear RMS), pitch (MIDI note)
     void setSirenState(sirenId id, float levelLinear, float pitchNote, bool noteOn);
 
-    // advances the animation; true while anything moves or has yet to settle
-    bool advance(double seconds, const Tuning& t);
+    // Advances the animation and returns the cell regions that need repainting.
+    juce::RectangleList<int> advance(double seconds, const Tuning& t);
 
     // the cells, with rounded corners, in g = the editor's Graphics
     void paintCells(juce::Graphics& g, const Tuning& t, float cornerSize);
+    Frame makeFrame(const Tuning&) const;
+    void paintFrame(juce::Graphics&, const Frame&, float cornerSize, juce::Point<int> surfaceOrigin);
 
     // what lies left of the cells when overflow is on, in the Graphics of a
     // component placed at `origin` in the editor
@@ -113,9 +121,10 @@ private:
     float fillOf(const Motion& m, const Tuning& t, float width) const;
     void paintCell(juce::Graphics& g, const CellParams& p, juce::Rectangle<float> area,
                    juce::Point<float> origin, float edgeX, float baseAlpha, bool allowGpu,
-                   std::size_t index, float cornerSize);
+                   std::size_t index, float cornerSize, juce::Point<float> cloudOffset = {});
     bool paintWithShader(juce::Graphics& g, const CellParams& p, juce::Rectangle<float> area,
-                         juce::Point<float> origin, float edgeX, float baseAlpha, float cornerSize);
+                         juce::Point<float> origin, float edgeX, float baseAlpha, float cornerSize,
+                         juce::Point<float> cloudOffset);
     void paintInSoftware(juce::Graphics& g, const CellParams& p, juce::Rectangle<float> area,
                          float edgeX, float baseAlpha, std::size_t index);
     void paintTitle(juce::Graphics& g, const CellParams& p, std::size_t index, const Tuning& t) const;
@@ -149,6 +158,7 @@ private:
     std::map<sirenId, Motion> motion;
     std::unique_ptr<juce::OpenGLGraphicsContextCustomShader> shader;
     juce::String shaderCode;          // the code that last compiled
+    juce::String requestedShader;
 #if COMPOSESIREN_DEV_BUILD && defined(COMPOSESIREN_WAVES_SHADER_DIR)
     // Debug builds read the shader from the source tree, and reload it when it changes
     void reloadShaderIfChanged(double seconds);

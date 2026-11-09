@@ -103,6 +103,9 @@ public:
     // the cell's colour, and the name, which the label then leaves out
     void setTitleFillVisible(bool v);
     juce::String getTitleText() const { return titleText; }
+    juce::Colour getTitleHoverColour() const { return titleLabel.findColour(juce::Label::backgroundColourId); }
+    bool isNotePlaying() const { return isPlayingNote; }
+    static void paintTitleNoteIndicator(juce::Graphics&, juce::Rectangle<float> titleArea, bool playing);
 
     bool getSelected() const;
     void setSelected(bool s);
