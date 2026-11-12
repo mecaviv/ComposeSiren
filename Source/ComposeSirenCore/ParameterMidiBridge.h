@@ -134,9 +134,6 @@ public:
     handleIncomingEvent(const juce::MidiMessage& msg,
                         int samplePosition,
                         MidiScheduler& scheduler
-#if COMPOSESIREN_RESETALLCONTROLLERS
-                        , bool preserveIncomingValue = false
-#endif
                         ) {
         int channel = msg.getChannel();
         // int ccNumber = msg.getControllerNumber();
@@ -151,14 +148,13 @@ public:
             audioParam.setValueNotifyingHost(value);
         }
 
-#if COMPOSESIREN_RESETALLCONTROLLERS
-        if (preserveIncomingValue) {
+        if (msg.isControllerOfType(121) || msg.isControllerOfType(123)
+        ) {
             auto routed = msg;
             routed.setChannel(mapChannel(channel));
             scheduler.schedule(routed, samplePosition);
             return;
         }
-#endif
         handleEventInternal({ channel, value, samplePosition }, scheduler);
     }
 

@@ -26,7 +26,7 @@ pub const LIST_SETTINGS: &str = "list_settings";
 pub const GET_SETTING: &str = "get_setting";
 /// `set_setting`.
 pub const SET_SETTING: &str = "set_setting";
-/// `reset_controllers` (a build with `COMPOSESIREN_RESETALLCONTROLLERS`).
+/// `reset_controllers`.
 /// `tap-viewer midi --reset` asks for it and goes on without it.
 pub const RESET_CONTROLLERS: &str = "reset_controllers";
 /// `set_song_title` (a build with `COMPOSESIREN_SONG_TITLE`): show the playing

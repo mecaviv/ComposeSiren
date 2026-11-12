@@ -38,20 +38,15 @@ OneSirenPluginProcessor::OneSirenPluginProcessor() :
     mcp(*this, "OneSiren", "MvOS")
 {
     ssm.subscribe(&siren);
-#if COMPOSESIREN_RESETALLCONTROLLERS
     // one siren : any siren number means the current one
     mcp.setResetHandler([this](int) {
         siren.requestReset();
         return true;
     });
-#endif
     vms.addListener(this);
     vms.notifyListeners();
 #if ONESIREN_SETTINGS_LISTENER
     settings->addListener(this);
-#endif
-#if COMPOSESIREN_RESETALLCONTROLLERS
-    applyControllerResetSetting();
 #endif
     startTimer(33);
 }
@@ -73,24 +68,11 @@ void OneSirenPluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlo
     siren.setSampleRate(sampleRate);
 }
 
-#if COMPOSESIREN_RESETALLCONTROLLERS
-void OneSirenPluginProcessor::applyControllerResetSetting()
-{
-    const auto policy = settings->getDspChannelModePolicy();
-    channelModePolicy.store(policy.packed(), std::memory_order_release);
-    siren.setResetRequestsEnabled(policy.enabled);
-    mcp.setControllerResetEnabled(policy.enabled);
-}
 
-#endif
 
 #if ONESIREN_SETTINGS_LISTENER
 void OneSirenPluginProcessor::settingChanged(cs::Settings::Id id)
 {
-#if COMPOSESIREN_RESETALLCONTROLLERS
-    if (cs::Settings::isControllerResetSetting(id))
-        applyControllerResetSetting();
-#endif
 #if COMPOSESIREN_RUST_DSP
     // app-wide: every instance rebuilds its voice off the audio thread (SirenVoice::reloadDsp)
     if (id == cs::Settings::Id::dspVariant || id == cs::Settings::Id::dspDataset
@@ -136,6 +118,12 @@ bool OneSirenPluginProcessor::isBusesLayoutSupported(const BusesLayout& layouts)
 void OneSirenPluginProcessor::resetSiren(std::optional<sirenId>)
 {
     siren.stop();
+}
+
+void OneSirenPluginProcessor::sendChannelModeAll(int controller)
+{
+    if (controller == 120 || controller == 121 || controller == 123)
+        pendingChannelModes.fetch_or(1u << (controller - 120), std::memory_order_release);
 }
 
 std::string OneSirenPluginProcessor::getResourcesPath()
@@ -200,17 +188,19 @@ void OneSirenPluginProcessor::setSirenId(sirenId id)
 void OneSirenPluginProcessor::processBlock(juce::AudioBuffer<float>& audio,
                                            juce::MidiBuffer& midiIn)
 {
-#if COMPOSESIREN_RESETALLCONTROLLERS
-    const auto policy = cs::DspChannelModePolicy::unpack(channelModePolicy.load(std::memory_order_acquire));
-    router.setChannelModePolicy(policy);
-    siren.setChannelModePolicy(policy);
-#endif
     juce::MidiBuffer midiOut;
 
     // MIDI ROUTING / SCHEDULING / UI SYNCING //////////////////////////////////
 
     mcp.drainMidi(midiIn);
     scheduler.reset();
+
+    const auto channelModes = pendingChannelModes.exchange(0, std::memory_order_acquire);
+    for (int cc : {120, 121, 123}) {
+        if (channelModes & (1u << (cc - 120)))
+            router.handleMessage(scheduler, juce::MidiMessage::controllerEvent(
+                vms.getMidiInput().isAny ? 1 : vms.getMidiInput().channel.oneBased, cc, 0), 0);
+    }
 
     for (const auto metadata : midiIn) {
         const auto& msg = metadata.getMessage();

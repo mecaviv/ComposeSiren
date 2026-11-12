@@ -31,6 +31,7 @@ public:
     public:
         virtual ~Listener() = default;
         virtual void resetSiren(std::optional<sirenId>) = 0;
+        virtual void sendChannelModeAll(int controller) = 0;
         virtual void selectedNewResourcesPath(const std::string&) = 0;
         virtual std::string getResourcesPath() = 0;
         // optionnel : pilotage des sirènes physiques — no-op par défaut.
@@ -71,14 +72,20 @@ public:
 
         resetButton.setColour(juce::TextButton::buttonColourId, juce::Colours::darkred);
         resetButton.setColour(juce::TextButton::textColourOffId , juce::Colours::whitesmoke);
-        resetButton.setButtonText ("Reset");
+        resetButton.setButtonText ("Reset all controllers");
         resetButton.addListener(this);
         addAndMakeVisible(resetButton);
+
+        allSoundOffButton.setButtonText("All sound off");
+        allSoundOffButton.setColour(juce::TextButton::buttonColourId, juce::Colours::darkred);
+        allSoundOffButton.setColour(juce::TextButton::textColourOffId, juce::Colours::whitesmoke);
+        allSoundOffButton.addListener(this);
+        addAndMakeVisible(allSoundOffButton);
 
         if (hasResetAllButton) {
             resetAllButton.setColour(juce::TextButton::buttonColourId, juce::Colours::darkred);
             resetAllButton.setColour(juce::TextButton::textColourOffId , juce::Colours::whitesmoke);
-            resetAllButton.setButtonText ("Reset All");
+            resetAllButton.setButtonText ("All notes off");
             resetAllButton.addListener(this);
             addAndMakeVisible(resetAllButton);
         }
@@ -166,8 +173,9 @@ public:
         }
 #endif
         if (hasResetAllButton)
-            add(resetAllButton, 88.f);
-        add(resetButton, 70.f);
+            add(resetAllButton, 110.f);
+        add(resetButton, 165.f);
+        add(allSoundOffButton, 115.f);
         add(menuButton, btnsHeight + 10.f);
 
         fb.performLayout(bounds);
@@ -276,8 +284,12 @@ public:
 
     void buttonClicked(juce::Button* btn) override
     {
+        if (btn == &allSoundOffButton) {
+            listener.sendChannelModeAll(120);
+            return;
+        }
         if (btn == &resetButton) {
-            listener.resetSiren(currentSirenId);
+            listener.sendChannelModeAll(121);
             return;
         }
 
@@ -297,7 +309,7 @@ public:
 #endif
 
         if (btn == &resetAllButton) {
-            listener.resetSiren(std::nullopt);
+            listener.sendChannelModeAll(123);
             return;
         }
     }
@@ -371,6 +383,7 @@ private:
     HamburgerButton menuButton;
     juce::TextButton resetButton;
     juce::TextButton resetAllButton;
+    juce::TextButton allSoundOffButton;
 #if COMPOSESIREN_PARK_BRIDGE
     juce::ToggleButton physicalButton;
     juce::ToggleButton stAllButton;

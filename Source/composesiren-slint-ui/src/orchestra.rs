@@ -225,8 +225,10 @@ pub trait OrchestraSink {
     fn gesture(&self, index: usize, begin: bool);
     /// A track's title was clicked (0 = the top track, `TRACKS` order).
     fn track_selected(&self, _track: usize) {}
-    /// Reset (the selected siren) or Reset All.
+    /// All channels: reset controllers (`false`) or release notes (`true`).
     fn reset(&self, _all: bool) {}
+    /// Stop notes and motors on every channel, keeping controllers.
+    fn all_sound_off(&self) {}
     /// The Menu button.
     fn menu(&self) {}
     /// "Sirenes physiques" or "ST" toggled (park bridge builds).
@@ -465,6 +467,10 @@ fn wire(
     ui.on_reset_all({
         let sink = sink.clone();
         move || sink.reset(true)
+    });
+    ui.on_all_sound_off({
+        let sink = sink.clone();
+        move || sink.all_sound_off()
     });
     ui.on_menu({
         let sink = sink.clone();

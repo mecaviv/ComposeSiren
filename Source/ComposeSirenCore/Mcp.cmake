@@ -4,13 +4,8 @@
 
 include("${CMAKE_SOURCE_DIR}/cmake/RustStaticLib.cmake")
 
-# The recording tools with COMPOSESIREN_RECORD, the song title tools with
-# COMPOSESIREN_SONG_TITLE, and the controller reset tool with
-# COMPOSESIREN_RESETALLCONTROLLERS.
-set(_cs_mcp_features "")
-if(COMPOSESIREN_RESETALLCONTROLLERS)
-  list(APPEND _cs_mcp_features reset-all-controllers)
-endif()
+# Controller reset is always included; other tools follow their feature options.
+set(_cs_mcp_features reset-all-controllers)
 if(COMPOSESIREN_RECORD)
   list(APPEND _cs_mcp_features record)
 endif()

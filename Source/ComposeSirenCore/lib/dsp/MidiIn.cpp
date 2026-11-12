@@ -119,26 +119,15 @@ void MidiIn::handleControlChange(int cc, int value) {
     // - pitch bend range (cc 16)
     // - effect order switch (cc 42) but this one is not implemented in firmware
     switch (cc) {
-#if COMPOSESIREN_RESETALLCONTROLLERS
         case 120: // All Sound Off (standard MIDI)
-            if (acceptsChannelMode(cc, value)) {
-                onMidiAllSoundsOff();
-            }
+            onMidiAllSoundsOff();
             break;
-#endif
         case 121: // Reset All Controllers
-#if COMPOSESIREN_RESETALLCONTROLLERS
-            if (!acceptsChannelMode(cc, value)) break;
-#endif
-            resetSirene();
+            resetControllers();
             break;
-#if COMPOSESIREN_RESETALLCONTROLLERS
         case 123: // All Notes Off (standard MIDI)
-            if (acceptsChannelMode(cc, value)) {
-                onMidiAllNotesOff();
-            }
+            realTimeStopNote(static_cast<int>(noteOn));
             break;
-#endif
         case 1 : { // vibrato depth
             control[1] = value ;
             if (control[11] == 0) {
@@ -421,7 +410,6 @@ void MidiIn::stopSirene() {
     ancienVolFinal = -1;
 }
 
-#if COMPOSESIREN_RESETALLCONTROLLERS
 void MidiIn::onMidiAllNotesOff() {
     // MIDI 1.0 Detailed Specification 4.2.1, appendix A-5: voices should
     // "go to the release stage of the envelope"; hold/sustain takes priority.
@@ -459,17 +447,30 @@ void MidiIn::onMidiAllSoundsOff() {
     veloFinal = 0;
     vitesseClapet = 0;
     ancienVelo = 0;
+    noteOn = noteOnFinal = tourMoteur = vitesse = 0;
+    onNoteChanged(0);
     onVolumeChanged(0);
 }
 
-#endif
-void MidiIn::resetSirene() {
-#if COMPOSESIREN_RESETALLCONTROLLERS
-    // Request zero MIDI volume before restoring the controller map.
-    if (isControllerResetEnabled())
-        onMidiAllSoundsOff();
+void MidiIn::resetControllers() {
+    // Restore controllers and center bend without changing the held note or gate.
+    for (int cc : {1, 5, 9, 11, 15, 18, 20, 21, 22, 23, 72, 73, 92})
+        control[cc] = 0;
+    control[6] = 64;
+    control[12] = control[13] = 127;
+    control[17] = 100;
+    controlFinal = varVfo = varTremolo = tremolo = 0;
+    isAttackVibrato = false;
+    LSB = 0;
+    MSB = 64;
+    handlePitchWheel(0, 64);
+    handleControlChange(7, 127);
+}
 
-#endif
+void MidiIn::resetSirene() {
+    // Request zero MIDI volume before restoring the controller map.
+    onMidiAllSoundsOff();
+
     noteOnFinal = 0.0;
     ///////////////////////////////////////////////////****** Ferme les volets
     ancienVolFinal = -1;
@@ -495,10 +496,7 @@ void MidiIn::resetSirene() {
     tourMoteur = 0.0;
     noteOnFinal = 0.0;
     volumeFinal = 0.0;
-#if COMPOSESIREN_RESETALLCONTROLLERS
-    if (isControllerResetEnabled())
-        controlFinal = 0;
-#endif
+    controlFinal = 0;
     control[6] = 64;
     control[12] = 127.;
     control[13] = 127.;

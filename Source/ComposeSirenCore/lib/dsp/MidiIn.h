@@ -7,7 +7,6 @@
 
 
 #include <functional>
-#include "ChannelModePolicy.h"
 #include "../definitions/parameterDefinitions.h"
 #include "../dsp/Sirene.h"
 
@@ -34,24 +33,15 @@ public:
     void setSampleRate(double newSampleRate);
     void stopSirene();
     void resetSirene();
+    void resetControllers();
     // Takes over another MidiIn of the same siren mid-note (a DSP swap with a note held): its
     // whole state (note, velocity, controllers, ramps, vibrato), but not its callbacks, which
     // drive the other synthesis. Calls nothing. Real-time.
     void copyStateFrom(const MidiIn& o);
-#if COMPOSESIREN_RESETALLCONTROLLERS
-    // Audio thread only: the wrapper copies its atomic setting once per block.
-    void setControllerResetEnabled(bool enabled) { channelModePolicy.enabled = enabled; }
-    bool isControllerResetEnabled() const { return channelModePolicy.enabled; }
-    void setChannelModePolicy(cs::DspChannelModePolicy policy) { channelModePolicy = policy; }
-    bool acceptsChannelMode(int cc, int value) const { return channelModePolicy.accepts(cc, value); }
     void onMidiAllSoundsOff();
     void onMidiAllNotesOff();
-#endif
 
 private:
-#if COMPOSESIREN_RESETALLCONTROLLERS
-    cs::DspChannelModePolicy channelModePolicy;
-#endif
 	// per-siren midi message management, refactored from MidiIn class :
 
 	// ---------- will be called from above

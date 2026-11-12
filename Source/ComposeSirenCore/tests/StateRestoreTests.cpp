@@ -88,6 +88,26 @@ int main(int argc, char** argv)
         if (!ok) ++failures;
     };
 
+    for (int value = 0; value <= 127; ++value) {
+        float volume = -1;
+        MidiIn midi(allSirenIds.front(), [&](float v) { volume = v; }, [](float) {});
+        midi.realTimeStartNote(69, 100);
+        midi.handleControlChange(7, 40);
+        midi.handlePitchWheel(0, 96);
+        midi.handleControlChange(121, value);
+        check(volume > 0, "CC 121 preserves a held note");
+        // A note-off for the original key still works after centering bend.
+        midi.realTimeStopNote(69);
+        check(volume == 0, "CC 121 preserves the original note identity");
+        midi.realTimeStartNote(69, 100);
+        midi.handleControlChange(7, 40);
+        const auto before = volume;
+        midi.handleControlChange(123, value);
+        check(volume == 0, "CC 123 releases for every value");
+        midi.realTimeStartNote(69, 100);
+        check(volume == before, "CC 123 preserves controller values");
+    }
+
     // the saved project: Volume 30, reverb on
     juce::MemoryBlock saved;
     {

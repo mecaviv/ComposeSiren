@@ -194,7 +194,7 @@ impl ComposeSirenServer {
     }
 }
 
-/// The controller reset tool, with `COMPOSESIREN_RESETALLCONTROLLERS`.
+/// The controller reset tool, included in plugin builds.
 #[cfg(feature = "reset-all-controllers")]
 #[tool_router(router = controller_reset_router)]
 impl ComposeSirenServer {

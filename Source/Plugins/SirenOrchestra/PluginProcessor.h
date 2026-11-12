@@ -69,6 +69,8 @@ public:
     // MainButtonsComponents::Listener callbacks
     //--------------------------------------------------------------------------
     void resetSiren(std::optional<sirenId>) override;
+    void sendChannelModeAll(int controller) override;
+    std::atomic<unsigned> pendingChannelModes{0};
     std::atomic<unsigned> pendingResets{0}; // bit per sirenId, see resetSiren
     std::string getResourcesPath() override;
     void selectedNewResourcesPath(const std::string&) override;
@@ -220,10 +222,6 @@ private:
     void applyClicOutputSetting();
 #endif
     void settingChanged(cs::Settings::Id id) override;
-#if COMPOSESIREN_RESETALLCONTROLLERS
-    void applyControllerResetSetting();
-    std::atomic<std::uint32_t> channelModePolicy { cs::DspChannelModePolicy{}.packed() };
-#endif
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SirenOrchestraPluginProcessor)
 };

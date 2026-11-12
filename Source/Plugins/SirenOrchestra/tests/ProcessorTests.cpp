@@ -106,6 +106,29 @@ int main(int argc, char** argv)
         if (!ok) ++failures;
     };
 
+    {
+        auto p = make();
+        p->prepareToPlay(rate, block);
+        juce::AudioBuffer<float> audio(p->getTotalNumOutputChannels(), block);
+        juce::MidiBuffer midi;
+        p->processBlock(audio, midi); // flush initial controller restore
+        for (int cc : {120, 121, 123}) {
+            midi.clear();
+            dynamic_cast<SirenOrchestraPluginProcessor&>(*p).sendChannelModeAll(cc);
+            p->processBlock(audio, midi);
+            unsigned channels = 0;
+            bool valid = midi.getNumEvents() == 7;
+            for (const auto event : midi) {
+                const auto message = event.getMessage();
+                valid &= message.isControllerOfType(cc) && message.getControllerValue() == 0
+                    && message.getChannel() >= 1 && message.getChannel() <= 7;
+                channels |= 1u << (message.getChannel() - 1);
+            }
+            check(valid && channels == 0x7f, "channel-mode button sends exactly seven CCs and no notes");
+        }
+        p->releaseResources();
+    }
+
     struct V { ParameterId id; float v; };
     const std::vector<V> values { { ParameterId::VibratoFrequency, 80 }, { ParameterId::VibratoAmplitude, 100 },
                                   { ParameterId::VibratoAcceleration, 40 }, { ParameterId::Volume, 90 } };

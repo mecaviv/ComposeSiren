@@ -5,9 +5,7 @@
 #include <lib/definitions/sirenProperties.h>
 #include <apvtsUtilities.h>
 #include <pathUtilities.h>
-#if COMPOSESIREN_RESETALLCONTROLLERS
 #include <algorithm>
-#endif
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 #include <Components/EditorSnapshot.h>
@@ -69,7 +67,6 @@ SirenOrchestraPluginProcessor::SirenOrchestraPluginProcessor() :
     mcp(*this, "SirenOrchestra", "MvSO")
 {
     ssm.subscribe(&ensemble);
-#if COMPOSESIREN_RESETALLCONTROLLERS
     mcp.setResetHandler([this](int siren) {
         std::optional<sirenId> id;
         if (siren > 0) {
@@ -87,7 +84,6 @@ SirenOrchestraPluginProcessor::SirenOrchestraPluginProcessor() :
 #endif
         return true;
     });
-#endif
 #if COMPOSESIREN_RECORD
     mcp.setRecorder(&recorder);
 #endif
@@ -101,9 +97,6 @@ SirenOrchestraPluginProcessor::SirenOrchestraPluginProcessor() :
     clicDecayParam = apvts.getRawParameterValue(ParameterIdGet::toJuceParameterId("C", ParameterId::ClicDecay));
 #endif
     settings->addListener(this);
-#if COMPOSESIREN_RESETALLCONTROLLERS
-    applyControllerResetSetting();
-#endif
 #if COMPOSESIREN_CLIC
     applyClicOutputSetting();
 #endif
@@ -242,6 +235,12 @@ void SirenOrchestraPluginProcessor::resetSiren(std::optional<sirenId> id)
 #endif
 }
 
+void SirenOrchestraPluginProcessor::sendChannelModeAll(int controller)
+{
+    if (controller == 120 || controller == 121 || controller == 123)
+        pendingChannelModes.fetch_or(1u << (controller - 120), std::memory_order_release);
+}
+
 std::string SirenOrchestraPluginProcessor::getResourcesPath()
 {
     return getResourcesPathFunction();
@@ -296,14 +295,7 @@ void SirenOrchestraPluginProcessor::endEditorTeardown()
 void SirenOrchestraPluginProcessor::processBlock(juce::AudioBuffer<float>& audio,
                                                  juce::MidiBuffer& midiIn)
 {
-#if COMPOSESIREN_RESETALLCONTROLLERS
-    const auto policyBits = channelModePolicy.load(std::memory_order_acquire);
-    const auto policy = cs::DspChannelModePolicy::unpack(policyBits);
-    router.setChannelModePolicy(policy);
-    ensemble.setChannelModePolicy(policy);
 #if COMPOSESIREN_PARK_BRIDGE
-    const auto bridgePolicy = cs::BridgeChannelModePolicy::unpack(policyBits >> 7);
-#endif
 #endif
     juce::MidiBuffer midiOut;
 
@@ -332,7 +324,14 @@ void SirenOrchestraPluginProcessor::processBlock(juce::AudioBuffer<float>& audio
     collectClicMidi(midiIn);
 #endif
 
-    // the Reset buttons: the same as a CC 121 on the siren's channel (or 16)
+    const auto channelModes = pendingChannelModes.exchange(0, std::memory_order_acquire);
+    for (int cc : {120, 121, 123}) {
+        if (channelModes & (1u << (cc - 120)))
+            for (int channel = 1; channel <= 7; ++channel)
+                router.handleMessage(scheduler, juce::MidiMessage::controllerEvent(channel, cc, 0), 0);
+    }
+
+    // Legacy internal reset requests.
     if (const auto mask = pendingResets.exchange(0, std::memory_order_acquire)) {
         for (const auto& [id, props] : sirenPropertiesById) {
             if (mask & (1u << static_cast<int>(id)))
@@ -366,14 +365,6 @@ void SirenOrchestraPluginProcessor::processBlock(juce::AudioBuffer<float>& audio
     for (const auto metadata : midiIn) {
         const auto& m = metadata.getMessage();
         if (m.getRawDataSize() == 3) {
-#if COMPOSESIREN_RESETALLCONTROLLERS
-            if (m.isController()) {
-                const auto value = bridgePolicy.forwardedValue(m.getControllerNumber(), m.getControllerValue());
-                if (value.has_value())
-                    udpBridge.pushMidi(m.getRawData()[0], m.getRawData()[1], static_cast<std::uint8_t>(*value));
-                continue;
-            }
-#endif
             udpBridge.pushMidi(m.getRawData()[0],
                                m.getRawData()[1],
                                m.getRawData()[2]);
@@ -549,26 +540,9 @@ void SirenOrchestraPluginProcessor::renderClic(juce::AudioBuffer<float>& audio)
 }
 #endif
 
-#if COMPOSESIREN_RESETALLCONTROLLERS
-void SirenOrchestraPluginProcessor::applyControllerResetSetting()
-{
-    const auto policy = settings->getDspChannelModePolicy();
-    auto bits = policy.packed();
-#if COMPOSESIREN_PARK_BRIDGE
-    bits |= settings->getBridgeChannelModePolicy().packed() << 7;
-#endif
-    channelModePolicy.store(bits, std::memory_order_release);
-    ensemble.setResetRequestsEnabled(policy.enabled);
-    mcp.setControllerResetEnabled(policy.enabled);
-}
-#endif
 
 void SirenOrchestraPluginProcessor::settingChanged(cs::Settings::Id id)
 {
-#if COMPOSESIREN_RESETALLCONTROLLERS
-    if (cs::Settings::isControllerResetSetting(id))
-        applyControllerResetSetting();
-#endif
 #if COMPOSESIREN_RUST_DSP
     // app-wide: every siren rebuilt off the audio thread, swapped at its next free note-on
     if (id == cs::Settings::Id::dspVariant || id == cs::Settings::Id::dspDataset
@@ -590,7 +564,7 @@ void SirenOrchestraPluginProcessor::settingChanged(cs::Settings::Id id)
     if (id == cs::Settings::Id::sirenControlMidiIn)
         sirenControlMidiInput.setHardwareDevice(settings->getString(id));
 #endif
-#if !COMPOSESIREN_CLIC && !COMPOSESIREN_DSP_CONTROL_MIDI_IN && !COMPOSESIREN_SIREN_CONTROL_MIDI_IN && !COMPOSESIREN_RESETALLCONTROLLERS && !COMPOSESIREN_RUST_DSP
+#if !COMPOSESIREN_CLIC && !COMPOSESIREN_DSP_CONTROL_MIDI_IN && !COMPOSESIREN_SIREN_CONTROL_MIDI_IN && !COMPOSESIREN_RUST_DSP
     juce::ignoreUnused(id);
 #endif
 }

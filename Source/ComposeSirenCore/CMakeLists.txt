@@ -126,7 +126,6 @@ endif()
 # Controller reset: keep the DSP and plugin declarations in sync. The MCP
 # tool is enabled by the matching Rust feature in Mcp.cmake.
 target_compile_definitions(ComposeSirenCore PUBLIC
-  COMPOSESIREN_RESETALLCONTROLLERS=$<BOOL:${COMPOSESIREN_RESETALLCONTROLLERS}>
 )
 
 target_link_libraries(ComposeSirenCore
@@ -200,7 +199,7 @@ else()
 endif()
 
 # Controller reset characterization tests: with -DBUILD_TESTING=ON, when the option is on.
-if(BUILD_TESTING AND COMPOSESIREN_RESETALLCONTROLLERS)
+if(BUILD_TESTING)
   add_executable(ComposeSirenControllerResetTests tests/ControllerResetTests.cpp)
   target_link_libraries(ComposeSirenControllerResetTests PRIVATE
     ComposeSirenCore juce::juce_audio_processors)

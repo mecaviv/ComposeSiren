@@ -10,7 +10,7 @@ publish = false
 [workspace]
 
 [features]
-# Controller-reset argument types and tools, for COMPOSESIREN_RESETALLCONTROLLERS.
+# Controller-reset argument types and tools, for the plugin MIDI controller reset command.
 reset-all-controllers = []
 # schemars::JsonSchema on the argument types (the server derives its tool schemas from them).
 schema = ["dep:schemars"]

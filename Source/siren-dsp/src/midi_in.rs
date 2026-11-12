@@ -161,7 +161,42 @@ impl MidiIn {
     pub fn control_change(&mut self, cc: i32, value: i32, sink: &mut impl Sink) {
         let v = value as f32;
         match cc {
-            121 => self.reset_sirene(),
+            120 => {
+                if self.is_rampe {
+                    self.is_rampe = false;
+                    self.count_create_attack -= 1;
+                }
+                self.is_release = false;
+                self.velocite = 0.0;
+                self.volume_final = 0.0;
+                self.tremolo = 0.0;
+                self.velo_final = 0;
+                self.vitesse_clapet = 0.0;
+                self.ancien_velo = 0;
+                self.note_on = 0.0;
+                self.note_on_final = 0.0;
+                self.tour_moteur = 0.0;
+                self.vitesse = 0.0;
+                sink.note(0.0);
+                sink.volume(0.0);
+            }
+            121 => {
+                for cc in [1, 5, 9, 11, 15, 18, 20, 21, 22, 23, 72, 73, 92] {
+                    self.control[cc] = 0.0;
+                }
+                self.control[6] = 64.0;
+                self.control[12] = 127.0;
+                self.control[13] = 127.0;
+                self.control[17] = 100.0;
+                self.control_final = 0.0;
+                self.var_vfo = 0.0;
+                self.var_tremolo = 0.0;
+                self.tremolo = 0.0;
+                self.is_attack_vibrato = false;
+                self.pitch_wheel(0, 64);
+                self.control_change(7, 127, sink);
+            }
+            123 => self.stop_note(self.note_on as i32, sink),
             1 => {
                 self.control[1] = v;
                 if self.control[11] == 0.0 {
@@ -375,7 +410,7 @@ impl MidiIn {
         self.clear_motion();
     }
 
-    /// `resetSirene()`, also CC 121: controllers back to the firmware's defaults
+    /// Internal full siren reset; MIDI CC 121 only resets controllers.
     pub fn reset_sirene(&mut self) {
         for cc in [1, 5, 9, 11, 15, 18, 20, 21, 22, 23, 92, 72, 73] {
             self.control[cc] = 0.0;
@@ -387,5 +422,45 @@ impl MidiIn {
         self.control[7] = 127.0;
         self.pitch_bend = 0.0;
         self.clear_motion();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::siren::SirenId;
+
+    #[derive(Default)]
+    struct Output { volume: f32 }
+    impl Sink for Output {
+        fn note(&mut self, _: f32) {}
+        fn volume(&mut self, value: f32) { self.volume = value; }
+    }
+
+    #[test]
+    fn channel_modes_separate_controllers_and_notes_for_every_value() {
+        for value in 0..=127 {
+            let mut midi = MidiIn::new(SirenId::parse("S1").unwrap().def());
+            let mut sink = Output::default();
+            midi.start_note(69, 100, &mut sink);
+            midi.control_change(7, 40, &mut sink);
+            midi.pitch_wheel(0, 96);
+            midi.control_change(121, value, &mut sink);
+            assert_eq!(midi.note_on, 69.0);
+            assert_eq!(midi.velocite, 100.0);
+            assert_eq!(midi.pitch_bend, 0.0);
+            assert_eq!(midi.control[7], 127.0);
+            assert!(sink.volume > 0.0);
+            midi.control_change(7, 40, &mut sink);
+            midi.control_change(123, value, &mut sink);
+            assert_eq!(midi.velocite, 0.0);
+            assert_eq!(midi.control[7], 40.0);
+            for _ in 0..200 { midi.timer_audio(&mut sink); }
+            assert_eq!(sink.volume, 0.0);
+            midi.start_note(69, 100, &mut sink);
+            midi.control_change(120, value, &mut sink);
+            assert_eq!(sink.volume, 0.0);
+            assert_eq!(midi.control[7], 40.0);
+        }
     }
 }

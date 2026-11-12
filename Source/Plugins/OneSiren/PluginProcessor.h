@@ -6,7 +6,7 @@
 #define ONESIREN_PLUGINPROCESSOR_H
 
 // the processor listens to the settings for the controller reset and for the DSP choice
-#define ONESIREN_SETTINGS_LISTENER (COMPOSESIREN_RESETALLCONTROLLERS || COMPOSESIREN_RUST_DSP)
+#define ONESIREN_SETTINGS_LISTENER (COMPOSESIREN_RUST_DSP)
 
 // #include <JuceHeader.h>
 #include <juce_audio_processors/juce_audio_processors.h>
@@ -18,9 +18,7 @@
 #include "OneMidiRouter.h"
 #include "lib/wrappers/SirenStateMonitor.h"
 #include <lib/net/mcp/McpControl.h>
-#if COMPOSESIREN_RESETALLCONTROLLERS
 #include <lib/settings/Settings.h>
-#endif
 // #include "UiState.h"
 
 class OneSirenPluginProcessor :
@@ -48,6 +46,8 @@ public:
     // MainButtonsComponents::Listener callbacks
     //--------------------------------------------------------------------------
     void resetSiren(std::optional<sirenId>) override;
+    void sendChannelModeAll(int controller) override;
+    std::atomic<unsigned> pendingChannelModes{0};
     std::string getResourcesPath() override;
     void selectedNewResourcesPath(const std::string&) override;
 
@@ -125,10 +125,6 @@ private:
 #if ONESIREN_SETTINGS_LISTENER
     void settingChanged(cs::Settings::Id id) override;
     juce::SharedResourcePointer<cs::Settings> settings;
-#endif
-#if COMPOSESIREN_RESETALLCONTROLLERS
-    void applyControllerResetSetting();
-    std::atomic<std::uint32_t> channelModePolicy { cs::DspChannelModePolicy{}.packed() };
 #endif
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(OneSirenPluginProcessor)

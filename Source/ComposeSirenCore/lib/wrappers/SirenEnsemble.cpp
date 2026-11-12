@@ -133,18 +133,8 @@ void SirenEnsemble::stop(std::optional<sirenId> id) {
     }
 }
 
-#if COMPOSESIREN_RESETALLCONTROLLERS
-void SirenEnsemble::setControllerResetEnabled(bool enabled) {
-    for (auto& t : tracks | std::views::values) { t->setControllerResetEnabled(enabled); }
-}
 
-void SirenEnsemble::setChannelModePolicy(cs::DspChannelModePolicy policy) {
-    for (auto& t : tracks | std::views::values) { t->setChannelModePolicy(policy); }
-}
 
-void SirenEnsemble::setResetRequestsEnabled(bool enabled) {
-    for (auto& t : tracks | std::views::values) { t->setResetRequestsEnabled(enabled); }
-}
 
 void SirenEnsemble::requestReset(std::optional<sirenId> id) {
     if (id.has_value()) {
@@ -154,7 +144,6 @@ void SirenEnsemble::requestReset(std::optional<sirenId> id) {
     }
 }
 
-#endif
 void SirenEnsemble::setPanning(sirenId id, float p) {
     tracks.at(id)->setPanning(p);
 }

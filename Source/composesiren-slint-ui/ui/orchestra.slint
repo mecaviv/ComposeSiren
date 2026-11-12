@@ -1,5 +1,5 @@
 // SirenOrchestra's editor (Source/Plugins/SirenOrchestra/PluginEditor.cpp) in Slint, at the JUCE geometry
-// (928 x 630): the top bar (Sirenes physiques / ST with the park bridge, Reset All, Reset, Menu), the seven
+// (928 x 630): the top bar (physical sirens / ST, controller reset, notes off, Menu), the seven
 // tracks (S7 on top, full; the others compact), each a siren strip plus its Master group (Pan, Gain) and
 // a title cell that selects the siren; under them Reverb, the keyboard, Clic (COMPOSESIREN_CLIC) and
 // Master Volume.
@@ -114,6 +114,7 @@ export component SirenOrchestra inherits Window {
     callback track-clicked(int);
     callback reset();
     callback reset-all();
+    callback all-sound-off();
     callback menu();
     callback physical-sirens-toggled(bool);
     callback st-all-toggled(bool);
@@ -142,8 +143,9 @@ export component SirenOrchestra inherits Window {
             text: "ST"; checked <=> root.st-all; enabled: root.physical-sirens;
             toggled(b) => { root.st-all-toggled(b); }
         }
-        Button { width: 88px; text: "Reset All"; tint: Look.dark-red; clicked => { root.reset-all(); } }
-        Button { width: 70px; text: "Reset"; tint: Look.dark-red; clicked => { root.reset(); } }
+        Button { width: 165px; text: "Reset all controllers"; tint: Look.dark-red; clicked => { root.reset(); } }
+        Button { width: 110px; text: "All notes off"; tint: Look.dark-red; clicked => { root.reset-all(); } }
+        Button { width: 115px; text: "All sound off"; tint: Look.dark-red; clicked => { root.all-sound-off(); } }
         Button { width: 64px; text: "Menu"; clicked => { root.menu(); } }
     }
 

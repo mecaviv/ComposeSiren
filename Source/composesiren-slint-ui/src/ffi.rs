@@ -286,7 +286,7 @@ pub struct CsSlintOrchCallbacks {
     pub gesture: Option<extern "C" fn(context: *mut c_void, param: u32, begin: bool)>,
     /// A track title was clicked: 0 = the top track (S7) .. 6 = the bottom one (S3), `sirenOrder`.
     pub track_selected: Option<extern "C" fn(context: *mut c_void, track: u32)>,
-    /// Reset (`all` false: the selected siren) or Reset All.
+    /// All channels: reset controllers (`all` false) or release notes (`all` true).
     pub reset: Option<extern "C" fn(context: *mut c_void, all: bool)>,
     /// The Menu button.
     pub menu: Option<extern "C" fn(context: *mut c_void)>,
@@ -294,6 +294,8 @@ pub struct CsSlintOrchCallbacks {
     pub park_switch: Option<extern "C" fn(context: *mut c_void, st: bool, on: bool)>,
     /// A key of the on-screen keyboard went down or up.
     pub note: Option<extern "C" fn(context: *mut c_void, note: u8, on: bool)>,
+    /// All Sound Off on every siren channel.
+    pub all_sound_off: Option<extern "C" fn(context: *mut c_void)>,
 }
 
 struct OrchCallbacks(CsSlintOrchCallbacks);
@@ -317,6 +319,11 @@ impl OrchestraSink for OrchCallbacks {
     fn reset(&self, all: bool) {
         if let Some(f) = self.0.reset {
             f(self.0.context, all);
+        }
+    }
+    fn all_sound_off(&self) {
+        if let Some(f) = self.0.all_sound_off {
+            f(self.0.context);
         }
     }
     fn menu(&self) {

@@ -121,7 +121,10 @@ private:
         };
         c.reset = [](void* context, bool all) {
             auto& e = self(context);
-            e.audioProcessor.resetSiren(all ? std::nullopt : e.selected);
+            e.audioProcessor.sendChannelModeAll(all ? 123 : 121);
+        };
+        c.all_sound_off = [](void* context) {
+            self(context).audioProcessor.sendChannelModeAll(120);
         };
         c.menu = [](void*) {
             // TODO: MainButtonsComponent's Menu (Settings..., Record..., resources directory, About...)

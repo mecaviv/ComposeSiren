@@ -3,7 +3,6 @@
 // Power-user settings of the plugins. What exists, with its type, range,
 // default and description, comes from lib/definitions/generated/
 // SettingsMetadata.h (generated from the shared settings metadata).
-// The compile-gated controller-reset rows extend it in Settings::describe().
 //
 // The values are stored per user (a properties file next to the other
 // Mecanique Vivante settings) and the Settings... menu item edits them, in
@@ -14,11 +13,7 @@
 
 #include <juce_data_structures/juce_data_structures.h>
 #include "../definitions/generated/SettingsMetadata.h"
-#include "../dsp/ChannelModePolicy.h"
 
-#ifndef COMPOSESIREN_RESETALLCONTROLLERS
-#define COMPOSESIREN_RESETALLCONTROLLERS 0
-#endif
 
 namespace cs {
 
@@ -27,31 +22,10 @@ class Settings : private juce::ValueTree::Listener
 public:
     using Id = mecaviv::metadata::SettingId;
 
-    static constexpr std::size_t resetExtraCount = COMPOSESIREN_RESETALLCONTROLLERS ? 10 : 0;
 
-#if COMPOSESIREN_RESETALLCONTROLLERS
-    // Optional extension: leave the generated base table and disabled builds
-    // unchanged. Stored by name, like the generated settings.
-    static constexpr Id controllerResetEnabled = static_cast<Id>(mecaviv::metadata::settingCount);
-    static constexpr Id dspAllSoundsOffValues = static_cast<Id>(mecaviv::metadata::settingCount + 1);
-    static constexpr Id dspResetControllersValues = static_cast<Id>(mecaviv::metadata::settingCount + 2);
-    static constexpr Id dspAllNotesOffValues = static_cast<Id>(mecaviv::metadata::settingCount + 3);
-    static constexpr Id bridgeAllSoundsOffValues = static_cast<Id>(mecaviv::metadata::settingCount + 4);
-    static constexpr Id bridgeResetControllersValues = static_cast<Id>(mecaviv::metadata::settingCount + 5);
-    static constexpr Id bridgeAllNotesOffValues = static_cast<Id>(mecaviv::metadata::settingCount + 6);
-    static constexpr Id bridgeAllSoundsOffOutput = static_cast<Id>(mecaviv::metadata::settingCount + 7);
-    static constexpr Id bridgeResetControllersOutput = static_cast<Id>(mecaviv::metadata::settingCount + 8);
-    static constexpr Id bridgeAllNotesOffOutput = static_cast<Id>(mecaviv::metadata::settingCount + 9);
-    static bool isControllerResetSetting(Id id) {
-        return static_cast<std::size_t>(id) >= mecaviv::metadata::settingCount
-            && static_cast<std::size_t>(id) < mecaviv::metadata::settingCount + resetExtraCount;
-    }
-    DspChannelModePolicy getDspChannelModePolicy() const;
-    BridgeChannelModePolicy getBridgeChannelModePolicy() const;
-#endif
 
     static constexpr std::size_t settingCount
-        = mecaviv::metadata::settingCount + resetExtraCount;
+        = mecaviv::metadata::settingCount;
 
     class Listener
     {

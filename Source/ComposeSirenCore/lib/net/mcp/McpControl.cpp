@@ -233,11 +233,9 @@ std::string McpControl::handle(const juce::var& request)
         return setSetting(request.getProperty("id", {}).toString(),
                           request.getProperty("value", {}));
 
-#if COMPOSESIREN_RESETALLCONTROLLERS
     if (op == "reset_controllers")
         return resetControllers(static_cast<int>(request.getProperty("siren", 0)));
 
-#endif
 #if COMPOSESIREN_RECORD
     if (op == "start_recording" || op == "stop_recording" || op == "recording_status")
         return recording(op, request);
@@ -502,11 +500,8 @@ std::string McpControl::clearSongTitle()
 }
 #endif // COMPOSESIREN_SONG_TITLE
 
-#if COMPOSESIREN_RESETALLCONTROLLERS
 std::string McpControl::resetControllers(int siren) const
 {
-    if (!controllerResetEnabled)
-        return jsonOf(failure("Controller reset is disabled in Settings.")).toStdString();
     if (!resetHandler)
         return jsonOf(failure("this plugin cannot reset its controllers")).toStdString();
     if (siren < 0 || siren > 16)
@@ -545,7 +540,6 @@ std::string McpControl::resetControllers(int siren) const
     return jsonOf(object).toStdString();
 }
 
-#endif
 #if COMPOSESIREN_RECORD
 std::string McpControl::recording(const juce::String& op, const juce::var& request) const
 {

@@ -96,12 +96,11 @@ void SirenVoiceUnit::handleMidi(int status, int value1, int value2) {
         ino = true;
     } else if (status >> 4 == 0xB) { // cc
         midiIn->handleControlChange(value1, value2);
-#if COMPOSESIREN_RESETALLCONTROLLERS
-        if (midiIn->isControllerResetEnabled()
-            && midiIn->acceptsChannelMode(value1, value2)) {
+        if (value1 == 123)
+            ino = false;
+        if (value1 == 120) {
             ino = false;
         }
-#endif
     } else if (status >> 4 & 0xE) { // pitch bend
         midiIn->handlePitchWheel(value1, value2);
     }
@@ -176,21 +175,13 @@ void SirenVoiceUnit::stopSiren() {
     midiIn->stopSirene();
 }
 
-#if COMPOSESIREN_RESETALLCONTROLLERS
-void SirenVoiceUnit::setControllerResetEnabled(bool enabled) {
-    midiIn->setControllerResetEnabled(enabled);
-}
 
-void SirenVoiceUnit::setChannelModePolicy(cs::DspChannelModePolicy policy) {
-    midiIn->setChannelModePolicy(policy);
-}
 
 void SirenVoiceUnit::resetSiren() {
     midiIn->resetSirene();
     ino = false;
 }
 
-#endif
 void SirenVoiceUnit::beginProcessBlock()
 {
     isNoteOn.store(ino, std::memory_order_relaxed);
@@ -350,14 +341,11 @@ void SirenVoice::stop()
     if (getRawSirenHandle()) { rawSiren->stopSiren(); }
 }
 
-#if COMPOSESIREN_RESETALLCONTROLLERS
 void SirenVoice::requestReset()
 {
-    if (resetRequestsEnabled.load(std::memory_order_acquire))
-        resetRequested.store(true, std::memory_order_release);
+    resetRequested.store(true, std::memory_order_release);
 }
 
-#endif
 void SirenVoice::update()
 {
     if (getRawSirenHandle()) { rawSiren->update(); }
@@ -377,14 +365,9 @@ void SirenVoice::handleMidiWithoutHandle(int status, int value1, int value2)
 
 void SirenVoice::beginProcessBlock()
 {
-#if COMPOSESIREN_RESETALLCONTROLLERS
-    const auto policy = cs::DspChannelModePolicy::unpack(channelModePolicy.load(std::memory_order_acquire));
-    rawSiren->setChannelModePolicy(policy);
-    // Consume pending requests even when disabled; don't replay them later.
-    if (resetRequested.exchange(false, std::memory_order_acq_rel) && policy.enabled) {
+    if (resetRequested.exchange(false, std::memory_order_acq_rel)) {
         rawSiren->resetSiren();
     }
-#endif
     rawSiren->beginProcessBlock();
 }
 
@@ -554,9 +537,6 @@ void SirenVoice::adoptPending(bool atNoteOn)
     }
     currentSiren.store(p, std::memory_order_release);
     rawSiren = p;
-#if COMPOSESIREN_RESETALLCONTROLLERS
-    p->setChannelModePolicy(cs::DspChannelModePolicy::unpack(channelModePolicy.load(std::memory_order_acquire)));
-#endif
     if (cur != nullptr) {
         fadingSiren = cur;
         fadeLeft = std::max(1, static_cast<int>(fadeSeconds * lastSampleRate));
@@ -565,13 +545,10 @@ void SirenVoice::adoptPending(bool atNoteOn)
     swaps.fetch_add(1, std::memory_order_acq_rel);
 }
 
-#if COMPOSESIREN_RESETALLCONTROLLERS
 void SirenVoice::requestReset()
 {
-    if (resetRequestsEnabled.load(std::memory_order_acquire))
-        resetRequested.store(true, std::memory_order_release);
+    resetRequested.store(true, std::memory_order_release);
 }
-#endif
 
 void SirenVoice::collectGarbage()
 {
@@ -664,13 +641,9 @@ void SirenVoice::beginProcessBlock()
         if (retiredSiren.compare_exchange_strong(none, fadingSiren, std::memory_order_acq_rel))
             fadingSiren = nullptr;
     }
-#if COMPOSESIREN_RESETALLCONTROLLERS
-    const auto policy = cs::DspChannelModePolicy::unpack(channelModePolicy.load(std::memory_order_acquire));
-    rawSiren->setChannelModePolicy(policy);
-    if (resetRequested.exchange(false, std::memory_order_acq_rel) && policy.enabled) {
+    if (resetRequested.exchange(false, std::memory_order_acq_rel)) {
         rawSiren->resetSiren();
     }
-#endif
     rawSiren->beginProcessBlock();
 }
 

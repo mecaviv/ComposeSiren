@@ -34,12 +34,6 @@ public:
 
     ~OrchestraMidiRouter() = default;
 
-#if COMPOSESIREN_RESETALLCONTROLLERS
-    void setChannelModePolicy(cs::DspChannelModePolicy policy) {
-        for (auto& bridges : midiBridges | std::ranges::views::values)
-            bridges->setChannelModePolicy(policy);
-    }
-#endif
 
     void requestParameterRestore() {
         restorePending.store(true, std::memory_order_release);

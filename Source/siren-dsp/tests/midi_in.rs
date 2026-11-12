@@ -84,6 +84,21 @@ fn midi_in_matches_the_cpp() {
     use Ev::*;
     let cases = [
         Case {
+            name: "controller-reset-and-notes-off",
+            siren: "S1",
+            seconds: 4.0,
+            quality: 30,
+            crossfade: false,
+            bit16: true,
+            events: &[
+                (0.0, On(69, 100)), (0.2, Cc(7, 40)), (0.3, Pw(0, 96)),
+                (0.5, Cc(121, 0)), (1.0, Cc(121, 1)), (1.5, Cc(121, 127)),
+                (2.0, Cc(72, 20)), (2.1, Cc(123, 0)),
+                (2.8, On(72, 100)), (3.0, Cc(123, 127)),
+                (3.3, On(69, 100)), (3.6, Cc(120, 0)),
+            ],
+        },
+        Case {
             name: "vibrato",
             siren: "S1",
             seconds: 6.0,

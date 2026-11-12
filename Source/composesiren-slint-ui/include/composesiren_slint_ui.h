@@ -66,7 +66,7 @@ typedef struct {
     void (*gesture)(void *context, uint32_t param, bool begin);
     // A track title was clicked: 0 = the top track (S7) .. 6 = the bottom one (S3), `sirenOrder`.
     void (*track_selected)(void *context, uint32_t track);
-    // Reset (`all` false: the selected siren) or Reset All.
+    // All channels: reset controllers (`all` false) or release notes (`all` true).
     void (*reset)(void *context, bool all);
     // The Menu button.
     void (*menu)(void *context);
@@ -74,6 +74,8 @@ typedef struct {
     void (*park_switch)(void *context, bool st, bool on);
     // A key of the on-screen keyboard went down or up.
     void (*note)(void *context, uint8_t note, bool on);
+    // All Sound Off on every siren channel.
+    void (*all_sound_off)(void *context);
 } CsSlintOrchCallbacks;
 
 #ifdef __cplusplus
